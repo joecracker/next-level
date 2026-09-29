@@ -30,6 +30,7 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "@dyad-sh/react-vite-component-tagger": "^0.9.0"
   }
 }

@@ -1,6 +1,6 @@
 # Google Drive Backup — one-time setup
 
-All 4 of Tim's apps (Field Layout Tracker, Proposal Builder, Fantasy Draft Assistant, Crackerbox Studio) share the same pattern: a client-side "Save to Drive / Restore from Drive" button, plus a local JSON export/import that always works with zero setup.
+All 4 of Tim's apps (Field Layout Tracker, Next Level Proposal, Fantasy Draft Assistant, Crackerbox Studio) share the same pattern: a client-side "Save to Drive / Restore from Drive" button, plus a local JSON export/import that always works with zero setup.
 
 The Drive button needs **one Google OAuth Client ID**. It's a public identifier (not a secret) — the same Client ID can be reused across all 4 apps, you just list every app's URL as an "authorized origin."
 
@@ -42,7 +42,7 @@ Same value in all 4 apps. Redeploy after adding it.
 | App | Drive folder | Backup file |
 |---|---|---|
 | Field Layout Tracker | `Apps/Field Layout Tracker/backups` | `nextlevel-projects-backup.json` |
-| Proposal Builder | `Apps/Proposal Builder/backups` | `proposal-builder-backup.json` |
+| Next Level Proposal | `Apps/Proposal Builder/backups` | `proposal-builder-backup.json` |
 | Fantasy Draft Assistant | `Apps/Fantasy Draft Assistant/backups` | `fantasy-draft-assistant-backup.json` |
 | Crackerbox Studio | `Apps/Crackerbox Studio/backups` | `crackerbox-studio-backup.json` |
 

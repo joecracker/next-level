@@ -10,9 +10,12 @@
      • Undo (~12 deep).
      • Ink-cycle (acid green / red / white / black) so marks stay visible on both
        light and dark parts of a photo. Manual cycle only — no auto contrast.
-     • Numeric voice: tap the mic, tap a spot on the photo, speak a measurement,
-       it drops there as a number. Words/fractions → real digits and typeset
-       fractions (to 1/16", occasionally 1/32"). STRICTLY numeric by design.
+     • Numeric voice (ported from Cut Once): tap the mic, then tap as many spots
+       as you like — each drops a ring, and exactly one ring is lit. Speak a
+       measurement and it lands on the lit ring; say "next" to move to the next
+       ring, "back" to undo the last one. Tap any old spot to re-aim at it (drag
+       it and its number moves too). Words/fractions → real digits and typeset
+       fractions down to 1/64". STRICTLY numeric by design.
      • Save = bake the photo and the markup together into ONE flat image.
 
    These marks are REFERENCE ONLY — for the estimator's own eye when they sit down
@@ -50,10 +53,14 @@ function injectStyles() {
   #pb-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
     -webkit-user-drag:none;pointer-events:none;}
   #pb-pad{position:absolute;inset:0;width:100%;height:100%;touch-action:none;}
-  #pb-cursor{position:fixed;width:14px;height:14px;border:2px solid #fff;border-radius:50%;
-    pointer-events:none;transform:translate(-50%,-50%);opacity:0;transition:opacity .15s ease;
-    box-shadow:0 0 0 3px rgba(0,0,0,.25);z-index:10001;}
-  #pb-cursor.show{opacity:.85;animation:pb-pulse 1.1s ease-in-out infinite;}
+  #pb-labels{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+  #pb-marks{position:absolute;inset:0;pointer-events:none;}
+  .pb-ring{position:absolute;width:14px;height:14px;border:2px solid #fff;border-radius:50%;
+    pointer-events:none;transform:translate(-50%,-50%);opacity:.45;transition:opacity .15s ease;
+    box-shadow:0 0 0 3px rgba(0,0,0,.25);}
+  .pb-ring.active{opacity:1;animation:pb-pulse 1.1s ease-in-out infinite;}
+  /* a labeled spot you've tapped to re-aim / move: solid ring, no pulse */
+  .pb-ring.editing{opacity:1;animation:none;border-width:3px;}
   @keyframes pb-pulse{0%,100%{transform:translate(-50%,-50%) scale(1);}50%{transform:translate(-50%,-50%) scale(1.35);}}
   .pb-bar{position:fixed;display:flex;align-items:center;background:rgba(20,20,22,0.85);
     backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
@@ -94,7 +101,8 @@ function injectStyles() {
 const OVERLAY_HTML = `
   <img id="pb-photo" alt="Photo" />
   <canvas id="pb-pad"></canvas>
-  <div id="pb-cursor"></div>
+  <canvas id="pb-labels"></canvas>
+  <div id="pb-marks"></div>
   <div id="pb-toast"></div>
   <div class="pb-bar secondary">
     <button class="pb-tool small" id="pb-ink" title="Pencil color"><span id="pb-ink-swatch"></span></button>
@@ -344,7 +352,45 @@ function formatMeasurement(raw: string): string {
   return t;
 }
 
+/* ── confirmation tones (from Cut Once) ─────────────────────────────────────
+   Short synthesized beeps — no audio files, works offline. Purely a nicety:
+   every call is wrapped so a missing/blocked AudioContext can never break the
+   booth. (Cut Once's vibration is not ported: it sits behind a settings switch
+   this app doesn't have.) */
+let audioCtx: AudioContext | null = null;
+function beep(freq: number, ms: number, delay = 0) {
+  try {
+    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AC) return;
+    if (!audioCtx) audioCtx = new AC();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t = audioCtx.currentTime + delay;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.18, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t + ms / 1000 + 0.05);
+  } catch { /* audio is optional */ }
+}
+function sfxMarker() { beep(660, 70); }
+function sfxLanded(clamped: boolean) { beep(880, 110); if (clamped) beep(440, 90, 0.16); }
+function sfxNext() { beep(990, 70, 0); beep(990, 70, 0.12); }
+
 /* ── the booth ─────────────────────────────────────────────────────────── */
+
+// A spot tapped while the mic is on. Exactly ONE spot is "active" (lit): the one
+// the next spoken measurement lands on. labelId is null until it has a number.
+interface VoicePoint { nx: number; ny: number; labelId: number | null; editing: boolean; el: HTMLDivElement | null; }
+// A spoken measurement. Coordinates are normalized to the photo's contain-fit
+// rect, so labels (and rings) stay glued to the photo through resize/rotation.
+interface VoiceLabel { id: number; nx: number; ny: number; text: string; ink: string; }
+type BoothAction = { kind: 'ink'; snap: ImageData } | { kind: 'label'; id: number };
+
+const MAX_ACTIONS = 40;
+const MAX_AUTO_RESTARTS = 12; // silent mic restarts before we stop listening (~90s)
 
 let currentObjectURL: string | null = null;
 
@@ -362,7 +408,9 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
   const photo = overlay.querySelector('#pb-photo') as HTMLImageElement;
   const canvas = overlay.querySelector('#pb-pad') as HTMLCanvasElement;
   const ctx = canvas.getContext('2d')!;
-  const cursorDot = overlay.querySelector('#pb-cursor') as HTMLDivElement;
+  const labelsCanvas = overlay.querySelector('#pb-labels') as HTMLCanvasElement;
+  const lctx = labelsCanvas.getContext('2d')!;
+  const marksEl = overlay.querySelector('#pb-marks') as HTMLDivElement;
   const toastEl = overlay.querySelector('#pb-toast') as HTMLDivElement;
   const drawBtn = overlay.querySelector('#pb-draw') as HTMLButtonElement;
   const micBtn = overlay.querySelector('#pb-mic') as HTMLButtonElement;
@@ -373,22 +421,47 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
   let tool: 'pencil' | 'line' | 'erase' = 'pencil';
   let drawing = false;
   let lastX = 0, lastY = 0;
-  let undoStack: ImageData[] = [];
+  let actions: BoothAction[] = [];   // undo history: ink snapshots + spoken labels, oldest first
   let inkIndex = 0;
   let ink = INK_PALETTE[inkIndex];
   let voiceMode = false;
   let recognition: any = null;
-  const cursor = { x: 40, y: 60 };
+  let voicePoints: VoicePoint[] = [];  // spots tapped this mic session, in the order placed
+  let voicePointIdx = 0;               // which spot the next spoken measurement lands on
+  let labels: VoiceLabel[] = [];
+  let nextLabelId = 1;
+  let dragPoint: VoicePoint | null = null;
+  let autoRestarts = 0;                // silent restarts since the last real result
+  let lastNextAt = 0;                  // debounce for an accidental double "next"
   const listeners: Array<() => void> = []; // teardown
 
   inkSwatch.style.background = ink;
-  cursorDot.style.borderColor = ink;
 
   function toast(msg: string) {
     toastEl.textContent = msg;
     toastEl.classList.add('show');
     clearTimeout((toast as any)._t);
     (toast as any)._t = setTimeout(() => toastEl.classList.remove('show'), 1800);
+  }
+
+  /* ── photo frame: where the photo actually sits inside the overlay ───── */
+  function photoFrame() {
+    const w = overlay!.clientWidth, h = overlay!.clientHeight;
+    if (photo.complete && photo.naturalWidth) {
+      const ir = photo.naturalWidth / photo.naturalHeight;
+      const br = w / h;
+      if (ir > br) { const dh = w / ir; return { dx: 0, dy: (h - dh) / 2, dw: w, dh }; }
+      const dw = h * ir; return { dx: (w - dw) / 2, dy: 0, dw, dh: h };
+    }
+    return { dx: 0, dy: 0, dw: w, dh: h };
+  }
+  function toNorm(x: number, y: number) {
+    const f = photoFrame();
+    return { nx: (x - f.dx) / f.dw, ny: (y - f.dy) / f.dh };
+  }
+  function toScreen(nx: number, ny: number) {
+    const f = photoFrame();
+    return { x: f.dx + nx * f.dw, y: f.dy + ny * f.dh };
   }
 
   function setCanvasSize() {
@@ -398,15 +471,81 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
     canvas.width = cssW * dpr; canvas.height = cssH * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (prev) { try { ctx.putImageData(prev, 0, 0); } catch { /* size changed */ } }
+    labelsCanvas.width = cssW * dpr; labelsCanvas.height = cssH * dpr;
+    lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    renderLabels();
+    syncRings();
   }
 
-  function pushUndo() {
-    undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-    if (undoStack.length > MAX_UNDO) undoStack.shift();
+  /* ── labels: spoken measurements, redrawn from data so they can move ─── */
+  const LABEL_FONT = '600 ' + FONT_SIZE + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+  // keep a label fully on-screen: dead-center unless it would clip an edge
+  function clampTextX(text: string, x: number) {
+    lctx.font = LABEL_FONT;
+    const half = lctx.measureText(text).width / 2;
+    const cssW = overlay!.clientWidth;
+    let clamped = false;
+    if (x - half < 6) { x = 6 + half; clamped = true; }
+    if (x + half > cssW - 6) { x = cssW - 6 - half; clamped = true; }
+    return { x, clamped };
+  }
+
+  function renderLabels() {
+    lctx.clearRect(0, 0, labelsCanvas.width, labelsCanvas.height);
+    lctx.font = LABEL_FONT;
+    lctx.textAlign = 'center'; lctx.textBaseline = 'middle';
+    for (const lb of labels) {
+      const q = toScreen(lb.nx, lb.ny);
+      lctx.fillStyle = lb.ink;
+      lctx.fillText(lb.text, clampTextX(lb.text, q.x).x, q.y);
+    }
+    lctx.textAlign = 'start'; lctx.textBaseline = 'alphabetic';
+  }
+
+  function removeLabel(id: number, revive: boolean) {
+    const i = labels.findIndex(l => l.id === id);
+    if (i >= 0) labels.splice(i, 1);
+    renderLabels();
+    if (!revive) return;
+    // undoing a measurement revives its ring and re-aims the mic at it
+    const idx = voicePoints.findIndex(p => p.labelId === id);
+    if (idx >= 0) {
+      const p = voicePoints[idx];
+      p.labelId = null; p.editing = false;
+      ensureRing(p);
+      voicePointIdx = idx;
+      syncActiveMark();
+    }
+  }
+
+  /* ── undo: ink snapshots and spoken labels share one history ─────────── */
+  function capActions() {
+    let inkCount = 0;
+    for (const a of actions) if (a.kind === 'ink') inkCount++;
+    while (inkCount > MAX_UNDO) { // ink snapshots are big — keep only the newest few
+      actions.splice(actions.findIndex(a => a.kind === 'ink'), 1);
+      inkCount--;
+    }
+    if (actions.length > MAX_ACTIONS) actions.shift();
+  }
+  function pushInkUndo() {
+    actions.push({ kind: 'ink', snap: ctx.getImageData(0, 0, canvas.width, canvas.height) });
+    capActions();
   }
   function undo() {
-    const snap = undoStack.pop();
-    if (snap) ctx.putImageData(snap, 0, 0);
+    const a = actions.pop();
+    if (!a) return;
+    if (a.kind === 'ink') ctx.putImageData(a.snap, 0, 0);
+    else removeLabel(a.id, true);
+  }
+  // voice "back": remove the most recent spoken label and re-aim at its spot
+  function undoLastLabel(): boolean {
+    for (let i = actions.length - 1; i >= 0; i--) {
+      const a = actions[i];
+      if (a.kind === 'label') { actions.splice(i, 1); removeLabel(a.id, true); return true; }
+    }
+    return false;
   }
 
   const TOOL_ORDER: Array<'pencil' | 'line' | 'erase'> = ['pencil', 'line', 'erase'];
@@ -423,7 +562,6 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
   }
 
   function pos(e: PointerEvent) { return { x: e.clientX, y: e.clientY }; }
-  function moveCursorIndicator() { cursorDot.style.left = cursor.x + 'px'; cursorDot.style.top = cursor.y + 'px'; }
 
   function drawSegment(p0: {x:number;y:number}, p1: {x:number;y:number}) {
     ctx.beginPath();
@@ -436,25 +574,109 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  /* ── voice markers (ported from Cut Once) ─────────────────────────────── */
+  function positionRing(p: VoicePoint) {
+    if (!p.el) return;
+    const q = toScreen(p.nx, p.ny);
+    p.el.style.left = q.x + 'px';
+    p.el.style.top = q.y + 'px';
+  }
+  function syncRings() { for (const p of voicePoints) positionRing(p); }
+  function ensureRing(p: VoicePoint) {
+    if (p.el && p.el.parentNode) return;
+    const dot = document.createElement('div');
+    dot.className = 'pb-ring';
+    dot.style.borderColor = ink;
+    marksEl.appendChild(dot);
+    p.el = dot;
+    positionRing(p);
+  }
+
+  // Drops a marker where you tap while the mic is on. Each one waits its turn
+  // to receive a spoken measurement; "next" moves down the list.
+  function addVoicePoint(x: number, y: number) {
+    const n = toNorm(x, y);
+    const p: VoicePoint = { nx: n.nx, ny: n.ny, labelId: null, editing: false, el: null };
+    voicePoints.push(p);
+    ensureRing(p);
+    syncActiveMark();
+    sfxMarker();
+  }
+
+  // Tapping an existing spot re-aims the mic at it (and flags a labeled one for
+  // replace/move) instead of dropping a brand-new ring on top of it.
+  function hitVoicePoint(x: number, y: number) {
+    for (let i = voicePoints.length - 1; i >= 0; i--) {
+      const q = toScreen(voicePoints[i].nx, voicePoints[i].ny);
+      if (Math.hypot(q.x - x, q.y - y) <= 24) return { p: voicePoints[i], idx: i };
+    }
+    return null;
+  }
+
+  // Exactly one marker is lit: the one the next spoken number lands on.
+  function syncActiveMark() {
+    const active = voicePoints[voicePointIdx];
+    for (const p of voicePoints) {
+      if (!p.el) continue;
+      p.el.classList.toggle('active', p === active && p.labelId === null);
+      p.el.classList.toggle('editing', p === active && p.labelId !== null && p.editing);
+    }
+  }
+
+  function resetVoicePoints() {
+    voicePoints = [];
+    voicePointIdx = 0;
+    dragPoint = null;
+    marksEl.innerHTML = '';
+  }
+
+  // a dragged spot takes its label with it
+  function moveLabelWithPoint(p: VoicePoint) {
+    if (p.labelId === null) return;
+    const lb = labels.find(l => l.id === p.labelId);
+    if (lb) { lb.nx = p.nx; lb.ny = p.ny; renderLabels(); }
+  }
+
   let lineStart: {x:number;y:number} | null = null;
   let lineSnapshot: ImageData | null = null;
 
   const onDown = (e: PointerEvent) => {
     const p = pos(e);
-    if (voiceMode) { cursor.x = p.x; cursor.y = p.y; moveCursorIndicator(); return; }
-    pushUndo();
+    if (voiceMode) {
+      const hit = hitVoicePoint(p.x, p.y);
+      if (hit) {
+        voicePointIdx = hit.idx;
+        if (hit.p.labelId !== null) hit.p.editing = true; // labeled spot: re-aim / move / replace
+        ensureRing(hit.p);                                // labeled spots have no ring yet
+        dragPoint = hit.p;
+        syncActiveMark();
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
+      addVoicePoint(p.x, p.y);
+      return;
+    }
+    pushInkUndo();
     drawing = true;
     if (tool === 'line') { lineStart = p; lineSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height); }
     else { lastX = p.x; lastY = p.y; }
     canvas.setPointerCapture(e.pointerId);
   };
   const onMove = (e: PointerEvent) => {
-    if (!drawing || voiceMode) return;
     const p = pos(e);
+    if (voiceMode && dragPoint) {
+      const n = toNorm(p.x, p.y);
+      dragPoint.nx = n.nx; dragPoint.ny = n.ny;
+      positionRing(dragPoint);
+      moveLabelWithPoint(dragPoint);
+      return;
+    }
+    if (!drawing || voiceMode) return;
     if (tool === 'line') { if (lineSnapshot) ctx.putImageData(lineSnapshot, 0, 0); drawSegment(lineStart!, p); return; }
     drawSegment({ x: lastX, y: lastY }, p); lastX = p.x; lastY = p.y;
   };
   const endStroke = (e: PointerEvent) => {
+    if (voiceMode) { dragPoint = null; return; }
     if (tool === 'line' && drawing && lineStart) {
       if (lineSnapshot) ctx.putImageData(lineSnapshot, 0, 0);
       if (e.type === 'pointerup') drawSegment(lineStart, pos(e));
@@ -487,10 +709,90 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
     inkIndex = (inkIndex + 1) % INK_PALETTE.length;
     ink = INK_PALETTE[inkIndex];
     inkSwatch.style.background = ink;
-    cursorDot.style.borderColor = ink;
   });
 
   /* ── voice (numeric only) ─────────────────────────────────────────────── */
+
+  // Shared "voice is done for now" teardown. Leaves marker rings alone.
+  function giveUpOnVoice(message: string) {
+    voiceMode = false;
+    micBtn.classList.remove('listening');
+    toast(message);
+    if (recognition) { try { recognition.stop(); } catch { /* */ } }
+  }
+
+  // Maps an engine error onto UI copy. Returns true when the error is fatal and
+  // listening should stop; false means keep going (silence, a transient blip).
+  function handleVoiceError(code: string): boolean {
+    if (code === 'not-allowed' || code === 'service-not-allowed') { toast('Mic permission blocked'); return true; }
+    if (code === 'audio-capture') { toast('No mic found'); return true; }
+    if (code === 'no-speech' || code === 'busy') return false; // keep listening quietly
+    if (code === 'network') { toast('No signal — voice needs internet'); return false; }
+    toast('Mic error: ' + code);
+    return false;
+  }
+
+  // One spoken phrase.
+  function handleTranscript(raw: string) {
+    if (!raw) return;
+    autoRestarts = 0;
+    const lower = raw.toLowerCase();
+
+    // "next" moves on to the next spot you tapped. Past the last spot it does
+    // nothing, so a stray "next" never resets the sequence.
+    if (/^\s*next[.!]?\s*$/.test(lower)) {
+      const now = Date.now();
+      if (now - lastNextAt < 500) return; // swallow an accidental double-"next"
+      lastNextAt = now;
+      if (voicePointIdx < voicePoints.length - 1) {
+        voicePointIdx++;
+        syncActiveMark();
+        sfxNext();
+        toast('Next spot');
+      } else if (voicePoints[voicePointIdx] && voicePoints[voicePointIdx].labelId === null) {
+        toast('Last spot');
+      } else {
+        toast('No more spots');
+      }
+      return;
+    }
+
+    // "back" removes the most recent spoken label and re-aims at its spot
+    if (/^\s*back[.!]?\s*$/.test(lower)) {
+      if (undoLastLabel()) { sfxNext(); toast('Back one'); }
+      else toast('Nothing to back up');
+      return;
+    }
+
+    const text = formatMeasurement(raw);
+
+    if (!voicePoints.length) { toast('Tap a spot first, then speak the number'); return; }
+    const p = voicePoints[voicePointIdx];
+    if (p.labelId !== null && !p.editing) {
+      toast('That spot is labeled — tap it to change it, or say "next"');
+      return;
+    }
+    if (!text) { toast('Didn’t catch a number'); return; }
+
+    // re-speaking a selected spot replaces its old label instead of stacking
+    if (p.labelId !== null) {
+      const oldId = p.labelId;
+      labels = labels.filter(l => l.id !== oldId);
+      actions = actions.filter(a => !(a.kind === 'label' && a.id === oldId));
+    }
+    const id = nextLabelId++;
+    labels.push({ id, nx: p.nx, ny: p.ny, text, ink });
+    actions.push({ kind: 'label', id });
+    capActions();
+    p.labelId = id;
+    p.editing = false;
+    if (p.el && p.el.parentNode) { p.el.parentNode.removeChild(p.el); }
+    p.el = null;
+    renderLabels();
+    sfxLanded(clampTextX(text, toScreen(p.nx, p.ny).x).clamped);
+    toast(voicePointIdx === voicePoints.length - 1 ? 'Last spot labeled' : 'Say "next" when ready');
+  }
+
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR || !window.isSecureContext) {
     micBtn.style.opacity = '0.35';
@@ -498,48 +800,48 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
   } else {
     recognition = new SR();
     recognition.continuous = true; recognition.interimResults = false; recognition.lang = 'en-US';
-    recognition.onstart = () => toast('Listening…');
+    // no toast on start: it also fires on every silent auto-restart
     recognition.onresult = (event: any) => {
       const res = event.results[event.results.length - 1];
       if (!res.isFinal) return;
-      const raw = (res[0].transcript || '').trim();
-      if (!raw) return;
-      if (raw.toLowerCase().includes('next line')) { cursor.x = 40; cursor.y += 32; moveCursorIndicator(); return; }
-      const text = formatMeasurement(raw);
-      if (!text) { toast('Didn\u2019t catch a number'); return; }
-      pushUndo();
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.font = '600 ' + FONT_SIZE + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-      ctx.fillStyle = ink;
-      ctx.fillText(text, cursor.x, cursor.y);
-      cursor.x += ctx.measureText(text).width + 24;
-      moveCursorIndicator();
+      handleTranscript((res[0].transcript || '').trim());
     };
-    recognition.onerror = (e: any) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { toast('Mic permission blocked'); stopVoice(); }
-      else if (e.error === 'audio-capture') { toast('No mic found'); stopVoice(); }
-      else if (e.error === 'network') { toast('No signal — voice needs internet'); }
-      else if (e.error !== 'no-speech') { toast('Mic error: ' + e.error); }
+    recognition.onerror = (e: any) => { if (handleVoiceError(e.error)) stopVoice(); };
+    recognition.onend = () => {
+      if (!voiceMode) return;
+      // The browser ends recognition after a few seconds of silence; restarting
+      // is what keeps it "always on". The cap stops a walked-away session
+      // holding the mic open forever — any real result resets the count.
+      if (autoRestarts >= MAX_AUTO_RESTARTS) { giveUpOnVoice('Voice unavailable — tap mic to retry'); return; }
+      autoRestarts++;
+      try { recognition.start(); } catch { /* already running */ }
     };
-    recognition.onend = () => { if (voiceMode) { try { recognition.start(); } catch { /* already running */ } } };
   }
   function startVoice() {
     if (!recognition) return;
     voiceMode = true;
+    autoRestarts = 0;
+    resetVoicePoints();
     micBtn.classList.add('listening');
-    cursorDot.classList.add('show');
-    moveCursorIndicator();
-    try { recognition.start(); } catch { voiceMode = false; micBtn.classList.remove('listening'); cursorDot.classList.remove('show'); }
+    toast('Listening… tap spots, then speak');
+    try { recognition.start(); }
+    catch { voiceMode = false; micBtn.classList.remove('listening'); toast('Could not start mic'); }
   }
   function stopVoice() {
     voiceMode = false;
     micBtn.classList.remove('listening');
-    cursorDot.classList.remove('show');
+    // clear any unlabeled marker rings so they don't linger as visual junk
+    resetVoicePoints();
     if (recognition) { try { recognition.stop(); } catch { /* */ } }
   }
   on(micBtn, 'click', () => { if (voiceMode) stopVoice(); else startVoice(); });
 
-  /* ── composite (photo contain-fit + ink), flattened ───────────────────── */
+  // Leaving the page ends the session (also covers a merely-hidden tab).
+  const onVisibility = () => { if (document.hidden && voiceMode) stopVoice(); };
+  document.addEventListener('visibilitychange', onVisibility);
+  listeners.push(() => document.removeEventListener('visibilitychange', onVisibility));
+
+  /* ── composite (photo contain-fit + ink + labels), flattened ──────────── */
   function drawContainFit(octx: CanvasRenderingContext2D, img: HTMLImageElement, boxW: number, boxH: number) {
     const ir = img.naturalWidth / img.naturalHeight;
     const br = boxW / boxH;
@@ -555,6 +857,7 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
     if (photo.complete && photo.naturalWidth) drawContainFit(octx, photo, off.width, off.height);
     else { octx.fillStyle = '#0b0b0c'; octx.fillRect(0, 0, off.width, off.height); }
     octx.drawImage(canvas, 0, 0);
+    octx.drawImage(labelsCanvas, 0, 0);
     return new Promise(res => off.toBlob(b => res(b), 'image/png'));
   }
 
@@ -565,11 +868,13 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
     overlay!.classList.remove('show');
     if (currentObjectURL) { URL.revokeObjectURL(currentObjectURL); currentObjectURL = null; }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    undoStack = [];
+    lctx.clearRect(0, 0, labelsCanvas.width, labelsCanvas.height);
+    labels = [];
+    actions = [];
   }
 
   on(overlay.querySelector('#pb-close')!, 'click', () => {
-    if (undoStack.length && !window.confirm('Discard markup on this photo?')) return;
+    if (actions.length && !window.confirm('Discard markup on this photo?')) return;
     close();
   });
   on(overlay.querySelector('#pb-save')!, 'click', async () => {

@@ -119,12 +119,22 @@ const OVERLAY_HTML = `
     </button>
   </div>`;
 
-/* ── measurement formatting (numeric-only, from Cut Once) ─────────────────── */
+/* ── measurement formatting (numeric-only) ─────────────────────────────────
+   Ported VERBATIM from Cut Once (index.html, "measurement formatting"). That
+   copy has been tuned for hours against real recognizer output, especially
+   32nds and 64ths, so treat the regex ORDER and the comments below as load
+   bearing — don't "simplify" them. If a fraction comes out wrong, fix it in
+   Cut Once first and re-port, so the two apps never drift apart again. */
 
 const ONES: Record<string, number> = {zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,
   ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19};
 const TENS: Record<string, number> = {twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
 
+// Converts spoken number words ("nine", "twenty-four") to digits, but
+// leaves fraction words ("half", "and") alone so the regexes below still
+// catch them. Only swallows "and" when it's gluing a hundreds term
+// ("two hundred and fifty"), not when it's introducing a fraction
+// ("nine and a half").
 function wordsToDigits(text: string): string {
   const tokens = text.replace(/-/g, ' ').split(/\s+/);
   const out: string[] = [];
@@ -143,17 +153,161 @@ function wordsToDigits(text: string): string {
 }
 
 function toFraction(n: number, d: number): string {
-  const sup: Record<string, string> = {'0':'\u2070','1':'\u00b9','2':'\u00b2','3':'\u00b3','4':'\u2074','5':'\u2075','6':'\u2076','7':'\u2077','8':'\u2078','9':'\u2079'};
-  const sub: Record<string, string> = {'0':'\u2080','1':'\u2081','2':'\u2082','3':'\u2083','4':'\u2084','5':'\u2085','6':'\u2086','7':'\u2087','8':'\u2088','9':'\u2089'};
+  const sup: Record<string, string> = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+  const sub: Record<string, string> = {'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉'};
   const s1 = String(n).split('').map(c => sup[c]).join('');
   const s2 = String(d).split('').map(c => sub[c]).join('');
-  return s1 + '\u2044' + s2;
+  return s1 + '⁄' + s2;
 }
 
+// Numerators run up to 63, so the compound tens have to be listed ahead of
+// the bare ones or "twenty-nine" captures as just "twenty". These run before
+// wordsToDigits, which is why the numerator is still a word here.
+const NUM_WORD =
+  '((?:twenty|thirty|forty|fifty)[- ](?:one|two|three|four|five|six|seven|eight|nine)' +
+  '|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen' +
+  '|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|\\d{1,2})';
+
+const RE_32NDS = new RegExp(
+  '\\b(?:and\\s+)?(?:' + NUM_WORD + '\\s+)?(?:thirty(?:[- ]two)?|3[02])[\\s-]+seconds?\\b', 'g');
+
+// Both arms need an explicit "fourth(s)" tail. Without it a plain whole
+// number like "sixty-four inches" would be eaten as a fraction. The digit arm
+// (6[34]) is there because the recognizer frequently hands back
+// "sixty-fourths" as a bare cardinal "64" with no unit at all; without it
+// "64 seconds" renders as 64 instead of 1/64. RE_32NDS has carried its 3[02]
+// arm all along, which is why "30 seconds" -> 1/32 already worked.
+const RE_64THS = new RegExp(
+  '\\b(?:and\\s+)?(?:' + NUM_WORD + '\\s+)?' +
+  '(?:sixty[- ]four[\\s-]+(?:seconds?|fourths?)|sixty[\\s-]+fourths?' +
+  '|6[34][\\s-]+(?:seconds?|fourths?))\\b', 'g');
+
+// The recognizer's own fraction rendering: with a numerator in front it hands
+// back a slash-joined pair and then spells the unit word — "seven
+// thirty-seconds" arrives as "7/30 seconds", with a stray truncated denominator
+// digit sometimes left in place ("7/3 30 seconds"). Every rule below wants a
+// word boundary in front of the denominator digits, and the slash provides
+// one, so the digit arms grab the "30 seconds" and leave a naked "7/" painted
+// on the canvas (Tim's canvas, 2026-10-02: "7/ 1/32", "3 7/ 3/32").
+// These therefore run FIRST: the numerator is whatever precedes the slash, and
+// the spelled unit word is the anchor. The 32nd denominator cue carries the
+// optional trailing digit because the truncation shows up as "3" as often as
+// "30"; the 64th cue doesn't, since that form hasn't been seen truncated.
+const RE_SLASH_32 = new RegExp('\\b(and\\s+)?(\\d{1,2})\\s*\\/\\s*(?:\\d{1,2}\\s+)?3[02]?\\s*seconds?\\b', 'g');
+const RE_SLASH_64 = new RegExp('\\b(and\\s+)?(\\d{1,2})\\s*\\/\\s*(?:\\d{1,2}\\s+)?6[34]\\s*(?:seconds?|fourths?)\\b', 'g');
+
+// "over" phrasing: "three over thirty-two", "five and five over sixty-four",
+// and the numerator-less "over 64". The denominator arrives as a cardinal as
+// often as a spelled ordinal, so both arms are accepted.
+const RE_OVER_64 = new RegExp(
+  '\\b(?:and\\s+)?(?:' + NUM_WORD + '\\s+)?over[\\s-]+(?:sixty[- ]four(?:ths?)?|6[34])\\b', 'g');
+const RE_OVER_32 = new RegExp(
+  '\\b(?:and\\s+)?(?:' + NUM_WORD + '\\s+)?over[\\s-]+(?:thirty(?:[- ]two)?|3[02])\\b', 'g');
+
+// Bare numerator + denominator with no unit word: "three thirty two" -> 3/32,
+// "five sixty four" -> 5/64. The numerator is required here — on its own
+// "thirty two" is a legitimate 32" measurement and has to survive. Any word
+// between the two ("three hundred thirty two") blocks the match, so 332 still
+// reads as 332.
+const RE_BARE_64 = new RegExp('\\b(?:and\\s+)?' + NUM_WORD + '\\s+(?:sixty[- ]four)\\b', 'g');
+const RE_BARE_32 = new RegExp('\\b(?:and\\s+)?' + NUM_WORD + '\\s+(?:thirty[- ]two)\\b', 'g');
+
+// The recognizer also merges the numerator and denominator into ONE cardinal:
+// "five and two sixty-fourths" comes back as "5 and 264" (numerator 2, denom
+// 64), "seven and eight sixty-fourths" as "7 and 864". Nothing above sees
+// that, because 264 is a bare number with no unit and no spelled denominator.
+// These two rules split the trailing 32/64 back out, and they REQUIRE the
+// "and" that introduces the fraction — that anchor is the only thing standing
+// between a real 164" ("one sixty-four" -> "164") and 1/64", so do not loosen
+// it to an optional "and". "and 64" ("two hundred and sixty-four") is left
+// alone too: the numerator digit is mandatory here.
+const RE_MERGED_64 = new RegExp('\\band\\s+([1-9]\\d?)\\s*(?:6[34])\\b', 'g');
+const RE_MERGED_32 = new RegExp('\\band\\s+([1-9]\\d?)\\s*(?:3[02])\\b', 'g');
+
+// Same merge, but with no whole number and no "and" in front: the recognizer
+// returns "one thirty-second" as "132nd" and "one sixty-fourth" as "164th" —
+// numerator and denominator fused, with the ordinal suffix still stuck on the
+// end. That suffix is the entire anchor. This is the one shape the rules above
+// deliberately skip, because a bare "164" is a perfectly good 164"; but a
+// real measurement never comes back as "164th", so requiring th/nd keeps
+// whole numbers safe. The numerator is mandatory and 1-2 digits: greedy match
+// plus backtrack lands "132nd" on 1+32 and "564th" on 5+64.
+const RE_ORD_MERGED_64 = new RegExp('\\b(\\d{1,2})(?:6[34])(?:th|ths)\\b', 'g');
+const RE_ORD_MERGED_32 = new RegExp('\\b(\\d{1,2})(?:3[02])(?:nd|nds)\\b', 'g');
+
+// ...and sometimes it fuses the numerator onto the denominator's digits while
+// leaving the unit word spelled: "one thirty-second" comes back as
+// "130 second" (device log 2026-10-02) — "one thirty" collapsed into 130 and
+// "second" survived as a word. The digit arms in RE_32NDS/RE_64THS can't see
+// this, because "3[02]" needs a word boundary in front of it and there is
+// none inside 130. So the leading digits are captured here and become the
+// numerator. Empty prefix is still 1/32 ("30 seconds"), matching what those
+// digit arms already do.
+const RE_FUSED_32 = new RegExp('\\b(\\d*?)3[02][\\s-]+seconds?\\b', 'g');
+const RE_FUSED_64 = new RegExp('\\b(\\d*?)6[34][\\s-]+(?:seconds?|fourths?)\\b', 'g');
+
+// Eighth shape, straight off Tim's canvas (2026-10-02): with a numerator word
+// in front, the recognizer sometimes drops the ordinal suffix AND the unit
+// word, handing back one bare fused cardinal — "six sixty-fourths" arrives as
+// "664", "one sixty-four" as "164". No "and", no th/nd, no unit, so every
+// rule above misses it and it renders as the whole number 664.
+//
+// This is the shape the earlier notes said to leave alone, and it is only
+// acceptable because the spelled route still works: a real 164" spoken as
+// "one hundred sixty-four" keeps words between numerator and denominator, so
+// RE_BARE_64 can't match it and wordsToDigits still yields 164. The genuine
+// cost is that "one sixty-four" spoken as a plain dimension now reads as
+// 1/64". Tim accepted that trade; delete this one line if it ever bites.
+const RE_BARE_MERGED_64 = new RegExp('\\b([1-9])6[34]\\b', 'g');
+
+// ...and its 32nd twin, added for symmetry (Tim, 2026-10-02). Same shape, same
+// cost: a bare "132" or "130" spoken as a plain dimension now reads as 1/32.
+// Four-digit numbers are safe (the trailing word boundary rejects "1300"), and
+// the fused form "130 second" is eaten by RE_FUSED_32 long before this runs.
+const RE_BARE_MERGED_32 = new RegExp('\\b([1-9])3[02]\\b', 'g');
+
 function formatMeasurement(raw: string): string {
-  let t = ' ' + wordsToDigits(raw.toLowerCase()) + ' ';
-  const wordFrac = /\b(?:and\s+)?(?:(a|an|one|\d{1,2})\s+)?(halves|half|quarters|quarter|eighths|eighth|sixteenths|sixteenth|thirty-seconds|thirty-second|thirty seconds|thirty second)\b/g;
-  t = t.replace(wordFrac, (_m, numGroup, unitGroup) => {
+  // Spoken 32nds and 64ths ("three thirty-seconds", "five sixty-fourths")
+  // must be rewritten to ordinal form BEFORE wordsToDigits, because that step
+  // adds consecutive number words together ("three thirty" -> 33, "five
+  // sixty" -> 65) and the fraction becomes unrecoverable. ordFrac below then
+  // turns "3 32nds" into the stacked glyphs. Order matters: "over" phrasing
+  // first, then the unit-bearing forms, then bare numerator+denominator. The
+  // rewritten output ("three 32nds") can't be re-eaten by a later rule,
+  // because every remaining pattern wants a spelled denominator or a "seconds"
+  // tail, and "32nds" offers neither.
+  const src = raw.toLowerCase()
+    .replace(RE_SLASH_64, (_m: string, andG: string, n: string) => (andG ? 'and ' : ' ') + n + ' 64ths ')
+    .replace(RE_SLASH_32, (_m: string, andG: string, n: string) => (andG ? 'and ' : ' ') + n + ' 32nds ')
+    .replace(RE_OVER_64, (_m: string, n: string) => ' and ' + (n || 'a') + ' 64ths ')
+    .replace(RE_OVER_32, (_m: string, n: string) => ' and ' + (n || 'a') + ' 32nds ')
+    .replace(RE_64THS, (_m: string, n: string) => ' and ' + (n || 'a') + ' 64ths ')
+    .replace(RE_32NDS, (_m: string, n: string) => ' and ' + (n || 'a') + ' 32nds ')
+    .replace(RE_BARE_64, (_m: string, n: string) => ' and ' + (n || 'a') + ' 64ths ')
+    .replace(RE_BARE_32, (_m: string, n: string) => ' and ' + (n || 'a') + ' 32nds ')
+    .replace(RE_MERGED_64, (_m: string, n: string) => ' and ' + n + ' 64ths ')
+    .replace(RE_MERGED_32, (_m: string, n: string) => ' and ' + n + ' 32nds ')
+    .replace(RE_ORD_MERGED_64, (_m: string, n: string) => ' and ' + n + ' 64ths ')
+    .replace(RE_ORD_MERGED_32, (_m: string, n: string) => ' and ' + n + ' 32nds ')
+    .replace(RE_FUSED_64, (_m: string, n: string) => ' and ' + (n || 'a') + ' 64ths ')
+    .replace(RE_FUSED_32, (_m: string, n: string) => ' and ' + (n || 'a') + ' 32nds ')
+    .replace(RE_BARE_MERGED_64, (_m: string, n: string) => ' and ' + n + ' 64ths ')
+    .replace(RE_BARE_MERGED_32, (_m: string, n: string) => ' and ' + n + ' 32nds ');
+  let t = ' ' + wordsToDigits(src) + ' ';
+
+  // trade vocabulary: "fifteen by sixty-seven" -> 15×67, "twelve point five"
+  // -> 12.5, "sixteen inches on center" -> 16" OC. Done before the letter
+  // strip so the connective words survive as symbols instead of vanishing.
+  t = t.replace(/\bon\s+center\b/g, ' ¤ ');
+  t = t.replace(/\b(?:by|times)\b/g, ' × ');
+  t = t.replace(/\bx\b/g, ' × ');
+  t = t.replace(/\s*point\s*/g, '.');
+
+  // Word-form fractions for the other denominators. 32nds and 64ths are
+  // handled above, before wordsToDigits, because their spoken forms would
+  // otherwise collapse into the whole number.
+  const wordFrac = /\b(?:and\s+)?(?:(a|an|one|\d{1,2})\s+)?(halves|half|quarters|quarter|eighths|eighth|sixteenths|sixteenth)\b/g;
+  t = t.replace(wordFrac, (_m: string, numGroup: string, unitGroup: string) => {
     let denom: number;
     if (unitGroup.startsWith('half')) denom = 2;
     else if (unitGroup.startsWith('quarter')) denom = 4;
@@ -163,17 +317,30 @@ function formatMeasurement(raw: string): string {
     const num = (numGroup && /^\d+$/.test(numGroup)) ? parseInt(numGroup, 10) : 1;
     return ' ' + toFraction(num, denom) + ' ';
   });
+
   const ordFrac = /\b(?:and\s+)?(?:(a|an|one|\d{1,2})\s+)?(\d{1,2})(?:st|nd|rd|th)s?\b/g;
-  t = t.replace(ordFrac, (_m, numGroup, denomStr) => {
+  t = t.replace(ordFrac, (_m: string, numGroup: string, denomStr: string) => {
     const denom = parseInt(denomStr, 10);
     const num = (numGroup && /^\d+$/.test(numGroup)) ? parseInt(numGroup, 10) : 1;
     return ' ' + toFraction(num, denom) + ' ';
   });
-  t = t.replace(/\bfeet\b/g, "'").replace(/\bfoot\b/g, "'").replace(/\binches\b/g, '"').replace(/\binch\b/g, '"');
-  t = t.replace(/[a-z]/gi, '');                 // strictly numbers from here on
+
+  // Recognizers that hand back a plain "3/32" get the same stacked glyphs.
+  t = t.replace(/\b(\d{1,2})\s*\/\s*(\d{1,2})\b/g, (_m: string, n: string, d: string) => toFraction(parseInt(n, 10), parseInt(d, 10)));
+
+  t = t.replace(/\bfeet\b/g, "'")
+       .replace(/\bfoot\b/g, "'")
+       .replace(/\binches\b/g, '"')
+       .replace(/\binch\b/g, '"');
+
+  // strictly numbers from here on — drop any word that never converted
+  t = t.replace(/[a-z]/gi, '');
+  t = t.replace(/¤/g, ' OC');
+
   t = t.replace(/\s{2,}/g, ' ').trim();
   t = t.replace(/\s+(['"])/g, '$1');
   t = t.replace(/'\s*(?=\d)/g, "'-");
+  t = t.replace(/\s*×\s*/g, '×');
   return t;
 }
 

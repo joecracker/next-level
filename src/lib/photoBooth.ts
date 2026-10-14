@@ -284,6 +284,16 @@ const RE_BARE_MERGED_64 = new RegExp('\\b([1-9])6[34]\\b', 'g');
 // the fused form "130 second" is eaten by RE_FUSED_32 long before this runs.
 const RE_BARE_MERGED_32 = new RegExp('\\b([1-9])3[02]\\b', 'g');
 
+// The recognizer sometimes types speech as a CLOCK TIME. Tim's phone, 2026-10-14:
+// "eleven and three thirty-seconds" arrived as "11:00 and 3:30 seconds" ("eleven"
+// became "11:00", "three thirty" became "3:30"). The colon cut the numerator off
+// from the denominator, so the 3 was stranded and the 30 became a bare 1/32.
+// A measurement never contains a colon, so both repairs are safe. They run FIRST,
+// ahead of every rule below: H:30 / H:32 + "seconds" is H/32, H:64 / H:63 +
+// "seconds" or "fourths" is H/64, and H:00 is just H.
+const RE_CLOCK_FRAC = new RegExp('\\b(?:and\\s+)?(\\d{1,2}):(3[02]|6[34])[\\s-]+(?:seconds?|fourths?)\\b', 'g');
+const RE_CLOCK_ZERO = new RegExp('\\b(\\d{1,2}):00\\b', 'g');
+
 function formatMeasurement(raw: string): string {
   // Spoken 32nds and 64ths ("three thirty-seconds", "five sixty-fourths")
   // must be rewritten to ordinal form BEFORE wordsToDigits, because that step
@@ -295,6 +305,8 @@ function formatMeasurement(raw: string): string {
   // because every remaining pattern wants a spelled denominator or a "seconds"
   // tail, and "32nds" offers neither.
   const src = raw.toLowerCase()
+    .replace(RE_CLOCK_FRAC, (_m: string, n: string, d: string) => ' and ' + n + (d.charAt(0) === '3' ? ' 32nds ' : ' 64ths '))
+    .replace(RE_CLOCK_ZERO, (_m: string, n: string) => n)
     .replace(RE_SLASH_64, (_m: string, andG: string, n: string) => (andG ? 'and ' : ' ') + n + ' 64ths ')
     .replace(RE_SLASH_32, (_m: string, andG: string, n: string) => (andG ? 'and ' : ' ') + n + ' 32nds ')
     .replace(RE_OVER_64, (_m: string, n: string) => ' and ' + (n || 'a') + ' 64ths ')

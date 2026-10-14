@@ -217,6 +217,9 @@ function StageBar({ stage, setStage, onHome }: { stage: Stage; setStage: (s: Sta
 }
 
 function CanvasModeToggle({ onOpenCamera }: { onOpenCamera: () => void }) {
+  // PHOTO now asks first: take a new picture, or pull one from the gallery
+  // (e.g. a wide shot the phone took and Phone Link delivered to this tablet).
+  const [menu, setMenu] = useState(false);
   // Draw is the resting state (the canvas IS the drawing surface). Camera is a
   // momentary trip: fire the existing native-camera input → Photo Booth markup →
   // back to the canvas. Reused by Capture and Quick Draw.
@@ -230,10 +233,26 @@ function CanvasModeToggle({ onOpenCamera }: { onOpenCamera: () => void }) {
     boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
   });
   const lbl: CSSProperties = { fontSize: '10px', fontWeight: 800, letterSpacing: '0.3px' };
+  const menuBtn: CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: '10px', whiteSpace: 'nowrap',
+    padding: '14px 18px', borderRadius: '14px', cursor: 'pointer',
+    border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(21,18,15,0.96)',
+    color: 'var(--cream)', fontSize: '16px', fontWeight: 800,
+    boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
+  };
   return (
     <div style={{ position: 'absolute', left: '12px', bottom: '12px', zIndex: 60, display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <div style={btn(true)}>✏️<span style={lbl}>DRAW</span></div>
-      <div onClick={onOpenCamera} style={btn(false)}>📷<span style={lbl}>PHOTO</span></div>
+      {menu && (
+        <>
+          <div onClick={() => setMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: -1 }} />
+          <div style={{ position: 'absolute', left: '68px', bottom: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button onClick={() => { setMenu(false); onOpenCamera(); }} style={menuBtn}>📷 Take a photo</button>
+            <button onClick={() => { setMenu(false); document.getElementById('photo-input-gallery')?.click(); }} style={menuBtn}>🖼️ From gallery</button>
+          </div>
+        </>
+      )}
+      <div onClick={() => setMenu(m => !m)} style={btn(false)}>📷<span style={lbl}>PHOTO</span></div>
     </div>
   );
 }
@@ -525,7 +544,7 @@ export default function App() {
             <span id="conn-status" className="conn-status conn-offline" title="Connection Status" style={{ fontSize: '10px', opacity: 0.6 }}>&#9679;</span>
             <button id="btn-reset-view" className="btn btn-sm toolbar-btn" title="Recenter the view (zoom &amp; pan only — does not change your drawing)">&#8857; Recenter</button>
             <span id="toolbar-zoom">100%</span>
-            <span id="build-stamp" style={{ fontSize: '9px', opacity: 0.4, marginLeft: '6px' }} title="Build marker — bumps every push, confirms new code is live">build-2026-10-14-f</span>
+            <span id="build-stamp" style={{ fontSize: '9px', opacity: 0.4, marginLeft: '6px' }} title="Build marker — bumps every push, confirms new code is live">build-2026-10-14-g</span>
           </div>
         </div>
         <div id="workflow-banner" style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', padding: '6px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: '#334155', flexWrap: 'wrap', gap: '6px', zIndex: 5 }}>

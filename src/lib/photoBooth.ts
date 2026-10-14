@@ -83,10 +83,17 @@ function injectStyles() {
   #pb-draw svg{display:none;}
   #pb-draw.mode-pencil .pb-i-pencil{display:block;}
   #pb-draw.mode-line .pb-i-line{display:block;}
+  #pb-draw.mode-arrow .pb-i-arrow{display:block;}
   #pb-draw.mode-erase .pb-i-erase{display:block;}
-  #pb-draw.mode-line,#pb-draw.mode-erase{background:rgba(244,244,242,0.92);color:#0b0b0c;}
+  #pb-draw.mode-line,#pb-draw.mode-arrow,#pb-draw.mode-erase{background:rgba(244,244,242,0.92);color:#0b0b0c;}
   button.pb-tool.mic.listening{background:#e85c4a;color:#fff;}
   #pb-ink-swatch{width:16px;height:16px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.45);display:block;}
+  #pb-heard{position:fixed;left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));
+    top:calc(max(10px,env(safe-area-inset-top)) + 56px);max-height:38vh;overflow-y:auto;display:none;
+    background:rgba(20,20,22,0.94);color:#f4f4f2;border-radius:14px;padding:10px 14px;z-index:10001;
+    font:500 14px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;}
+  #pb-heard.show{display:block;}
+  #pb-heard .h{font:700 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;opacity:.6;margin-bottom:6px;letter-spacing:.04em;}
   #pb-toast{position:fixed;left:50%;top:max(18px,env(safe-area-inset-top));
     transform:translateX(-50%) translateY(-12px);background:rgba(20,20,22,0.92);color:#f4f4f2;
     padding:9px 16px;border-radius:12px;font:500 14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
@@ -104,14 +111,17 @@ const OVERLAY_HTML = `
   <canvas id="pb-labels"></canvas>
   <div id="pb-marks"></div>
   <div id="pb-toast"></div>
+  <div id="pb-heard"></div>
   <div class="pb-bar secondary">
+    <button class="pb-tool small" id="pb-heardbtn" title="What the phone heard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
     <button class="pb-tool small" id="pb-ink" title="Pencil color"><span id="pb-ink-swatch"></span></button>
     <button class="pb-tool small danger" id="pb-close" title="Close without saving">&times;</button>
   </div>
   <div class="pb-bar primary">
-    <button class="pb-tool mode-pencil" id="pb-draw" title="Pencil (tap to cycle line / eraser)">
+    <button class="pb-tool mode-pencil" id="pb-draw" title="Pencil (tap to cycle line / arrow / eraser)">
       <svg class="pb-i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
       <svg class="pb-i-line" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2" fill="currentColor" stroke="none"/><line x1="6.5" y1="17.5" x2="17.5" y2="6.5"/><circle cx="19" cy="5" r="2" fill="currentColor" stroke="none"/></svg>
+      <svg class="pb-i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="19" y2="5"/><path d="M10 5h9v9"/></svg>
       <svg class="pb-i-erase" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7l-4.5-4.5a2 2 0 0 1 0-2.8l9-9a2 2 0 0 1 2.8 0l6 6a2 2 0 0 1 0 2.8L13 20"/></svg>
     </button>
     <button class="pb-tool" id="pb-undo" title="Undo">
@@ -415,10 +425,28 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
   const drawBtn = overlay.querySelector('#pb-draw') as HTMLButtonElement;
   const micBtn = overlay.querySelector('#pb-mic') as HTMLButtonElement;
   const inkBtn = overlay.querySelector('#pb-ink') as HTMLButtonElement;
+  const heardBtn = overlay.querySelector('#pb-heardbtn') as HTMLButtonElement;
+  const heardEl = overlay.querySelector('#pb-heard') as HTMLDivElement;
+
+  // "Last heard": what the recognizer heard → what the booth made of it, newest first.
+  // A wrong number can then be blamed on the right half (the phone's ears or our formatter).
+  const heardLog: Array<{ raw: string; out: string }> = [];
+  function renderHeard() {
+    heardEl.innerHTML = '<div class="h">LAST HEARD  →  WHAT THE BOOTH MADE OF IT</div>';
+    const body = document.createElement('div');
+    body.textContent = heardLog.length
+      ? heardLog.map(e => (e.out ? e.raw + '   →   ' + e.out : e.raw)).join('\n')
+      : 'Nothing yet. Tap the mic and say a number.';
+    heardEl.appendChild(body);
+  }
+  heardBtn.addEventListener('click', () => {
+    const open = heardEl.classList.toggle('show');
+    if (open) renderHeard();
+  });
   const inkSwatch = overlay.querySelector('#pb-ink-swatch') as HTMLSpanElement;
 
   let dpr = Math.max(1, window.devicePixelRatio || 1);
-  let tool: 'pencil' | 'line' | 'erase' = 'pencil';
+  let tool: 'pencil' | 'line' | 'arrow' | 'erase' = 'pencil';
   let drawing = false;
   let lastX = 0, lastY = 0;
   let actions: BoothAction[] = [];   // undo history: ink snapshots + spoken labels, oldest first
@@ -548,15 +576,16 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
     return false;
   }
 
-  const TOOL_ORDER: Array<'pencil' | 'line' | 'erase'> = ['pencil', 'line', 'erase'];
+  const TOOL_ORDER: Array<'pencil' | 'line' | 'arrow' | 'erase'> = ['pencil', 'line', 'arrow', 'erase'];
   const TOOL_TITLES = {
     pencil: 'Pencil (tap for straight line)',
-    line: 'Straight line (tap for eraser)',
+    line: 'Straight line (tap for arrow)',
+    arrow: 'Arrow (tap for eraser)',
     erase: 'Eraser (tap for pencil)',
   };
-  function setTool(name: 'pencil' | 'line' | 'erase') {
+  function setTool(name: 'pencil' | 'line' | 'arrow' | 'erase') {
     tool = name;
-    drawBtn.classList.remove('mode-pencil', 'mode-line', 'mode-erase');
+    drawBtn.classList.remove('mode-pencil', 'mode-line', 'mode-arrow', 'mode-erase');
     drawBtn.classList.add('mode-' + name);
     drawBtn.title = TOOL_TITLES[name];
   }
@@ -571,6 +600,17 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
     if (tool === 'erase') { ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = 22; }
     else { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = ink; ctx.lineWidth = 4; }
     ctx.stroke();
+    if (tool === 'arrow') {
+      // arrowhead at the end point: two short strokes angled back from the tip
+      const ang = Math.atan2(p1.y - p0.y, p1.x - p0.x), len = 14;
+      if (Math.hypot(p1.x - p0.x, p1.y - p0.y) > 2) {
+        ctx.beginPath();
+        ctx.moveTo(p1.x - len * Math.cos(ang - 0.5), p1.y - len * Math.sin(ang - 0.5));
+        ctx.lineTo(p1.x, p1.y);
+        ctx.lineTo(p1.x - len * Math.cos(ang + 0.5), p1.y - len * Math.sin(ang + 0.5));
+        ctx.stroke();
+      }
+    }
     ctx.globalCompositeOperation = 'source-over';
   }
 
@@ -658,7 +698,7 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
     }
     pushInkUndo();
     drawing = true;
-    if (tool === 'line') { lineStart = p; lineSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height); }
+    if (tool === 'line' || tool === 'arrow') { lineStart = p; lineSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height); }
     else { lastX = p.x; lastY = p.y; }
     canvas.setPointerCapture(e.pointerId);
   };
@@ -672,12 +712,12 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
       return;
     }
     if (!drawing || voiceMode) return;
-    if (tool === 'line') { if (lineSnapshot) ctx.putImageData(lineSnapshot, 0, 0); drawSegment(lineStart!, p); return; }
+    if (tool === 'line' || tool === 'arrow') { if (lineSnapshot) ctx.putImageData(lineSnapshot, 0, 0); drawSegment(lineStart!, p); return; }
     drawSegment({ x: lastX, y: lastY }, p); lastX = p.x; lastY = p.y;
   };
   const endStroke = (e: PointerEvent) => {
     if (voiceMode) { dragPoint = null; return; }
-    if (tool === 'line' && drawing && lineStart) {
+    if ((tool === 'line' || tool === 'arrow') && drawing && lineStart) {
       if (lineSnapshot) ctx.putImageData(lineSnapshot, 0, 0);
       if (e.type === 'pointerup') drawSegment(lineStart, pos(e));
       lineStart = null; lineSnapshot = null;
@@ -736,11 +776,17 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
   function handleTranscript(raw: string) {
     if (!raw) return;
     autoRestarts = 0;
+    const entry = { raw, out: '' };
+    heardLog.unshift(entry);
+    if (heardLog.length > 20) heardLog.pop();
+    const done = (out: string) => { entry.out = out; if (heardEl.classList.contains('show')) renderHeard(); };
+    done('');
     const lower = raw.toLowerCase();
 
     // "next" moves on to the next spot you tapped. Past the last spot it does
     // nothing, so a stray "next" never resets the sequence.
     if (/^\s*next[.!]?\s*$/.test(lower)) {
+      done('(next)');
       const now = Date.now();
       if (now - lastNextAt < 500) return; // swallow an accidental double-"next"
       lastNextAt = now;
@@ -759,12 +805,14 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
 
     // "back" removes the most recent spoken label and re-aims at its spot
     if (/^\s*back[.!]?\s*$/.test(lower)) {
+      done('(back)');
       if (undoLastLabel()) { sfxNext(); toast('Back one'); }
       else toast('Nothing to back up');
       return;
     }
 
     const text = formatMeasurement(raw);
+    done(text || '(no number)');
 
     if (!voicePoints.length) { toast('Tap a spot first, then speak the number'); return; }
     const p = voicePoints[voicePointIdx];

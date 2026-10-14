@@ -105,9 +105,13 @@ function CameraModal({ onClose }: { onClose: () => void }) {
               audio: false,
               screenshotFormat: 'image/jpeg',
               screenshotQuality: 0.92,
-              videoConstraints: { facingMode: facing },
+              // No size was ever requested, so browsers fell back to ~640x480. Ask for the
+              // biggest 4:3 picture the camera can give; it picks the closest it supports.
+              videoConstraints: { facingMode: facing, width: { ideal: 4096 }, height: { ideal: 3072 } },
+              // Save the photo at the camera's real size, not the on-screen preview size.
+              forceScreenshotSourceSize: true,
               onUserMediaError: () => setErr('Could not open the camera. Check that the browser has camera permission, then try again.'),
-              style: { maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain' },
+              style: { width: '100%', maxHeight: '80vh', objectFit: 'contain' },
             } as any)}
           />
           <div style={{ position: 'absolute', bottom: '32px', display: 'flex', alignItems: 'center', gap: '36px' }}>
@@ -521,7 +525,7 @@ export default function App() {
             <span id="conn-status" className="conn-status conn-offline" title="Connection Status" style={{ fontSize: '10px', opacity: 0.6 }}>&#9679;</span>
             <button id="btn-reset-view" className="btn btn-sm toolbar-btn" title="Recenter the view (zoom &amp; pan only — does not change your drawing)">&#8857; Recenter</button>
             <span id="toolbar-zoom">100%</span>
-            <span id="build-stamp" style={{ fontSize: '9px', opacity: 0.4, marginLeft: '6px' }} title="Build marker — bumps every push, confirms new code is live">build-2026-10-14-e</span>
+            <span id="build-stamp" style={{ fontSize: '9px', opacity: 0.4, marginLeft: '6px' }} title="Build marker — bumps every push, confirms new code is live">build-2026-10-14-f</span>
           </div>
         </div>
         <div id="workflow-banner" style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', padding: '6px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: '#334155', flexWrap: 'wrap', gap: '6px', zIndex: 5 }}>

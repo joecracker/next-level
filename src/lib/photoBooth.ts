@@ -8,8 +8,8 @@
      • Tool-cycle button: pencil → straight-line (drag point-to-point, locks
        straight on release) → eraser → back to pencil.
      • Undo (~12 deep).
-     • Ink-cycle (acid green / red / white / black) so marks stay visible on both
-       light and dark parts of a photo. Manual cycle only — no auto contrast.
+     • Pencil colors (tap the dot for a row of eight swatches) so marks stay visible on both
+       light and dark parts of a photo. Picked by hand — no auto contrast.
      • Numeric voice (ported from Cut Once): tap the mic, then tap as many spots
        as you like — each drops a ring, and exactly one ring is lit. Speak a
        measurement and it lands on the lit ring; say "next" to move to the next
@@ -39,7 +39,8 @@ export interface PhotoBoothOptions {
 
 const MAX_UNDO = 12;
 const FONT_SIZE = 22;
-const INK_PALETTE = ['#c6ff00', '#ff2d2d', '#f4f4f2', '#0b0b0c']; // acid green, red, white, black
+// acid green, red, white, black, yellow, orange, sky blue, pink
+const INK_PALETTE = ['#c6ff00', '#ff2d2d', '#f4f4f2', '#0b0b0c', '#ffd60a', '#ff8a00', '#2d9bff', '#ff4fd8'];
 
 let injected = false;
 
@@ -88,6 +89,11 @@ function injectStyles() {
   #pb-draw.mode-line,#pb-draw.mode-arrow,#pb-draw.mode-erase{background:rgba(244,244,242,0.92);color:#0b0b0c;}
   button.pb-tool.mic.listening{background:#e85c4a;color:#fff;}
   #pb-ink-swatch{width:16px;height:16px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.45);display:block;}
+  #pb-inkrow{position:fixed;display:none;z-index:10002;gap:10px;padding:12px;background:rgba(20,20,22,0.96);
+    border:1px solid rgba(255,255,255,0.18);border-radius:16px;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
+  #pb-inkrow.show{display:grid;grid-template-columns:repeat(4,44px);}
+  #pb-inkrow button{width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,0.35);padding:0;cursor:pointer;}
+  #pb-inkrow button.sel{border:3px solid #fff;}
   #pb-heard{position:fixed;left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));
     top:calc(max(10px,env(safe-area-inset-top)) + 56px);max-height:38vh;overflow-y:auto;display:none;
     background:rgba(20,20,22,0.94);color:#f4f4f2;border-radius:14px;padding:10px 14px;z-index:10001;
@@ -757,11 +763,45 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
 
   on(drawBtn, 'click', () => setTool(TOOL_ORDER[(TOOL_ORDER.indexOf(tool) + 1) % TOOL_ORDER.length]));
   on(overlay.querySelector('#pb-undo')!, 'click', undo);
-  on(inkBtn, 'click', () => {
-    inkIndex = (inkIndex + 1) % INK_PALETTE.length;
-    ink = INK_PALETTE[inkIndex];
+  // Pencil color: tap the dot for a row of swatches; tap one to pick it.
+  overlay.querySelector('#pb-inkrow')?.remove(); // the overlay is reused between photos
+  const inkRow = document.createElement('div');
+  inkRow.id = 'pb-inkrow';
+  const inkChips: HTMLButtonElement[] = [];
+  function setInk(i: number) {
+    inkIndex = i;
+    ink = INK_PALETTE[i];
     inkSwatch.style.background = ink;
+    inkChips.forEach((c, j) => c.classList.toggle('sel', j === i));
+  }
+  INK_PALETTE.forEach((c, i) => {
+    const chip = document.createElement('button');
+    chip.style.background = c;
+    chip.setAttribute('aria-label', 'Pencil color ' + (i + 1));
+    on(chip, 'click', () => { setInk(i); inkRow.classList.remove('show'); });
+    inkRow.appendChild(chip);
+    inkChips.push(chip);
   });
+  overlay.appendChild(inkRow);
+  setInk(inkIndex);
+  on(inkBtn, 'click', () => {
+    if (inkRow.classList.toggle('show')) {
+      const r = inkBtn.getBoundingClientRect();
+      inkRow.style.top = (r.bottom + 10) + 'px';
+      inkRow.style.right = Math.max(10, window.innerWidth - r.right) + 'px';
+    }
+  });
+  // A tap anywhere else just closes the row, and doesn't start a stroke.
+  const closeInkRow = (e: Event) => {
+    if (!inkRow.classList.contains('show')) return;
+    const target = e.target as Node;
+    if (inkRow.contains(target) || inkBtn.contains(target)) return;
+    inkRow.classList.remove('show');
+    e.stopPropagation();
+    e.preventDefault();
+  };
+  overlay.addEventListener('pointerdown', closeInkRow, true);
+  listeners.push(() => overlay.removeEventListener('pointerdown', closeInkRow, true));
 
   /* ── voice (numeric only) ─────────────────────────────────────────────── */
 

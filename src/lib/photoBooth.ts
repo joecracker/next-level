@@ -38,7 +38,12 @@ export interface PhotoBoothOptions {
 }
 
 const MAX_UNDO = 12;
-const FONT_SIZE = 22;
+// Size of the measurement numbers drawn on photos. The Capture screen's
+// "Number size" buttons store a value in localStorage; read fresh each time
+// the booth opens so a change applies to the very next photo.
+function readFontSize(): number {
+  try { const v = parseInt(localStorage.getItem('nl_label_size') || '', 10); return v >= 14 && v <= 60 ? v : 22; } catch { return 22; }
+}
 // acid green, red, white, black, yellow, orange, sky blue, pink
 const INK_PALETTE = ['#c6ff00', '#ff2d2d', '#f4f4f2', '#0b0b0c', '#ffd60a', '#ff8a00', '#2d9bff', '#ff4fd8'];
 
@@ -524,7 +529,7 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
   }
 
   /* ── labels: spoken measurements, redrawn from data so they can move ─── */
-  const LABEL_FONT = '600 ' + FONT_SIZE + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  const LABEL_FONT = '600 ' + readFontSize() + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
   // keep a label fully on-screen: dead-center unless it would clip an edge
   function clampTextX(text: string, x: number) {

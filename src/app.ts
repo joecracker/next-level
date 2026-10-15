@@ -82,6 +82,7 @@ export function initNextLevel() {
     dataUrl?: string; // transient only: set while hydrating for export/Drive, or as private-mode fallback. Bytes live in IndexedDB keyed by id.
     caption: string;
     timestamp: string;
+    note?: string; // Capture screen: notes written on this picture
   }
   interface CustomTakeoffItem {
     id: string;
@@ -114,9 +115,15 @@ export function initNextLevel() {
     _notesTa?: string;
     photos?: Photo[];
     canvas?: any;
+    date?: string;      // Capture screen: matches the Excel's Date
+    jobDesc?: string;  // Capture screen: matches the Excel's Description of Job
+    jobNotes?: string; // Capture screen: tear-out to debris removal notes
   }
 
   let projects: Project[] = [];
+  // Capture screen listens here so it refreshes when photos change.
+  const captureListeners: Array<() => void> = [];
+  const notifyCapture = () => { captureListeners.slice().forEach(f => { try { f(); } catch { /* ignore */ } }); };
   let currentProjectId: string | null = null;
   let currentPageIdx = 0;
   let currentView = 'before';
@@ -2540,6 +2547,7 @@ export function initNextLevel() {
   }
 
   function renderPhotoGallery(){
+    notifyCapture();
     const p = getProject();
     const gallery = document.getElementById('photo-gallery');
     if(!gallery) return;
@@ -5199,5 +5207,57 @@ export function initNextLevel() {
       render();
     },
     openSkipCategory(): void { openSkipCategoryModal(); },
+
+    // â”€â”€ Capture screen bridge (new) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    getCapture() {
+      const p = getProject();
+      if (!p) return null;
+      return {
+        id: p.id, name: p.name,
+        customer: p.customer || '', phone: p.phone || '', address: p.address || '',
+        date: p.date || '', jobDesc: p.jobDesc || '', jobNotes: p.jobNotes || '',
+        photos: (p.photos || []).map(ph => ({ id: ph.id, caption: ph.caption || '', note: ph.note || '', timestamp: ph.timestamp })),
+      };
+    },
+    setCapture(patch: Record<string, string>): void {
+      const p = getProject();
+      if (!p) return;
+      const prevCustomer = p.customer || '';
+      (['customer', 'phone', 'address', 'date', 'jobDesc', 'jobNotes'] as const).forEach(k => {
+        if (typeof patch[k] === 'string') (p as any)[k] = patch[k];
+      });
+      if (typeof patch.customer === 'string' && (p.name === 'New Project' || p.name === prevCustomer)) {
+        p.name = patch.customer || 'New Project';
+      }
+      save();
+    },
+    async photoUrl(id: string): Promise<string | null> {
+      const ph = getProject()?.photos?.find(x => x.id === id);
+      if (!ph) return null;
+      try { return (await getDisplayURL(ph)) || null; } catch { return null; }
+    },
+    setPhoto(id: string, patch: { caption?: string; note?: string }): void {
+      const ph = getProject()?.photos?.find(x => x.id === id);
+      if (!ph) return;
+      if (typeof patch.caption === 'string') ph.caption = patch.caption;
+      if (typeof patch.note === 'string') ph.note = patch.note;
+      save();
+      notifyCapture();
+    },
+    deletePhoto(id: string): void {
+      const p = getProject();
+      if (!p || !p.photos) return;
+      p.photos = p.photos.filter(x => x.id !== id);
+      deletePhotoBlob(id);
+      save();
+      renderPhotoGallery();
+      updateStorageMeter();
+    },
+    markUpPhoto(id: string): void { editExistingPhoto(id); },
+    onCapture(cb: () => void): () => void {
+      captureListeners.push(cb);
+      return () => { const i = captureListeners.indexOf(cb); if (i >= 0) captureListeners.splice(i, 1); };
+    },
+    exportReport(): void { openBossReportModal(); },
   };
 }

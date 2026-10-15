@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback, type CSSProperties } from 'react';
 import Webcam from 'react-webcam';
 import { initNextLevel } from './app';
+import CaptureScreen, { type CaptureData, type CapturePatch } from './CaptureScreen';
 
 // Live-camera modal. Works on desktop (Surface) AND phones via getUserMedia,
 // unlike the native <input capture> which desktop browsers ignore.
@@ -14,11 +15,19 @@ declare global {
       listJobs: () => JobSummary[];
       openJob: (id: string) => void;
       openSkipCategory: () => void;
+      getCapture: () => CaptureData | null;
+      setCapture: (patch: CapturePatch) => void;
+      photoUrl: (id: string) => Promise<string | null>;
+      setPhoto: (id: string, patch: { caption?: string; note?: string }) => void;
+      deletePhoto: (id: string) => void;
+      markUpPhoto: (id: string) => void;
+      onCapture: (cb: () => void) => () => void;
+      exportReport: () => void;
     };
   }
 }
 
-function OpenJobPicker({ onOpen, onCancel }: { onOpen: (id: string) => void; onCancel: () => void }) {
+function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew }: { onOpen: (id: string) => void; onCancel: () => void; title?: string; onNew?: () => void }) {
   const [q, setQ] = useState('');
   const jobs = (window.NextLevel?.listJobs() || [])
     .filter(j => !q.trim() || j.name.toLowerCase().includes(q.trim().toLowerCase()))
@@ -30,12 +39,18 @@ function OpenJobPicker({ onOpen, onCancel }: { onOpen: (id: string) => void; onC
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
         <button onClick={onCancel} style={{ background: 'none', border: 'none', color: 'var(--cream)', fontSize: '26px', cursor: 'pointer', lineHeight: 1 }}>&larr;</button>
-        <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--cream)' }}>Open Job</div>
+        <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--cream)' }}>{title}</div>
       </div>
       <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search jobs…" autoFocus style={{
         padding: '12px 14px', borderRadius: '12px', border: '1px solid rgba(245,243,239,0.2)',
         background: 'rgba(245,243,239,0.06)', color: 'var(--cream)', fontSize: '16px', marginBottom: '14px', outline: 'none',
       }} />
+      {onNew && (
+        <button onClick={onNew} style={{
+          padding: '16px', borderRadius: '14px', border: 'none', background: 'var(--ember)', color: 'var(--ink)',
+          fontSize: '17px', fontWeight: 800, cursor: 'pointer', marginBottom: '14px',
+        }}>+ Start a new job</button>
+      )}
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {jobs.length === 0 ? (
           <div style={{ color: 'var(--muted)', textAlign: 'center', marginTop: '30px', fontSize: '14px' }}>
@@ -125,7 +140,7 @@ function CameraModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Launcher({ onPick }: { onPick: (door: 'new' | 'open' | 'just' | 'quick') => void }) {
+function Launcher({ onPick }: { onPick: (door: 'new' | 'open' | 'just' | 'quick' | 'capture') => void }) {
   const doorBtn: CSSProperties = {
     display: 'flex', alignItems: 'center', gap: '16px', width: '100%',
     padding: '20px 24px', borderRadius: '16px', fontSize: '20px', fontWeight: 800,
@@ -152,6 +167,10 @@ function Launcher({ onPick }: { onPick: (door: 'new' | 'open' | 'just' | 'quick'
         <button onClick={() => onPick('new')} style={{ ...doorBtn, border: 'none', background: 'var(--ember)', color: 'var(--ink)' }}>
           <span style={iconWrap}>🔨</span>
           <span>New Job<div style={{ ...sub, color: 'rgba(21,18,15,0.65)' }}>Start capturing a fresh job</div></span>
+        </button>
+        <button onClick={() => onPick('capture')} style={{ ...doorBtn, border: '2px solid var(--ember)' }}>
+          <span style={iconWrap}>{'\u{1F4CB}'}</span>
+          <span>Capture (new)<div style={sub}>Try the new information-gathering screen</div></span>
         </button>
         <button onClick={() => onPick('open')} style={doorBtn}>
           <span style={iconWrap}>📂</span>
@@ -262,6 +281,8 @@ export default function App() {
   const [openPicker, setOpenPicker] = useState(false);
   const [stage, setStage] = useState<Stage>('capture');
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [captureOn, setCaptureOn] = useState(false);
+  const [capturePicker, setCapturePicker] = useState(false);
 
   useEffect(() => {
     initNextLevel();
@@ -272,7 +293,12 @@ export default function App() {
     if (sb) sb.dataset.stage = stage;
   }, [stage, showLauncher]);
 
-  const pickDoor = (door: 'new' | 'open' | 'just' | 'quick') => {
+  const pickDoor = (door: 'new' | 'open' | 'just' | 'quick' | 'capture') => {
+    if (door === 'capture') {
+      setShowLauncher(false);
+      setCapturePicker(true);
+      return;
+    }
     if (door === 'open') {
       setOpenPicker(true);
       return; // launcher stays until a job is picked (or cancelled)
@@ -295,7 +321,26 @@ export default function App() {
     setTimeout(() => window.NextLevel?.openJob(id), 60);
   };
 
+  const startCapture = (id: string) => {
+    setCapturePicker(false);
+    setShowLauncher(false);
+    setStage('capture');
+    window.NextLevel?.openJob(id);
+    setCaptureOn(true);
+  };
+  const newCapture = () => {
+    const id = window.NextLevel?.newJob();
+    if (id) startCapture(id);
+  };
+  const captureToFullApp = () => {
+    const id = window.NextLevel?.getCapture()?.id;
+    setCaptureOn(false);
+    if (id) window.NextLevel?.openJob(id);
+  };
+
   const goHome = () => {
+    setCaptureOn(false);
+    setCapturePicker(false);
     setOpenPicker(false);
     setShowLauncher(true);
   };
@@ -304,6 +349,8 @@ export default function App() {
     <>
       {showLauncher && <Launcher onPick={pickDoor} />}
       {openPicker && <OpenJobPicker onOpen={openExistingJob} onCancel={() => setOpenPicker(false)} />}
+      {capturePicker && <OpenJobPicker title="Capture" onNew={newCapture} onOpen={startCapture} onCancel={() => { setCapturePicker(false); setShowLauncher(true); }} />}
+      {captureOn && <CaptureScreen onHome={goHome} onFull={captureToFullApp} onTakePhoto={() => setCameraOpen(true)} />}
       {cameraOpen && <CameraModal onClose={() => setCameraOpen(false)} />}
       <div id="app-shell">
         {!showLauncher && <StageBar stage={stage} setStage={setStage} onHome={goHome} />}
@@ -544,7 +591,7 @@ export default function App() {
             <span id="conn-status" className="conn-status conn-offline" title="Connection Status" style={{ fontSize: '10px', opacity: 0.6 }}>&#9679;</span>
             <button id="btn-reset-view" className="btn btn-sm toolbar-btn" title="Recenter the view (zoom &amp; pan only — does not change your drawing)">&#8857; Recenter</button>
             <span id="toolbar-zoom">100%</span>
-            <span id="build-stamp" style={{ fontSize: '9px', opacity: 0.4, marginLeft: '6px' }} title="Build marker — bumps every push, confirms new code is live">build-2026-10-14-h</span>
+            <span id="build-stamp" style={{ fontSize: '9px', opacity: 0.4, marginLeft: '6px' }} title="Build marker — bumps every push, confirms new code is live">build-2026-10-14-i</span>
           </div>
         </div>
         <div id="workflow-banner" style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', padding: '6px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: '#334155', flexWrap: 'wrap', gap: '6px', zIndex: 5 }}>

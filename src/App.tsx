@@ -285,6 +285,26 @@ export default function App() {
   const [captureOn, setCaptureOn] = useState(false);
   const [capturePicker, setCapturePicker] = useState(false);
 
+  // Phone/tablet Back button (and swipe-back) should step up one level inside the
+  // app — job screen -> jobs list -> start screen — instead of leaving the app.
+  const navRef = useRef({ captureOn: false, capturePicker: false });
+  navRef.current = { captureOn, capturePicker };
+  useEffect(() => {
+    const onPop = () => {
+      if (document.getElementById('nl-capture-viewer')) return; // the big-picture viewer handles its own Back
+      const { captureOn: c, capturePicker: p } = navRef.current;
+      if (c) { setCaptureOn(false); setCapturePicker(true); }
+      else if (p) { setCapturePicker(false); setShowLauncher(true); }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  // On-screen buttons use the same path as the Back button so history never drifts.
+  const backOne = (expect: 'picker' | 'capture', fallback: () => void) => {
+    if (window.history.state && window.history.state.nl === expect) window.history.back();
+    else fallback();
+  };
+
   useEffect(() => {
     initNextLevel();
     // Ask the browser to treat this app's saved jobs and photos as keep-me data,
@@ -299,6 +319,7 @@ export default function App() {
 
   const pickDoor = (door: 'new' | 'open' | 'just' | 'quick' | 'capture') => {
     if (door === 'capture') {
+      window.history.pushState({ nl: 'picker' }, '');
       setShowLauncher(false);
       setCapturePicker(true);
       return;
@@ -326,6 +347,7 @@ export default function App() {
   };
 
   const startCapture = (id: string) => {
+    window.history.pushState({ nl: 'capture' }, '');
     setCapturePicker(false);
     setShowLauncher(false);
     setStage('capture');
@@ -353,8 +375,8 @@ export default function App() {
     <>
       {showLauncher && <Launcher onPick={pickDoor} />}
       {openPicker && <OpenJobPicker onOpen={openExistingJob} onCancel={() => setOpenPicker(false)} />}
-      {capturePicker && <OpenJobPicker title="Capture" onNew={newCapture} onOpen={startCapture} onCancel={() => { setCapturePicker(false); setShowLauncher(true); }} />}
-      {captureOn && <CaptureScreen onHome={goHome} onFull={captureToFullApp} onTakePhoto={() => setCameraOpen(true)} />}
+      {capturePicker && <OpenJobPicker title="Capture" onNew={newCapture} onOpen={startCapture} onCancel={() => backOne('picker', () => { setCapturePicker(false); setShowLauncher(true); })} />}
+      {captureOn && <CaptureScreen onHome={() => backOne('capture', () => { setCaptureOn(false); setCapturePicker(true); })} onFull={captureToFullApp} onTakePhoto={() => setCameraOpen(true)} />}
       {cameraOpen && <CameraModal onClose={() => setCameraOpen(false)} />}
       <div id="app-shell">
         {!showLauncher && <StageBar stage={stage} setStage={setStage} onHome={goHome} />}
@@ -595,7 +617,7 @@ export default function App() {
             <span id="conn-status" className="conn-status conn-offline" title="Connection Status" style={{ fontSize: '10px', opacity: 0.6 }}>&#9679;</span>
             <button id="btn-reset-view" className="btn btn-sm toolbar-btn" title="Recenter the view (zoom &amp; pan only — does not change your drawing)">&#8857; Recenter</button>
             <span id="toolbar-zoom">100%</span>
-            <span id="build-stamp" style={{ fontSize: '9px', opacity: 0.4, marginLeft: '6px' }} title="Build marker — bumps every push, confirms new code is live">build-2026-10-15-k</span>
+            <span id="build-stamp" style={{ fontSize: '9px', opacity: 0.4, marginLeft: '6px' }} title="Build marker — bumps every push, confirms new code is live">build-2026-10-15-l</span>
           </div>
         </div>
         <div id="workflow-banner" style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', padding: '6px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: '#334155', flexWrap: 'wrap', gap: '6px', zIndex: 5 }}>

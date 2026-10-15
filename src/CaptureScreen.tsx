@@ -142,7 +142,7 @@ function Viewer({ data, rev, startId, wide, onClose }: {
   );
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9100, background: CREAM, display: 'flex', flexDirection: wide ? 'row' : 'column' }}>
+    <div id="nl-capture-viewer" style={{ position: 'fixed', inset: 0, zIndex: 9100, background: CREAM, display: 'flex', flexDirection: wide ? 'row' : 'column' }}>
       {imageArea}
       {panel}
     </div>
@@ -180,7 +180,19 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
 
   const set = (p: CapturePatch) => { window.NextLevel?.setCapture(p); refresh(); };
   const bump = (d: number) => { const v = Math.max(14, Math.min(60, size + d)); setSize(v); writeSize(v); };
-  const closeViewer = useCallback(() => setViewId(null), []);
+  // The big-picture viewer takes one Back press to close, like a normal screen.
+  const closeViewer = useCallback(() => {
+    if (window.history.state && window.history.state.nl === 'viewer') window.history.back();
+    else setViewId(null);
+  }, []);
+  const viewerOpen = viewId !== null;
+  useEffect(() => {
+    if (!viewerOpen) return;
+    window.history.pushState({ nl: 'viewer' }, '');
+    const onPop = () => setViewId(null);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [viewerOpen]);
 
   if (!data) {
     return (
@@ -331,7 +343,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: CREAM, color: INK, fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', display: 'flex', flexDirection: 'column' }}>
       <div style={{ background: INK, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-        <button onClick={onHome} style={headBtn}>Home</button>
+        <button onClick={onHome} style={headBtn}>&lsaquo; Jobs</button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '18px', fontWeight: 500 }}><span style={{ color: CREAM }}>Next </span><span style={{ color: EMBER }}>Level</span> <span style={{ color: CREAM, fontWeight: 800, letterSpacing: '1px', fontSize: '13px' }}>CAPTURE</span></div>
           <div style={{ fontSize: '12px', color: '#B9B4AC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.customer || data.name}</div>

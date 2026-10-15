@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 // New Capture screen (test drive). Sits on top of the existing app and talks to
 // it ONLY through window.NextLevel (bridge at the end of src/app.ts), so the
@@ -39,6 +39,32 @@ const headBtn: CSSProperties = {
   minHeight: '40px', padding: '0 14px', borderRadius: '10px', border: '1px solid rgba(245,243,239,0.3)',
   background: 'transparent', color: CREAM, fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
 };
+
+// A one-or-more-line text box that wraps long sentences and grows taller to fit,
+// instead of cutting the text off at the edge. Enter commits (never adds a new line).
+function AutoText({ value, onChange, onEnter, style, placeholder, ariaLabel, enterKeyHint }: {
+  value: string; onChange: (v: string) => void; onEnter?: () => void; style?: CSSProperties;
+  placeholder?: string; ariaLabel?: string; enterKeyHint?: 'done' | 'enter' | 'next';
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const fit = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }, []);
+  useLayoutEffect(fit, [value, fit]);
+  useEffect(() => {
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [fit]);
+  return (
+    <textarea ref={ref} rows={1} value={value} placeholder={placeholder} aria-label={ariaLabel} enterKeyHint={enterKeyHint} autoComplete="off"
+      onChange={e => onChange(e.target.value.replace(/\n/g, ' '))}
+      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onEnter?.(); } }}
+      style={{ resize: 'none', overflow: 'hidden', ...style }} />
+  );
+}
 
 function Photo({ id, rev, style }: { id: string; rev: number; style?: CSSProperties }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -183,7 +209,9 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
         <div style={{ flex: 1.3, minWidth: 0 }}>{field('Customer Phone', data.phone, 'phone', 'tel')}</div>
       </div>
       {field('Customer Address', data.address, 'address')}
-      {field('Description of Job', data.jobDesc, 'jobDesc')}
+      <label style={fieldLabel}>Description of Job
+        <AutoText value={data.jobDesc} onChange={v => set({ jobDesc: v })} style={{ ...fieldInput, minHeight: '46px', padding: '11px 12px', lineHeight: 1.35 }} />
+      </label>
     </section>
   );
 
@@ -255,19 +283,19 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
       </div>
       {notesShown && (
         <>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input value={newLine} onChange={e => setNewLine(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addLine(); }}
-              placeholder="Type a reminder, press Enter" enterKeyHint="done" autoComplete="off" style={{ ...fieldInput, flex: 1 }} />
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+            <AutoText value={newLine} onChange={setNewLine} onEnter={addLine} enterKeyHint="done"
+              placeholder="Type a reminder, press Enter" style={{ ...fieldInput, flex: 1, minWidth: 0, padding: '11px 12px', lineHeight: 1.35 }} />
             <button onClick={addLine} style={{ ...solidBtn, minHeight: '46px', padding: '0 18px' }}>Add</button>
           </div>
           {noteCount === 0 && (
             <div style={{ fontSize: '15px', color: MUTED }}>One-liners go here: oak cabinets, brushed nickel faucets, tear out...</div>
           )}
           {scratch.map(s => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {dot('#8A857E')}
-              <input value={s.text} onChange={e => editLine(s.id, e.target.value)} aria-label="Reminder"
-                style={{ flex: 1, minWidth: 0, minHeight: '44px', border: 'none', borderBottom: '1px solid #E6E2DB', background: 'transparent', fontSize: '18px', color: INK, fontFamily: 'inherit', padding: 0 }} />
+            <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+              <span style={{ marginTop: '17px', display: 'flex' }}>{dot('#8A857E')}</span>
+              <AutoText value={s.text} onChange={v => editLine(s.id, v)} ariaLabel="Reminder"
+                style={{ flex: 1, minWidth: 0, minHeight: '44px', border: 'none', borderBottom: '1px solid #E6E2DB', background: 'transparent', fontSize: '18px', lineHeight: 1.35, color: INK, fontFamily: 'inherit', padding: '9px 0' }} />
               <button aria-label="Remove reminder" onClick={() => removeLine(s.id)} style={{ flex: 'none', width: '44px', height: '44px', border: 'none', background: 'transparent', color: MUTED, fontSize: '22px', cursor: 'pointer' }}>&times;</button>
             </div>
           ))}

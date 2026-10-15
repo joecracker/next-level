@@ -6,11 +6,13 @@ import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } 
 // screens use. Nothing in the old screens is changed or removed.
 
 export type CapturePhoto = { id: string; caption: string; note: string; timestamp: string };
+export type ScratchItem = { id: string; text: string };
 export type CaptureData = {
   id: string; name: string;
   customer: string; phone: string; address: string; date: string;
   jobDesc: string; jobNotes: string;
   photos: CapturePhoto[];
+  scratch: ScratchItem[];
 };
 export type CapturePatch = Partial<Pick<CaptureData, 'customer' | 'phone' | 'address' | 'date' | 'jobDesc' | 'jobNotes'>>;
 
@@ -96,7 +98,7 @@ function Viewer({ data, rev, startId, wide, onClose }: {
         <input key={id + 'c'} defaultValue={photo.caption} onChange={e => update({ caption: e.target.value })} placeholder="What is this a picture of?" style={{ ...fieldInput, fontSize: '19px' }} />
       </label>
       <label style={fieldLabel}>Notes on this picture
-        <textarea key={id + 'n'} defaultValue={photo.note} onChange={e => update({ note: e.target.value })} rows={wide ? 9 : 5}
+        <textarea key={id + 'n'} defaultValue={photo.note} onChange={e => update({ note: e.target.value })} rows={wide ? 5 : 3}
           placeholder="Odd sizes, things to remember, what happens here..."
           style={{ ...fieldInput, fontSize: '21px', lineHeight: 1.4, padding: '10px 12px', resize: 'vertical' }} />
       </label>
@@ -128,6 +130,8 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   const [rev, setRev] = useState(0);
   const [viewId, setViewId] = useState<string | null>(null);
   const [size, setSize] = useState(readSize());
+  const [newLine, setNewLine] = useState('');
+  const [notesOpen, setNotesOpen] = useState(true);
   const [w, setW] = useState(window.innerWidth);
   const wide = w >= 900;
 
@@ -220,24 +224,62 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
     </section>
   );
 
+  const scratch = data.scratch;
+  const newId = () => 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const addLine = () => {
+    const t = newLine.trim();
+    if (!t) return;
+    window.NextLevel?.setScratch([...scratch, { id: newId(), text: t }]);
+    setNewLine('');
+    refresh();
+  };
+  const editLine = (id: string, text: string) => { window.NextLevel?.setScratch(scratch.map(s => (s.id === id ? { ...s, text } : s))); refresh(); };
+  const removeLine = (id: string) => { window.NextLevel?.setScratch(scratch.filter(s => s.id !== id)); refresh(); };
   const withNotes = data.photos.map((p, i) => ({ p, i })).filter(x => x.p.note.trim());
-  const areaNotes = (
+  const noteCount = scratch.length + withNotes.length;
+  const notesShown = wide || notesOpen;
+  const dot = (color: string) => (
+    <span aria-hidden="true" style={{ flex: 'none', width: '10px', height: '10px', borderRadius: '5px', background: color }} />
+  );
+  const notesCard = (
     <section style={card}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        <h2 style={heading}>AREA NOTES</h2>
-        <span style={{ fontSize: '12px', color: MUTED }}>from your pictures</span>
-      </div>
-      {withNotes.length === 0 ? (
-        <div style={{ fontSize: '15px', color: MUTED }}>Notes you write on a picture show up here, all in one place.</div>
-      ) : withNotes.map(({ p, i }, n) => (
-        <div key={p.id}>
-          {n > 0 && <div style={{ height: '1px', background: '#E6E2DB', margin: '0 0 10px' }} />}
-          <button onClick={() => setViewId(p.id)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', color: INK }}>
-            <div style={{ fontSize: '12px', fontWeight: 800, color: '#B8481C', marginBottom: '2px' }}>{p.caption || 'Picture ' + (i + 1)}</div>
-            <div style={{ fontSize: '18px', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{p.note}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        <h2 style={heading}>NOTES</h2>
+        {wide ? (
+          <span style={{ fontSize: '12px', color: MUTED }}>quick reminders for yourself</span>
+        ) : (
+          <button onClick={() => setNotesOpen(o => !o)} style={{ minHeight: '40px', padding: '0 12px', border: `1px solid ${INK}`, borderRadius: '8px', background: 'transparent', color: INK, fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+            {notesOpen ? 'Hide' : `Show (${noteCount})`}
           </button>
-        </div>
-      ))}
+        )}
+      </div>
+      {notesShown && (
+        <>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input value={newLine} onChange={e => setNewLine(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addLine(); }}
+              placeholder="Type a reminder, press Enter" enterKeyHint="done" autoComplete="off" style={{ ...fieldInput, flex: 1 }} />
+            <button onClick={addLine} style={{ ...solidBtn, minHeight: '46px', padding: '0 18px' }}>Add</button>
+          </div>
+          {noteCount === 0 && (
+            <div style={{ fontSize: '15px', color: MUTED }}>One-liners go here: oak cabinets, brushed nickel faucets, tear out...</div>
+          )}
+          {scratch.map(s => (
+            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {dot('#8A857E')}
+              <input value={s.text} onChange={e => editLine(s.id, e.target.value)} aria-label="Reminder"
+                style={{ flex: 1, minWidth: 0, minHeight: '44px', border: 'none', borderBottom: '1px solid #E6E2DB', background: 'transparent', fontSize: '18px', color: INK, fontFamily: 'inherit', padding: 0 }} />
+              <button aria-label="Remove reminder" onClick={() => removeLine(s.id)} style={{ flex: 'none', width: '44px', height: '44px', border: 'none', background: 'transparent', color: MUTED, fontSize: '22px', cursor: 'pointer' }}>&times;</button>
+            </div>
+          ))}
+          {withNotes.map(({ p, i }) => (
+            <button key={p.id} onClick={() => setViewId(p.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', width: '100%', textAlign: 'left', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', color: INK }}>
+              <span style={{ marginTop: '8px', display: 'flex' }}>{dot('#8A857E')}</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: '18px', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{p.note}</span>
+              <span style={{ flex: 'none', maxWidth: '38%', fontSize: '12px', fontWeight: 800, color: '#B8481C', border: '1px solid #E6C9BA', borderRadius: '8px', padding: '3px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.caption || 'Picture ' + (i + 1)}</span>
+            </button>
+          ))}
+        </>
+      )}
     </section>
   );
 
@@ -271,12 +313,12 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {wide ? (
           <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '18px 16px 28px', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '22px', alignItems: 'start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>{customerCard}{jobNotes}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>{pictures}{areaNotes}{exportBtn}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>{customerCard}{pictures}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>{notesCard}{jobNotes}{exportBtn}</div>
           </div>
         ) : (
           <div style={{ padding: '18px 16px 28px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
-            {customerCard}{pictures}{areaNotes}{jobNotes}{exportBtn}
+            {customerCard}{pictures}{notesCard}{jobNotes}{exportBtn}
           </div>
         )}
       </div>

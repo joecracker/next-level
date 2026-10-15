@@ -118,6 +118,7 @@ export function initNextLevel() {
     date?: string;      // Capture screen: matches the Excel's Date
     jobDesc?: string;  // Capture screen: matches the Excel's Description of Job
     jobNotes?: string; // Capture screen: tear-out to debris removal notes
+    scratch?: Array<{ id: string; text: string }>; // Capture screen: one-line reminders
   }
 
   let projects: Project[] = [];
@@ -5216,6 +5217,7 @@ export function initNextLevel() {
         id: p.id, name: p.name,
         customer: p.customer || '', phone: p.phone || '', address: p.address || '',
         date: p.date || '', jobDesc: p.jobDesc || '', jobNotes: p.jobNotes || '',
+        scratch: (p.scratch || []).map(s => ({ id: s.id, text: s.text })),
         photos: (p.photos || []).map(ph => ({ id: ph.id, caption: ph.caption || '', note: ph.note || '', timestamp: ph.timestamp })),
       };
     },
@@ -5229,6 +5231,12 @@ export function initNextLevel() {
       if (typeof patch.customer === 'string' && (p.name === 'New Project' || p.name === prevCustomer)) {
         p.name = patch.customer || 'New Project';
       }
+      save();
+    },
+    setScratch(items: Array<{ id: string; text: string }>): void {
+      const p = getProject();
+      if (!p) return;
+      p.scratch = items.map(s => ({ id: String(s.id), text: String(s.text) }));
       save();
     },
     async photoUrl(id: string): Promise<string | null> {

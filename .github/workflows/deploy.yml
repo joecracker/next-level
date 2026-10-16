@@ -21,6 +21,7 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: 697837929024-544irmi27plds8pmjua5pfk17qilm7j2.apps.googleusercontent.com
       # SPA fallback is handled by the Worker config; the Pages-style catch-all rule can loop on Workers
       - run: rm -f dist/_redirects
+      - run: npx --yes wrangler@4 pages functions build --outdir=./.worker
       - run: npx --yes wrangler@4 deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

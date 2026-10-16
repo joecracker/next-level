@@ -5216,7 +5216,7 @@ export function initNextLevel() {
       return {
         id: p.id, name: p.name,
         customer: p.customer || '', phone: p.phone || '', address: p.address || '',
-        date: p.date || '', jobDesc: p.jobDesc || '', jobNotes: p.jobNotes || '',
+        date: p.date || '', jobDesc: p.jobDesc || '', jobNotes: p.jobNotes || '', email: p.email || '',
         scratch: (p.scratch || []).map(s => ({ id: s.id, text: s.text })),
         photos: (p.photos || []).map(ph => ({ id: ph.id, caption: ph.caption || '', note: ph.note || '', timestamp: ph.timestamp })),
       };
@@ -5225,7 +5225,7 @@ export function initNextLevel() {
       const p = getProject();
       if (!p) return;
       const prevCustomer = p.customer || '';
-      (['customer', 'phone', 'address', 'date', 'jobDesc', 'jobNotes'] as const).forEach(k => {
+      (['customer', 'phone', 'address', 'date', 'jobDesc', 'jobNotes', 'email'] as const).forEach(k => {
         if (typeof patch[k] === 'string') (p as any)[k] = patch[k];
       });
       if (typeof patch.customer === 'string' && (p.name === 'New Project' || p.name === prevCustomer)) {

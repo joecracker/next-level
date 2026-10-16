@@ -10,11 +10,11 @@ export type ScratchItem = { id: string; text: string };
 export type CaptureData = {
   id: string; name: string;
   customer: string; phone: string; address: string; date: string;
-  jobDesc: string; jobNotes: string;
+  jobDesc: string; jobNotes: string; email: string;
   photos: CapturePhoto[];
   scratch: ScratchItem[];
 };
-export type CapturePatch = Partial<Pick<CaptureData, 'customer' | 'phone' | 'address' | 'date' | 'jobDesc' | 'jobNotes'>>;
+export type CapturePatch = Partial<Pick<CaptureData, 'customer' | 'phone' | 'address' | 'date' | 'jobDesc' | 'jobNotes' | 'email'>>;
 
 const LABEL_KEY = 'nl_label_size';
 function readSize(): number {
@@ -158,6 +158,11 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   const [size, setSize] = useState(readSize());
   const [newLine, setNewLine] = useState('');
   const [notesOpen, setNotesOpen] = useState(true);
+  const [polishBusy, setPolishBusy] = useState(false);
+  const [polishItems, setPolishItems] = useState<string[] | null>(null);
+  const [polishSource, setPolishSource] = useState('');
+  const [polishMsg, setPolishMsg] = useState('');
+  const [polishUndo, setPolishUndo] = useState<string | null>(null);
   const [w, setW] = useState(window.innerWidth);
   const wide = w >= 900;
 
@@ -221,6 +226,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
         <div style={{ flex: 1.3, minWidth: 0 }}>{field('Customer Phone', data.phone, 'phone', 'tel')}</div>
       </div>
       {field('Customer Address', data.address, 'address')}
+      {field('Email', data.email, 'email', 'email')}
       <label style={fieldLabel}>Description of Job
         <AutoText value={data.jobDesc} onChange={v => set({ jobDesc: v })} style={{ ...fieldInput, minHeight: '46px', padding: '11px 12px', lineHeight: 1.35 }} />
       </label>
@@ -323,6 +329,37 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
     </section>
   );
 
+  // Polish: sends ONLY the Job notes text to /api/format-section and shows the result next to the
+  // original. Nothing is replaced until the person taps "Use this".
+  const runPolish = async () => {
+    const raw = data.jobNotes;
+    if (!raw.trim()) { setPolishItems(null); setPolishMsg('Type or say your job notes first, then tap Polish.'); return; }
+    setPolishBusy(true); setPolishMsg(''); setPolishItems(null); setPolishUndo(null);
+    try {
+      const res = await fetch('/api/format-section', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryName: 'Whole job', rawInput: raw }),
+      });
+      let json: any = null;
+      try { json = await res.json(); } catch { json = null; }
+      const items: string[] = json && Array.isArray(json.formattedItems)
+        ? json.formattedItems.map((x: unknown) => String(x).trim()).filter((x: string) => x) : [];
+      if (res.ok && items.length) { setPolishItems(items); setPolishSource(raw); }
+      else if (!json || json.error === 'not_configured') setPolishMsg("Polish isn't connected yet. Your notes are untouched.");
+      else setPolishMsg("Polish couldn't finish this time. Your notes are untouched. Try again in a minute.");
+    } catch {
+      setPolishMsg("Couldn't reach Polish. Check your connection. Your notes are untouched.");
+    }
+    setPolishBusy(false);
+  };
+  const polishShown = polishItems && polishSource === data.jobNotes ? polishItems : null;
+  const useTheirs = () => {
+    if (!polishShown) return;
+    setPolishUndo(data.jobNotes);
+    set({ jobNotes: polishShown.map((t, i) => (i + 1) + '. ' + t).join('\n') });
+    setPolishItems(null);
+  };
+
   const jobNotes = (
     <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
@@ -332,7 +369,32 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
       <textarea value={data.jobNotes} onChange={e => set({ jobNotes: e.target.value })} rows={wide ? 12 : 8}
         placeholder="Say or type what happens on this job, start to finish. (Tip: use your keyboard's mic.)"
         style={{ ...fieldInput, background: '#fff', fontSize: '17px', lineHeight: 1.45, padding: '14px', borderRadius: '14px', resize: 'vertical' }} />
-      <button disabled style={{ ...solidBtn, minHeight: '54px', fontSize: '17px', opacity: 0.45, cursor: 'not-allowed' }}>Polish (coming next)</button>
+      <button onClick={runPolish} disabled={polishBusy} style={{ ...solidBtn, minHeight: '54px', fontSize: '17px', opacity: polishBusy ? 0.6 : 1 }}>{polishBusy ? 'Polishing...' : 'Polish'}</button>
+      <div style={{ fontSize: '12px', color: MUTED }}>Polishes the Job notes only. Your customer info and reminders are not sent.</div>
+      {polishMsg && <div style={{ fontSize: '15px', color: INK, background: '#FFF4E5', border: '1px solid #F0D2A8', borderRadius: '10px', padding: '10px 12px' }}>{polishMsg}</div>}
+      {polishUndo !== null && !polishShown && (
+        <button onClick={() => { set({ jobNotes: polishUndo }); setPolishUndo(null); }} style={{ ...outlineBtn, minHeight: '46px' }}>Undo polish (put my words back)</button>
+      )}
+      {polishShown && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-start' }}>
+            <div style={{ flex: '1 1 260px', minWidth: 0, background: '#fff', border: '1px solid ' + LINE, borderRadius: '12px', padding: '12px' }}>
+              <div style={{ ...heading, marginBottom: '6px' }}>YOUR WORDS</div>
+              <div style={{ fontSize: '16px', lineHeight: 1.45, whiteSpace: 'pre-wrap', color: INK }}>{data.jobNotes}</div>
+            </div>
+            <div style={{ flex: '1 1 260px', minWidth: 0, background: '#fff', border: '2px solid ' + EMBER, borderRadius: '12px', padding: '12px' }}>
+              <div style={{ ...heading, marginBottom: '6px' }}>POLISHED</div>
+              <ol style={{ margin: 0, paddingLeft: '24px', fontSize: '16px', lineHeight: 1.45, color: INK }}>
+                {polishShown.map((t, i) => <li key={i} style={{ marginBottom: '4px' }}>{t}</li>)}
+              </ol>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={useTheirs} style={{ ...solidBtn, flex: 1 }}>Use this</button>
+            <button onClick={() => setPolishItems(null)} style={{ ...outlineBtn, flex: 1 }}>Keep mine</button>
+          </div>
+        </div>
+      )}
     </section>
   );
 

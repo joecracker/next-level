@@ -75,6 +75,14 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew }: { onOpen
   );
 }
 
+// On a phone, PHOTO opens the phone's own camera app (ultra-wide lens, autofocus, full processing)
+// through the hidden native input. Tablets and desktops keep the in-page camera above.
+const IS_PHONE = /Android.*Mobile|iPhone|iPod/i.test(navigator.userAgent);
+function takePhoto(openModal: () => void) {
+  const input = document.getElementById('photo-input-camera') as HTMLInputElement | null;
+  if (IS_PHONE && input) input.click(); else openModal();
+}
+
 function CameraModal({ onClose }: { onClose: () => void }) {
   const webcamRef = useRef<Webcam>(null);
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
@@ -376,7 +384,7 @@ export default function App() {
       {showLauncher && <Launcher onPick={pickDoor} />}
       {openPicker && <OpenJobPicker onOpen={openExistingJob} onCancel={() => setOpenPicker(false)} />}
       {capturePicker && <OpenJobPicker title="Capture" onNew={newCapture} onOpen={startCapture} onCancel={() => backOne('picker', () => { setCapturePicker(false); setShowLauncher(true); })} />}
-      {captureOn && <CaptureScreen onHome={() => backOne('capture', () => { setCaptureOn(false); setCapturePicker(true); })} onFull={captureToFullApp} onTakePhoto={() => setCameraOpen(true)} />}
+      {captureOn && <CaptureScreen onHome={() => backOne('capture', () => { setCaptureOn(false); setCapturePicker(true); })} onFull={captureToFullApp} onTakePhoto={() => takePhoto(() => setCameraOpen(true))} />}
       {cameraOpen && <CameraModal onClose={() => setCameraOpen(false)} />}
       <div id="app-shell">
         {!showLauncher && <StageBar stage={stage} setStage={setStage} onHome={goHome} />}
@@ -617,7 +625,7 @@ export default function App() {
             <span id="conn-status" className="conn-status conn-offline" title="Connection Status" style={{ fontSize: '10px', opacity: 0.6 }}>&#9679;</span>
             <button id="btn-reset-view" className="btn btn-sm toolbar-btn" title="Recenter the view (zoom &amp; pan only — does not change your drawing)">&#8857; Recenter</button>
             <span id="toolbar-zoom">100%</span>
-            <span id="build-stamp" style={{ fontSize: '9px', opacity: 0.4, marginLeft: '6px' }} title="Build marker — bumps every push, confirms new code is live">build-2026-10-16-m</span>
+            <span id="build-stamp" style={{ fontSize: '9px', opacity: 0.4, marginLeft: '6px' }} title="Build marker — bumps every push, confirms new code is live">build-2026-10-16-n</span>
           </div>
         </div>
         <div id="workflow-banner" style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', padding: '6px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: '#334155', flexWrap: 'wrap', gap: '6px', zIndex: 5 }}>
@@ -633,7 +641,7 @@ export default function App() {
         </div>
         <div id="canvas-wrap">
           <canvas id="floorplan"></canvas>
-          {stage !== 'review' && <CanvasModeToggle onOpenCamera={() => setCameraOpen(true)} />}
+          {stage !== 'review' && <CanvasModeToggle onOpenCamera={() => takePhoto(() => setCameraOpen(true))} />}
           <button id="reference-rail-tab" title="Reference: Notes, Photos, Measurements" style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 60, background: 'var(--ember)', color: 'var(--ink)', border: 'none', borderRadius: '8px 0 0 8px', padding: '14px 6px', fontSize: '18px', cursor: 'pointer', boxShadow: '-2px 0 8px rgba(0,0,0,0.25)' }}>🔖</button>
           <div id="reference-rail" className="hidden" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '280px', maxWidth: '85vw', background: 'rgba(20,20,26,0.97)', zIndex: 65, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 16px rgba(0,0,0,0.35)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.15)', flex: 'none' }}>

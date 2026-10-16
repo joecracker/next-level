@@ -1,16 +1,30 @@
-{
-  "name": "Next Level — Field Layout Tracker",
+﻿{
+  "name": "Next Level Field & Desk",
   "short_name": "Next Level",
+  "description": "Field capture and layout for remodeling jobs: photos, measurements, notes, drawings and takeoffs.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#f5f6f8",
-  "theme_color": "#00274C",
-  "description": "Remodeling field layout tracking — draw walls, place doors/windows, takeoffs, voice notes. Works offline.",
+  "background_color": "#261D13",
+  "theme_color": "#15120F",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏗</text></svg>",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

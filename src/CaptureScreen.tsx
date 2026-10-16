@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { BUILD_STAMP } from './buildStamp';
 
 // New Capture screen (test drive). Sits on top of the existing app and talks to
 // it ONLY through window.NextLevel (bridge at the end of src/app.ts), so the
@@ -409,6 +410,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '18px', fontWeight: 500 }}><span style={{ color: CREAM }}>Next </span><span style={{ color: EMBER }}>Level</span> <span style={{ color: CREAM, fontWeight: 800, letterSpacing: '1px', fontSize: '13px' }}>CAPTURE</span></div>
           <div style={{ fontSize: '12px', color: '#B9B4AC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.customer || data.name}</div>
+          <div style={{ fontSize: '11px', color: '#9D978F', whiteSpace: 'nowrap' }}>{BUILD_STAMP}</div>
         </div>
         <button onClick={onFull} style={headBtn}>Full app</button>
       </div>

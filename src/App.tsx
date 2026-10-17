@@ -56,7 +56,7 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew }: { onOpen
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {jobs.length === 0 ? (
           <div style={{ color: 'var(--muted)', textAlign: 'center', marginTop: '30px', fontSize: '14px' }}>
-            {q.trim() ? 'No jobs match that search' : 'No jobs yet — start one with New Job'}
+            {q.trim() ? 'No jobs match that search' : 'No jobs yet — start one with Capture'}
           </div>
         ) : jobs.map(j => (
           <button key={j.id} onClick={() => onOpen(j.id)} style={{
@@ -150,7 +150,7 @@ function CameraModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Launcher({ onPick }: { onPick: (door: 'new' | 'open' | 'just' | 'quick' | 'capture') => void }) {
+function Launcher({ onPick }: { onPick: (door: 'new' | 'open' | 'just' | 'quick' | 'capture' | 'design') => void }) {
   const doorBtn: CSSProperties = {
     display: 'flex', alignItems: 'center', gap: '16px', width: '100%',
     padding: '20px 24px', borderRadius: '16px', fontSize: '20px', fontWeight: 800,
@@ -174,25 +174,17 @@ function Launcher({ onPick }: { onPick: (door: 'new' | 'open' | 'just' | 'quick'
       <div style={{ fontSize: '11px', letterSpacing: '3px', color: 'var(--muted)', marginBottom: '40px' }}>MEASURE &middot; DESIGN &middot; DELIVER</div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '440px' }}>
-        <button onClick={() => onPick('new')} style={{ ...doorBtn, border: 'none', background: 'var(--ember)', color: 'var(--ink)' }}>
-          <span style={iconWrap}>🔨</span>
-          <span>New Job<div style={{ ...sub, color: 'rgba(21,18,15,0.65)' }}>Start capturing a fresh job</div></span>
-        </button>
-        <button onClick={() => onPick('capture')} style={{ ...doorBtn, border: '2px solid var(--ember)' }}>
+        <button onClick={() => onPick('capture')} style={{ ...doorBtn, border: 'none', background: 'var(--ember)', color: 'var(--ink)' }}>
           <span style={iconWrap}>{'\u{1F4CB}'}</span>
-          <span>Capture (new)<div style={sub}>Try the new information-gathering screen</div></span>
+          <span>Capture<div style={{ ...sub, color: 'rgba(21,18,15,0.65)' }}>Start a new job</div></span>
         </button>
         <button onClick={() => onPick('open')} style={doorBtn}>
-          <span style={iconWrap}>📂</span>
+          <span style={iconWrap}>{'\u{1F4C2}'}</span>
           <span>Open Job<div style={sub}>Pick up where you left off</div></span>
         </button>
-        <button onClick={() => onPick('just')} style={doorBtn}>
-          <span style={iconWrap}>✏️</span>
-          <span>Just Draw<div style={sub}>Already have the info — go straight to the layout</div></span>
-        </button>
-        <button onClick={() => onPick('quick')} style={doorBtn}>
-          <span style={iconWrap}>⚡</span>
-          <span>Quick Draw<div style={sub}>Grab a fast one — photo or sketch, in and out</div></span>
+        <button onClick={() => onPick('design')} style={doorBtn}>
+          <span style={iconWrap}>{'\u{1F4D0}'}</span>
+          <span>Design Studio<div style={sub}>Walls, cabinets, plumbing and takeoff</div></span>
         </button>
       </div>
     </div>
@@ -326,16 +318,18 @@ export default function App() {
     if (sb) sb.dataset.stage = stage;
   }, [stage, showLauncher]);
 
-  const pickDoor = (door: 'new' | 'open' | 'just' | 'quick' | 'capture') => {
-    if (door === 'capture') {
+  const pickDoor = (door: 'new' | 'open' | 'just' | 'quick' | 'capture' | 'design') => {
+    if (door === 'capture') { newCapture(); return; } // a fresh job, straight into Capture
+    if (door === 'open') { // the job list; the job you pick opens in Capture
       window.history.pushState({ nl: 'picker' }, '');
       setShowLauncher(false);
       setCapturePicker(true);
       return;
     }
-    if (door === 'open') {
+    if (door === 'design') { // pick a job, then open it in the full drawing app
+      setShowLauncher(false);
       setOpenPicker(true);
-      return; // launcher stays until a job is picked (or cancelled)
+      return;
     }
     setStage(door === 'just' || door === 'quick' ? 'draw' : 'capture');
     setShowLauncher(false);
@@ -349,7 +343,7 @@ export default function App() {
   };
 
   const openExistingJob = (id: string) => {
-    setStage('capture');
+    setStage('draw');
     setOpenPicker(false);
     setShowLauncher(false);
     setTimeout(() => window.NextLevel?.openJob(id), 60);
@@ -363,12 +357,19 @@ export default function App() {
     window.NextLevel?.openJob(id);
     setCaptureOn(true);
   };
+  // From the full app back to Capture on the same job (nothing is lost; both use the same saved job).
+  const toCapture = () => {
+    const id = window.NextLevel?.getCapture()?.id;
+    if (id) startCapture(id);
+    else { window.history.pushState({ nl: 'picker' }, ''); setCapturePicker(true); }
+  };
   const newCapture = () => {
     const id = window.NextLevel?.newJob();
     if (id) startCapture(id);
   };
   const captureToFullApp = () => {
     const id = window.NextLevel?.getCapture()?.id;
+    setStage('draw');
     setCaptureOn(false);
     if (id) window.NextLevel?.openJob(id);
   };
@@ -383,8 +384,8 @@ export default function App() {
   return (
     <>
       {showLauncher && <Launcher onPick={pickDoor} />}
-      {openPicker && <OpenJobPicker onOpen={openExistingJob} onCancel={() => setOpenPicker(false)} />}
-      {capturePicker && <OpenJobPicker title="Capture" onNew={newCapture} onOpen={startCapture} onCancel={() => backOne('picker', () => { setCapturePicker(false); setShowLauncher(true); })} />}
+      {openPicker && <OpenJobPicker title="Design Studio" onOpen={openExistingJob} onCancel={() => { setOpenPicker(false); setShowLauncher(true); }} />}
+      {capturePicker && <OpenJobPicker title="Open Job" onNew={newCapture} onOpen={startCapture} onCancel={() => backOne('picker', () => { setCapturePicker(false); setShowLauncher(true); })} />}
       {captureOn && <CaptureScreen onHome={() => backOne('capture', () => { setCaptureOn(false); setCapturePicker(true); })} onFull={captureToFullApp} onTakePhoto={() => takePhoto(() => setCameraOpen(true))} />}
       {cameraOpen && <CameraModal onClose={() => setCameraOpen(false)} />}
       <div id="app-shell">
@@ -615,6 +616,7 @@ export default function App() {
       <main id="main-area">
         <div id="toolbar">
           <div className="toolbar-left">
+            <button id="btn-back-capture" className="btn btn-sm toolbar-btn" onClick={toCapture} title="Back to Capture" style={{ background: 'transparent', color: 'var(--cream)', border: '1px solid var(--ember)', padding: '2px 10px', fontSize: '12px', fontWeight: 800 }}>&#8249; Capture</button>
             <button id="btn-toggle-sidebar" className="btn btn-sm toolbar-btn" title="Toggle Sidebar" style={{ fontSize: '26px', lineHeight: '1', fontWeight: 700 }}>&#8249;</button>
             <button id="btn-toolbar-wizard" className="btn btn-sm btn-accent" style={{ background: 'var(--ember)', color: 'var(--ink)', border: 'none', padding: '2px 8px', fontSize: '11px' }}>🪄 Project Wizard</button>
             <span id="toolbar-info">New project</span>

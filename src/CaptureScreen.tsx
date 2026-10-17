@@ -434,7 +434,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
           <div style={{ fontSize: '12px', color: '#B9B4AC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.customer || data.name}</div>
           <div style={{ fontSize: '11px', color: '#9D978F', whiteSpace: 'nowrap' }}>{BUILD_STAMP}</div>
         </div>
-        <button onClick={onFull} style={headBtn}>Full app</button>
+        <button onClick={onFull} style={headBtn}>Design</button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {wide ? (

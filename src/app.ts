@@ -5094,6 +5094,7 @@ export function initNextLevel() {
     currentPageIdx = 0;
     pushHistory(); save(); renderSidebar(); render();
     toast(`📥 Job in! "${incoming.name}" added to your list`);
+    notifyCapture(); // lets an open job list refresh itself
   }
 
   /* ════════════════════════════════════════════════════════════════
@@ -5267,5 +5268,8 @@ export function initNextLevel() {
       return () => { const i = captureListeners.indexOf(cb); if (i >= 0) captureListeners.splice(i, 1); };
     },
     exportReport(): void { openBossReportModal(); },
+    // Same single-job send / open used by the full app's side menu, reachable from Capture and the job lists.
+    sendJob(): void { sendCurrentJob(); },
+    pickJobFile(): void { document.getElementById('job-file-input')?.click(); },
   };
 }

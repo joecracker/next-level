@@ -422,7 +422,11 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   );
 
   const exportBtn = (
-    <button onClick={() => window.NextLevel?.exportReport()} style={{ ...outlineBtn, minHeight: '56px', fontSize: '17px' }}>Send / Export this job</button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <button onClick={() => window.NextLevel?.sendJob()} style={{ ...solidBtn, minHeight: '56px', fontSize: '17px' }}>Send this job</button>
+      <div style={{ fontSize: '12px', color: MUTED }}>Packs the whole job (photos, notes, sketches, customer info) into one file. Pick Drive, email or another device from the share sheet.</div>
+      <button onClick={() => window.NextLevel?.exportReport()} style={{ ...outlineBtn, minHeight: '46px', fontSize: '15px' }}>Boss report (print)</button>
+    </div>
   );
 
   return (

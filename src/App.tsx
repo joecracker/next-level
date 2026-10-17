@@ -25,12 +25,16 @@ declare global {
       markUpPhoto: (id: string) => void;
       onCapture: (cb: () => void) => () => void;
       exportReport: () => void;
+      sendJob: () => void;
+      pickJobFile: () => void;
     };
   }
 }
 
-function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew }: { onOpen: (id: string) => void; onCancel: () => void; title?: string; onNew?: () => void }) {
+function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile }: { onOpen: (id: string) => void; onCancel: () => void; title?: string; onNew?: () => void; onGetFile?: () => void }) {
   const [q, setQ] = useState('');
+  const [, setTick] = useState(0);
+  useEffect(() => window.NextLevel?.onCapture(() => setTick(t => t + 1)), []);
   const jobs = (window.NextLevel?.listJobs() || [])
     .filter(j => !q.trim() || j.name.toLowerCase().includes(q.trim().toLowerCase()))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -52,6 +56,12 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew }: { onOpen
           padding: '16px', borderRadius: '14px', border: 'none', background: 'var(--ember)', color: 'var(--ink)',
           fontSize: '17px', fontWeight: 800, cursor: 'pointer', marginBottom: '14px',
         }}>+ Start a new job</button>
+      )}
+      {onGetFile && (
+        <button onClick={onGetFile} style={{
+          padding: '14px', borderRadius: '14px', border: '1px solid rgba(245,243,239,0.3)', background: 'transparent',
+          color: 'var(--cream)', fontSize: '16px', fontWeight: 700, cursor: 'pointer', marginBottom: '14px',
+        }}>Get a job file</button>
       )}
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {jobs.length === 0 ? (
@@ -384,8 +394,8 @@ export default function App() {
   return (
     <>
       {showLauncher && <Launcher onPick={pickDoor} />}
-      {openPicker && <OpenJobPicker title="Design Studio" onOpen={openExistingJob} onCancel={() => { setOpenPicker(false); setShowLauncher(true); }} />}
-      {capturePicker && <OpenJobPicker title="Open Job" onNew={newCapture} onOpen={startCapture} onCancel={() => backOne('picker', () => { setCapturePicker(false); setShowLauncher(true); })} />}
+      {openPicker && <OpenJobPicker title="Design Studio" onGetFile={() => window.NextLevel?.pickJobFile()} onOpen={openExistingJob} onCancel={() => { setOpenPicker(false); setShowLauncher(true); }} />}
+      {capturePicker && <OpenJobPicker title="Open Job" onGetFile={() => window.NextLevel?.pickJobFile()} onNew={newCapture} onOpen={startCapture} onCancel={() => backOne('picker', () => { setCapturePicker(false); setShowLauncher(true); })} />}
       {captureOn && <CaptureScreen onHome={() => backOne('capture', () => { setCaptureOn(false); setCapturePicker(true); })} onFull={captureToFullApp} onTakePhoto={() => takePhoto(() => setCameraOpen(true))} />}
       {cameraOpen && <CameraModal onClose={() => setCameraOpen(false)} />}
       <div id="app-shell">

@@ -25,7 +25,6 @@ declare global {
       markUpPhoto: (id: string) => void;
       onCapture: (cb: () => void) => () => void;
       exportReport: () => void;
-      floorplanUrl: () => string | null;
     };
   }
 }

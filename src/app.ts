@@ -3038,7 +3038,7 @@ export function initNextLevel() {
     }
     filtered.forEach(p => {
       const photoCount = p.photos?.length || 0;
-      const noteCount = p.pages.reduce((sum, pg) => sum + (pg.notes?.length || 0), 0);
+      const noteCount = p.pages.reduce((sum, pg) => sum + (pg.notes?.length || 0), 0) + (p.scratch?.length || 0) + (p.photos || []).filter(ph => ph.note && ph.note.trim()).length;
       const row = document.createElement('button');
       row.className = 'skip-existing-job-row';
       row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;width:100%;padding:10px;border-radius:8px;background:#f8fafc;border:1px solid var(--border);color:#1e293b;cursor:pointer;';
@@ -5195,7 +5195,7 @@ export function initNextLevel() {
         name: p.name,
         category: p.category,
         photoCount: p.photos?.length || 0,
-        noteCount: p.pages.reduce((s, pg) => s + (pg.notes?.length || 0), 0),
+        noteCount: p.pages.reduce((s, pg) => s + (pg.notes?.length || 0), 0) + (p.scratch?.length || 0) + (p.photos || []).filter(ph => ph.note && ph.note.trim()).length,
       }));
     },
     openJob(id: string): void {

@@ -245,7 +245,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
       {field('Customer Name', data.customer, 'customer')}
       <div style={{ display: 'flex', gap: '12px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>{field('Date', data.date, 'date')}</div>
-        <div style={{ flex: 1.3, minWidth: 0 }}>{field('Customer Phone', data.phone, 'phone', 'tel')}</div>
+        <div style={{ flex: 1.3, minWidth: 0 }}>{field('Customer Phone', data.phone, 'phone')}</div>
       </div>
       {field('Customer Address', data.address, 'address')}
       {field('Email', data.email, 'email', 'email')}

@@ -955,14 +955,33 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
     else { dh = boxH; dw = boxH * ir; dy = 0; dx = (boxW - dw) / 2; }
     octx.drawImage(img, dx, dy, dw, dh);
   }
+  // The saved picture is just the photo (no black bars from the booth screen), at the photo's own
+  // size up to 1600 px on the long side, with the ink and labels scaled along with it.
   function compositeToBlob(): Promise<Blob | null> {
+    if (!(photo.complete && photo.naturalWidth > 0)) {
+      const fb = document.createElement('canvas');
+      fb.width = canvas.width; fb.height = canvas.height;
+      const fctx = fb.getContext('2d')!;
+      fctx.fillStyle = '#0b0b0c'; fctx.fillRect(0, 0, fb.width, fb.height);
+      fctx.drawImage(canvas, 0, 0);
+      fctx.drawImage(labelsCanvas, 0, 0);
+      return new Promise(res => fb.toBlob(b => res(b), 'image/png'));
+    }
+    // where the photo sits inside the booth canvas (contain fit)
+    const ir = photo.naturalWidth / photo.naturalHeight;
+    const br = canvas.width / canvas.height;
+    let dw: number, dh: number, dx: number, dy: number;
+    if (ir > br) { dw = canvas.width; dh = canvas.width / ir; dx = 0; dy = (canvas.height - dh) / 2; }
+    else { dh = canvas.height; dw = canvas.height * ir; dy = 0; dx = (canvas.width - dw) / 2; }
+    const k = Math.min(photo.naturalWidth / dw, 1600 / Math.max(dw, dh));
+    const ow = Math.max(1, Math.round(dw * k)), oh = Math.max(1, Math.round(dh * k));
     const off = document.createElement('canvas');
-    off.width = canvas.width; off.height = canvas.height;
+    off.width = ow; off.height = oh;
     const octx = off.getContext('2d')!;
-    if (photo.complete && photo.naturalWidth) drawContainFit(octx, photo, off.width, off.height);
-    else { octx.fillStyle = '#0b0b0c'; octx.fillRect(0, 0, off.width, off.height); }
-    octx.drawImage(canvas, 0, 0);
-    octx.drawImage(labelsCanvas, 0, 0);
+    octx.imageSmoothingQuality = 'high';
+    octx.drawImage(photo, 0, 0, ow, oh);
+    octx.drawImage(canvas, dx, dy, dw, dh, 0, 0, ow, oh);
+    octx.drawImage(labelsCanvas, dx, dy, dw, dh, 0, 0, ow, oh);
     return new Promise(res => off.toBlob(b => res(b), 'image/png'));
   }
 

@@ -164,6 +164,8 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   const [polishSource, setPolishSource] = useState('');
   const [polishMsg, setPolishMsg] = useState('');
   const [polishUndo, setPolishUndo] = useState<string | null>(null);
+  const [planUrl, setPlanUrl] = useState<string | null>(null);
+  const [planOpen, setPlanOpen] = useState(false);
   const [w, setW] = useState(window.innerWidth);
   const wide = w >= 900;
 
@@ -199,6 +201,22 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [viewerOpen]);
+
+  // Floor plan picture: a fresh snapshot of the drawing each time Capture opens (the drawing can only change in the full app).
+  useEffect(() => {
+    try { setPlanUrl(window.NextLevel?.floorplanUrl?.() || null); } catch { setPlanUrl(null); }
+  }, []);
+  useEffect(() => {
+    if (!planOpen) return;
+    window.history.pushState({ nl: 'plan' }, '');
+    const onPop = () => setPlanOpen(false);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [planOpen]);
+  const closePlan = useCallback(() => {
+    if (window.history.state && window.history.state.nl === 'plan') window.history.back();
+    else setPlanOpen(false);
+  }, []);
 
   if (!data) {
     return (
@@ -249,12 +267,20 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
         <button onClick={onTakePhoto} style={{ ...solidBtn, flex: 1.3 }}>PHOTO</button>
         <button onClick={() => document.getElementById('photo-input-gallery')?.click()} style={{ ...outlineBtn, flex: 1 }}>Gallery</button>
       </div>
-      {data.photos.length === 0 ? (
+      {data.photos.length === 0 && !planUrl ? (
         <div style={{ padding: '22px 12px', textAlign: 'center', color: MUTED, fontSize: '15px', border: `1px dashed ${LINE}`, borderRadius: '12px' }}>
           No pictures yet. Take one, or pick one from the gallery.
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
+          {planUrl && (
+            <button onClick={() => setPlanOpen(true)} style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: 0, border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: INK, minWidth: 0 }}>
+              <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: '10px', overflow: 'hidden', background: '#fff', border: `1px solid ${LINE}`, boxSizing: 'border-box' }}>
+                <img src={planUrl} alt="Floor plan" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+              </div>
+              <div style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Floor plan</div>
+            </button>
+          )}
           {data.photos.map((p, i) => (
             <button key={p.id} onClick={() => setViewId(p.id)} style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: 0, border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: INK, minWidth: 0 }}>
               <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: '10px', overflow: 'hidden', background: '#E6E2DB' }}>
@@ -428,6 +454,18 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
       </div>
       <style>{'.modal-overlay{z-index:9500 !important}.toast{z-index:9600 !important}'}</style>
       {viewId && <Viewer data={data} rev={rev} startId={viewId} wide={wide} onClose={closeViewer} />}
+      {planOpen && planUrl && (
+        <div id="nl-capture-viewer" style={{ position: 'fixed', inset: 0, zIndex: 9100, background: '#fff', display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, sans-serif' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '10px 14px', background: INK, color: CREAM }}>
+            <span style={{ fontSize: '16px', fontWeight: 800 }}>Floor plan</span>
+            <button onClick={closePlan} style={headBtn}>Close</button>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, padding: '12px', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }}>
+            <img src={planUrl} alt="Floor plan" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+          </div>
+          <div style={{ padding: '8px 14px 14px', fontSize: '12px', color: MUTED }}>View only. Change the drawing from the full app.</div>
+        </div>
+      )}
     </div>
   );
 }

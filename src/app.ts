@@ -140,6 +140,7 @@ export function initNextLevel() {
   let canvasW = 0, canvasH = 0;
   let dpr = 1;
   let panX = 0, panY = 0, zoom = 1;
+  let suppressGrid = false; // true only while floorplanUrl() takes its clean snapshot
   let isPanning = false, panStartX = 0, panStartY = 0, panStartPx = 0, panStartPy = 0;
 
   // Tool state
@@ -1368,6 +1369,7 @@ export function initNextLevel() {
   }
 
   function drawGrid(){
+    if(suppressGrid) return;
     ctx.save();
     const w = canvasW/dpr, h = canvasH/dpr;
     const x0 = -panX/zoom, y0 = -panY/zoom;
@@ -5267,5 +5269,47 @@ export function initNextLevel() {
       return () => { const i = captureListeners.indexOf(cb); if (i >= 0) captureListeners.splice(i, 1); };
     },
     exportReport(): void { openBossReportModal(); },
+    // Clean, fit-to-content snapshot of the current page's drawing (walls, openings, cabinets, fixtures) for the
+    // Capture screen. Re-renders the live canvas with a temporary view, copies it, then puts the view back.
+    floorplanUrl(): string | null {
+      const page = getPage();
+      if (!page || !canvas || !ctx || canvasW < 50 || canvasH < 50) return null;
+      if (page.walls.length === 0 && page.assets.length === 0) return null;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      const add = (x: number, y: number) => { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; };
+      page.walls.forEach(w => { add(w.start.x, w.start.y); add(w.end.x, w.end.y); });
+      page.assets.forEach(a => { const r = Math.max(a.width || 0, a.depth || 0) / 2 + 6; add(a.x - r, a.y - r); add(a.x + r, a.y + r); });
+      if (!isFinite(minX) || !isFinite(minY)) return null;
+      const pad = 40;
+      const pw = (maxX - minX) + pad * 2, ph = (maxY - minY) + pad * 2;
+      const cssW = canvasW / dpr, cssH = canvasH / dpr;
+      const z = Math.min(cssW / pw, cssH / ph);
+      if (!isFinite(z) || z <= 0) return null;
+      const saved = { panX, panY, zoom, wi: selectedWallIdx, wis: selectedWallIndices, ai: selectedAssetIds, a1: selectedAssetId, op: selectedOpening };
+      let url: string | null = null;
+      try {
+        selectedWallIdx = -1; selectedWallIndices = []; selectedAssetIds = []; selectedAssetId = null; selectedOpening = null;
+        suppressGrid = true;
+        zoom = z;
+        panX = (cssW - (minX + maxX) * z) / 2;
+        panY = (cssH - (minY + maxY) * z) / 2;
+        render();
+        const sw = Math.max(1, Math.round(pw * z * dpr)), sh = Math.max(1, Math.round(ph * z * dpr));
+        const sx = Math.round((cssW - pw * z) / 2 * dpr), sy = Math.round((cssH - ph * z) / 2 * dpr);
+        const out = document.createElement('canvas');
+        out.width = sw; out.height = sh;
+        const octx = out.getContext('2d')!;
+        octx.fillStyle = '#ffffff'; octx.fillRect(0, 0, sw, sh);
+        octx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+        url = out.toDataURL('image/png');
+      } catch { url = null; }
+      finally {
+        suppressGrid = false;
+        panX = saved.panX; panY = saved.panY; zoom = saved.zoom;
+        selectedWallIdx = saved.wi; selectedWallIndices = saved.wis; selectedAssetIds = saved.ai; selectedAssetId = saved.a1; selectedOpening = saved.op;
+        render();
+      }
+      return url;
+    },
   };
 }

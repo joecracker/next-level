@@ -173,7 +173,7 @@ const JOBSHEET_CSS = [
   '#nl-jobsheet-root .nl-js-cap{padding:8px 10px;font-size:14px;line-height:1.35}',
   '#nl-jobsheet-root .nl-js-note{margin-top:3px;white-space:pre-wrap;color:#333;overflow-wrap:anywhere}',
   '@media (max-width:560px){#nl-jobsheet-root .nl-js-photos{grid-template-columns:1fr}}',
-  '@media print{html,body{height:auto !important;overflow:visible !important}#root{display:none !important}#nl-jobsheet-root,#nl-jobsheet-root *{visibility:visible}#nl-jobsheet-root{position:static !important;overflow:visible !important;height:auto !important}#nl-jobsheet-root .nl-js-bar{display:none !important}#nl-jobsheet-root .nl-js-page{padding:0;max-width:none}@page{margin:12mm}}',
+  '@media print{html,body{height:auto !important;overflow:visible !important}#root{display:none !important}#nl-jobsheet-root,#nl-jobsheet-root *{visibility:visible}#nl-jobsheet-root{position:static !important;overflow:visible !important;height:auto !important}#nl-jobsheet-root .nl-js-bar{display:none !important}#nl-jobsheet-root .nl-js-page{padding:0;max-width:none}#nl-jobsheet-root .nl-js-fig img{width:auto !important;max-width:100% !important;max-height:90mm !important;margin:0 auto}@page{margin:12mm}}',
 ].join(' ');
 
 function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onClose: () => void }) {

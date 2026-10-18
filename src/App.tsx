@@ -19,6 +19,8 @@ declare global {
       getCapture: () => CaptureData | null;
       setCapture: (patch: CapturePatch) => void;
       setScratch: (items: ScratchItem[]) => void;
+      setPolish: (patch: { items?: string[] | null; source?: string; undo?: string | null }) => void;
+      deleteJob: (id: string) => void;
       photoUrl: (id: string) => Promise<string | null>;
       setPhoto: (id: string, patch: { caption?: string; note?: string }) => void;
       deletePhoto: (id: string) => void;
@@ -34,6 +36,7 @@ declare global {
 function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile }: { onOpen: (id: string) => void; onCancel: () => void; title?: string; onNew?: () => void; onGetFile?: () => void }) {
   const [q, setQ] = useState('');
   const [, setTick] = useState(0);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   useEffect(() => window.NextLevel?.onCapture(() => setTick(t => t + 1)), []);
   const jobs = (window.NextLevel?.listJobs() || [])
     .filter(j => !q.trim() || j.name.toLowerCase().includes(q.trim().toLowerCase()))
@@ -69,17 +72,37 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
             {q.trim() ? 'No jobs match that search' : 'No jobs yet — start one with Capture'}
           </div>
         ) : jobs.map(j => (
-          <button key={j.id} onClick={() => onOpen(j.id)} style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px',
-            padding: '16px', borderRadius: '14px', border: '1px solid rgba(245,243,239,0.14)',
-            background: 'rgba(245,243,239,0.05)', color: 'var(--cream)', cursor: 'pointer', textAlign: 'left',
+          <div key={j.id} style={{
+            display: 'flex', alignItems: 'stretch', gap: '8px',
+            borderRadius: '14px', border: '1px solid rgba(245,243,239,0.14)', background: 'rgba(245,243,239,0.05)',
           }}>
-            <span style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '16px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.name}</div>
-              <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px' }}>{j.category} &middot; {j.photoCount} photo{j.photoCount === 1 ? '' : 's'} &middot; {j.noteCount} note{j.noteCount === 1 ? '' : 's'}</div>
-            </span>
-            <span style={{ color: 'var(--ember)', fontSize: '22px', flexShrink: 0 }}>&rsaquo;</span>
-          </button>
+            {confirmId === j.id ? (
+              <div style={{ flex: 1, minWidth: 0, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ color: 'var(--cream)', fontSize: '15px', lineHeight: 1.4 }}>Delete <b>{j.name}</b>? This removes the whole job: pictures, notes, drawing, everything. It can&apos;t be undone.</div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => { window.NextLevel?.deleteJob(j.id); setConfirmId(null); }} style={{ flex: 1, minHeight: '48px', borderRadius: '10px', border: 'none', background: '#B42318', color: '#fff', fontSize: '16px', fontWeight: 800, cursor: 'pointer' }}>Yes, delete it</button>
+                  <button onClick={() => setConfirmId(null)} style={{ flex: 1, minHeight: '48px', borderRadius: '10px', border: '1px solid rgba(245,243,239,0.3)', background: 'transparent', color: 'var(--cream)', fontSize: '16px', fontWeight: 700, cursor: 'pointer' }}>Keep it</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button onClick={() => onOpen(j.id)} style={{
+                  flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px',
+                  padding: '16px', border: 'none', background: 'transparent', color: 'var(--cream)', cursor: 'pointer', textAlign: 'left',
+                }}>
+                  <span style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '16px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.name}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px' }}>{j.category} &middot; {j.photoCount} photo{j.photoCount === 1 ? '' : 's'} &middot; {j.noteCount} note{j.noteCount === 1 ? '' : 's'}</div>
+                  </span>
+                  <span style={{ color: 'var(--ember)', fontSize: '22px', flexShrink: 0 }}>&rsaquo;</span>
+                </button>
+                <button aria-label={'Delete ' + j.name} onClick={() => setConfirmId(j.id)} style={{
+                  flex: 'none', width: '64px', border: 'none', borderLeft: '1px solid rgba(245,243,239,0.14)', background: 'transparent',
+                  color: '#F0A59B', fontSize: '13px', fontWeight: 800, cursor: 'pointer',
+                }}>Delete</button>
+              </>
+            )}
+          </div>
         ))}
       </div>
     </div>
@@ -302,7 +325,7 @@ export default function App() {
   navRef.current = { captureOn, capturePicker };
   useEffect(() => {
     const onPop = () => {
-      if (document.getElementById('nl-capture-viewer')) return; // the big-picture viewer handles its own Back
+      if (document.getElementById('nl-capture-viewer') || document.getElementById('nl-jobsheet-root')) return; // the big-picture viewer and the Job Sheet handle their own Back
       const { captureOn: c, capturePicker: p } = navRef.current;
       if (c) { setCaptureOn(false); setCapturePicker(true); }
       else if (p) { setCapturePicker(false); setShowLauncher(true); }

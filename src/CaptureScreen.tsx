@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { BUILD_STAMP } from './buildStamp';
 
 // New Capture screen (test drive). Sits on top of the existing app and talks to
@@ -14,6 +15,7 @@ export type CaptureData = {
   jobDesc: string; jobNotes: string; email: string;
   photos: CapturePhoto[];
   scratch: ScratchItem[];
+  polished: string[] | null; polishedFrom: string; polishUndo: string | null;
 };
 export type CapturePatch = Partial<Pick<CaptureData, 'customer' | 'phone' | 'address' | 'date' | 'jobDesc' | 'jobNotes' | 'email'>>;
 
@@ -150,6 +152,106 @@ function Viewer({ data, rev, startId, wide, onClose }: {
   );
 }
 
+// Job Sheet: a clean, readable page built ONLY from what was captured (customer, job description, job notes,
+// reminders, pictures with their captions and notes). "Print / Save as PDF" opens the phone's own print screen,
+// which has a Save as PDF choice. It replaces the old Boss report on the Capture screen.
+const JOBSHEET_CSS = [
+  '#nl-jobsheet-root{position:fixed;inset:0;z-index:9300;background:#fff;color:#15120F;overflow-y:auto;-webkit-overflow-scrolling:touch;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}',
+  '#nl-jobsheet-root .nl-js-bar{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:#15120F}',
+  '#nl-jobsheet-root .nl-js-hint{flex-basis:100%;font-size:12px;color:#B9B4AC}',
+  '#nl-jobsheet-root .nl-js-page{max-width:820px;margin:0 auto;padding:18px 16px 48px}',
+  '#nl-jobsheet-root .nl-js-brand{font-size:12px;letter-spacing:2px;font-weight:800;color:#B8481C}',
+  '#nl-jobsheet-root .nl-js-title{font-size:28px;font-weight:800;margin:2px 0 12px;border-bottom:2px solid #15120F;padding-bottom:10px;overflow-wrap:anywhere}',
+  '#nl-jobsheet-root .nl-js-row{display:flex;gap:10px;font-size:15px;line-height:1.4;margin:4px 0}',
+  '#nl-jobsheet-root .nl-js-k{flex:none;width:96px;font-weight:800;color:#555}',
+  '#nl-jobsheet-root .nl-js-v{flex:1;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}',
+  '#nl-jobsheet-root .nl-js-h{font-size:13px;letter-spacing:2px;font-weight:800;color:#B8481C;margin:22px 0 8px;border-bottom:1px solid #D9D5CE;padding-bottom:4px}',
+  '#nl-jobsheet-root .nl-js-text{font-size:15px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}',
+  '#nl-jobsheet-root .nl-js-li{font-size:15px;line-height:1.45;margin:3px 0;overflow-wrap:anywhere}',
+  '#nl-jobsheet-root .nl-js-photos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}',
+  '#nl-jobsheet-root .nl-js-fig{break-inside:avoid;page-break-inside:avoid;border:1px solid #D9D5CE;border-radius:8px;overflow:hidden;background:#fff}',
+  '#nl-jobsheet-root .nl-js-cap{padding:8px 10px;font-size:14px;line-height:1.35}',
+  '#nl-jobsheet-root .nl-js-note{margin-top:3px;white-space:pre-wrap;color:#333;overflow-wrap:anywhere}',
+  '@media (max-width:560px){#nl-jobsheet-root .nl-js-photos{grid-template-columns:1fr}}',
+  '@media print{#root{display:none !important}#nl-jobsheet-root,#nl-jobsheet-root *{visibility:visible}#nl-jobsheet-root{position:static !important;overflow:visible !important;height:auto !important}#nl-jobsheet-root .nl-js-bar{display:none !important}#nl-jobsheet-root .nl-js-page{padding:0;max-width:none}@page{margin:12mm}}',
+].join(' ');
+
+function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onClose: () => void }) {
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  // Back (phone button or swipe) closes the sheet first, like the big-picture viewer.
+  useEffect(() => {
+    window.history.pushState({ nl: 'sheet' }, '');
+    const onPop = () => closeRef.current();
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  // A saved PDF is named after the page title, so give it the customer's name while the sheet is open.
+  useEffect(() => {
+    const prev = document.title;
+    document.title = (data.customer || data.name || 'Job') + ' - Job Sheet';
+    return () => { document.title = prev; };
+  }, [data.customer, data.name]);
+  const close = () => {
+    if (window.history.state && window.history.state.nl === 'sheet') window.history.back();
+    else onClose();
+  };
+  const info = (label: string, value: string): ReactNode => value.trim() ? (
+    <div className="nl-js-row"><span className="nl-js-k">{label}</span><span className="nl-js-v">{value}</span></div>
+  ) : null;
+  const notes = data.jobNotes.trim();
+  const reminders = data.scratch.filter(s => s.text.trim());
+  return createPortal(
+    <div id="nl-jobsheet-root">
+      <style>{JOBSHEET_CSS}</style>
+      <div className="nl-js-bar">
+        <button onClick={close} style={headBtn}>&larr; Back</button>
+        <button onClick={() => window.print()} style={{ ...headBtn, background: EMBER, color: INK, border: 'none', fontWeight: 800 }}>Print / Save as PDF</button>
+        <div className="nl-js-hint">To make a PDF: tap Print / Save as PDF, then choose Save as PDF as the printer.</div>
+      </div>
+      <div className="nl-js-page">
+        <div className="nl-js-brand">NEXT LEVEL &middot; JOB SHEET</div>
+        <div className="nl-js-title">{data.customer || data.name}</div>
+        {info('Customer', data.customer)}
+        {info('Date', data.date)}
+        {info('Phone', data.phone)}
+        {info('Email', data.email)}
+        {info('Address', data.address)}
+        {info('Job', data.jobDesc)}
+        {notes && (
+          <>
+            <div className="nl-js-h">JOB NOTES</div>
+            <div className="nl-js-text">{notes}</div>
+          </>
+        )}
+        {reminders.length > 0 && (
+          <>
+            <div className="nl-js-h">REMINDERS</div>
+            {reminders.map(s => <div key={s.id} className="nl-js-li">&bull; {s.text}</div>)}
+          </>
+        )}
+        {data.photos.length > 0 && (
+          <>
+            <div className="nl-js-h">PICTURES ({data.photos.length})</div>
+            <div className="nl-js-photos">
+              {data.photos.map((p, i) => (
+                <div key={p.id} className="nl-js-fig">
+                  <Photo id={p.id} rev={rev} style={{ width: '100%', height: 'auto', display: 'block' }} />
+                  <div className="nl-js-cap">
+                    <b>{p.caption || 'Picture ' + (i + 1)}</b>
+                    {p.note.trim() ? <div className="nl-js-note">{p.note}</div> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   onHome: () => void; onFull: () => void; onTakePhoto: () => void;
 }) {
@@ -160,10 +262,8 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   const [newLine, setNewLine] = useState('');
   const [notesOpen, setNotesOpen] = useState(true);
   const [polishBusy, setPolishBusy] = useState(false);
-  const [polishItems, setPolishItems] = useState<string[] | null>(null);
-  const [polishSource, setPolishSource] = useState('');
   const [polishMsg, setPolishMsg] = useState('');
-  const [polishUndo, setPolishUndo] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [w, setW] = useState(window.innerWidth);
   const wide = w >= 900;
 
@@ -356,8 +456,8 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   // original. Nothing is replaced until the person taps "Use this".
   const runPolish = async () => {
     const raw = data.jobNotes;
-    if (!raw.trim()) { setPolishItems(null); setPolishMsg('Type or say your job notes first, then tap Polish.'); return; }
-    setPolishBusy(true); setPolishMsg(''); setPolishItems(null); setPolishUndo(null);
+    if (!raw.trim()) { setPolishMsg('Type or say your job notes first, then tap Polish.'); return; }
+    setPolishBusy(true); setPolishMsg(''); window.NextLevel?.setPolish({ items: null });
     try {
       const res = await fetch('/api/format-section', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -367,7 +467,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
       try { json = await res.json(); } catch { json = null; }
       const items: string[] = json && Array.isArray(json.formattedItems)
         ? json.formattedItems.map((x: unknown) => String(x).trim()).filter((x: string) => x) : [];
-      if (res.ok && items.length) { setPolishItems(items); setPolishSource(raw); }
+      if (res.ok && items.length) { window.NextLevel?.setPolish({ items, source: raw }); refresh(); }
       else if (!json || json.error === 'not_configured') setPolishMsg("Polish isn't connected yet. Your notes are untouched.");
       else setPolishMsg("Polish couldn't finish this time. Your notes are untouched. Try again in a minute.");
     } catch {
@@ -375,12 +475,11 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
     }
     setPolishBusy(false);
   };
-  const polishShown = polishItems && polishSource === data.jobNotes ? polishItems : null;
+  const polishShown = data.polished && data.polishedFrom === data.jobNotes ? data.polished : null;
   const useTheirs = () => {
     if (!polishShown) return;
-    setPolishUndo(data.jobNotes);
+    window.NextLevel?.setPolish({ items: null, undo: data.jobNotes });
     set({ jobNotes: polishShown.map((t, i) => (i + 1) + '. ' + t).join('\n') });
-    setPolishItems(null);
   };
 
   const jobNotes = (
@@ -389,14 +488,15 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
         <h2 style={heading}>JOB NOTES</h2>
         <span style={{ fontSize: '12px', color: MUTED }}>tear-out to debris removal</span>
       </div>
-      <textarea value={data.jobNotes} onChange={e => set({ jobNotes: e.target.value })} rows={wide ? 12 : 8}
+      <textarea value={data.jobNotes} onChange={e => { if (data.polishUndo !== null) window.NextLevel?.setPolish({ undo: null }); set({ jobNotes: e.target.value }); }} rows={wide ? 12 : 8}
         placeholder="Say or type what happens on this job, start to finish. (Tip: use your keyboard's mic.)"
         style={{ ...fieldInput, background: '#fff', fontSize: '17px', lineHeight: 1.45, padding: '14px', borderRadius: '14px', resize: 'vertical' }} />
+      <div style={{ fontSize: '12px', color: MUTED }}>The mic is your keyboard&apos;s voice typing, so it needs a signal. If it stops, keep typing. Nothing is lost.</div>
       <button onClick={runPolish} disabled={polishBusy} style={{ ...solidBtn, minHeight: '54px', fontSize: '17px', opacity: polishBusy ? 0.6 : 1 }}>{polishBusy ? 'Polishing...' : 'Polish'}</button>
       <div style={{ fontSize: '12px', color: MUTED }}>Polishes the Job notes only. Your customer info and reminders are not sent.</div>
       {polishMsg && <div style={{ fontSize: '15px', color: INK, background: '#FFF4E5', border: '1px solid #F0D2A8', borderRadius: '10px', padding: '10px 12px' }}>{polishMsg}</div>}
-      {polishUndo !== null && !polishShown && (
-        <button onClick={() => { set({ jobNotes: polishUndo }); setPolishUndo(null); }} style={{ ...outlineBtn, minHeight: '46px' }}>Undo polish (put my words back)</button>
+      {data.polishUndo !== null && !polishShown && (
+        <button onClick={() => { set({ jobNotes: data.polishUndo || '' }); window.NextLevel?.setPolish({ undo: null }); refresh(); }} style={{ ...outlineBtn, minHeight: '46px' }}>Undo polish (put my words back)</button>
       )}
       {polishShown && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -414,7 +514,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={useTheirs} style={{ ...solidBtn, flex: 1 }}>Use this</button>
-            <button onClick={() => setPolishItems(null)} style={{ ...outlineBtn, flex: 1 }}>Keep mine</button>
+            <button onClick={() => { window.NextLevel?.setPolish({ items: null }); refresh(); }} style={{ ...outlineBtn, flex: 1 }}>Keep mine</button>
           </div>
         </div>
       )}
@@ -422,10 +522,18 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   );
 
   const exportBtn = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      <button onClick={() => window.NextLevel?.sendJob()} style={{ ...solidBtn, minHeight: '56px', fontSize: '17px' }}>Send this job</button>
-      <div style={{ fontSize: '12px', color: MUTED }}>Packs the whole job (photos, notes, sketches, customer info) into one file. Pick Drive, email or another device from the share sheet.</div>
-      <button onClick={() => window.NextLevel?.exportReport()} style={{ ...outlineBtn, minHeight: '46px', fontSize: '15px' }}>Boss report (print)</button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', fontWeight: 700, color: '#1F6F3D', background: '#E8F5EC', border: '1px solid #BFE0C8', borderRadius: '10px', padding: '10px 12px' }}>
+        <span aria-hidden="true">&#10003;</span>
+        <span>Saved. Everything saves on this device as you type, so you can close the app any time.</span>
+      </div>
+      <button onClick={() => setSheetOpen(true)} style={{ ...solidBtn, minHeight: '56px', fontSize: '17px' }}>Job Sheet (read, print, save as PDF)</button>
+      <button onClick={onHome} style={{ ...outlineBtn, minHeight: '52px', fontSize: '16px' }}>Done &mdash; back to Jobs</button>
+      <div style={{ borderTop: '1px solid ' + LINE, paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={heading}>MOVE THIS JOB</div>
+        <button onClick={() => window.NextLevel?.sendJob()} style={{ ...outlineBtn, minHeight: '46px', fontSize: '15px' }}>Move this job to another device</button>
+        <div style={{ fontSize: '12px', color: MUTED }}>Packs the whole job (photos, notes, sketches, customer info) into one file that your tablet or laptop can open and pick up as a job. It is not a readable page. Use the Job Sheet for that.</div>
+      </div>
     </div>
   );
 
@@ -453,6 +561,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
         )}
       </div>
       <style>{'.modal-overlay{z-index:9500 !important}.toast{z-index:9600 !important}'}</style>
+      {sheetOpen && <JobSheet data={data} rev={rev} onClose={() => setSheetOpen(false)} />}
       {viewId && <Viewer data={data} rev={rev} startId={viewId} wide={wide} onClose={closeViewer} />}
     </div>
   );

@@ -119,6 +119,9 @@ export function initNextLevel() {
     jobDesc?: string;  // Capture screen: matches the Excel's Description of Job
     jobNotes?: string; // Capture screen: tear-out to debris removal notes
     scratch?: Array<{ id: string; text: string }>; // Capture screen: one-line reminders
+    polished?: string[];   // Capture screen: Polish result waiting for "Use this" / "Keep mine"
+    polishedFrom?: string; // the Job notes text that list was made from
+    polishUndo?: string;   // Job notes as they were before "Use this"
   }
 
   let projects: Project[] = [];
@@ -5218,6 +5221,7 @@ export function initNextLevel() {
         id: p.id, name: p.name,
         customer: p.customer || '', phone: p.phone || '', address: p.address || '',
         date: p.date || '', jobDesc: p.jobDesc || '', jobNotes: p.jobNotes || '', email: p.email || '',
+        polished: p.polished || null, polishedFrom: p.polishedFrom || '', polishUndo: p.polishUndo ?? null,
         scratch: (p.scratch || []).map(s => ({ id: s.id, text: s.text })),
         photos: (p.photos || []).map(ph => ({ id: ph.id, caption: ph.caption || '', note: ph.note || '', timestamp: ph.timestamp })),
       };
@@ -5239,6 +5243,28 @@ export function initNextLevel() {
       if (!p) return;
       p.scratch = items.map(s => ({ id: String(s.id), text: String(s.text) }));
       save();
+    },
+    // Keeps the Polish result with the job so leaving the screen never loses it.
+    setPolish(patch: { items?: string[] | null; source?: string; undo?: string | null }): void {
+      const p = getProject();
+      if (!p) return;
+      if (patch.items === null) { delete p.polished; delete p.polishedFrom; }
+      else if (Array.isArray(patch.items)) { p.polished = patch.items.map(x => String(x)); p.polishedFrom = String(patch.source || ''); }
+      if (patch.undo === null) delete p.polishUndo;
+      else if (typeof patch.undo === 'string') p.polishUndo = patch.undo;
+      save();
+    },
+    // Removes one whole job (and its saved pictures). The job lists ask "are you sure" before calling this.
+    deleteJob(id: string): void {
+      const p = projects.find(x => x.id === id);
+      if (!p) return;
+      (p.photos || []).forEach(ph => { try { Promise.resolve(deletePhotoBlob(ph.id)).catch(() => { /* ignore */ }); } catch { /* ignore */ } });
+      projects = projects.filter(x => x.id !== id);
+      if (currentProjectId === id) { currentProjectId = projects[0]?.id || null; currentPageIdx = 0; selectedWallIdx = -1; }
+      save();
+      renderSidebar();
+      render();
+      notifyCapture();
     },
     async photoUrl(id: string): Promise<string | null> {
       const ph = getProject()?.photos?.find(x => x.id === id);

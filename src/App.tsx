@@ -40,7 +40,7 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
   useEffect(() => window.NextLevel?.onCapture(() => setTick(t => t + 1)), []);
   const jobs = (window.NextLevel?.listJobs() || [])
     .filter(j => !q.trim() || j.name.toLowerCase().includes(q.trim().toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .reverse(); // newest job first (jobs are stored oldest to newest)
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9998, background: 'var(--ink)',
@@ -50,7 +50,7 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
         <button onClick={onCancel} style={{ background: 'none', border: 'none', color: 'var(--cream)', fontSize: '26px', cursor: 'pointer', lineHeight: 1 }}>&larr;</button>
         <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--cream)' }}>{title}</div>
       </div>
-      <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search jobs…" autoFocus style={{
+      <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search jobs…" style={{
         padding: '12px 14px', borderRadius: '12px', border: '1px solid rgba(238,241,238,0.2)',
         background: 'rgba(238,241,238,0.06)', color: 'var(--cream)', fontSize: '16px', marginBottom: '14px', outline: 'none',
       }} />

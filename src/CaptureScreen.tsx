@@ -210,7 +210,7 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
         <div className="nl-js-hint">To make a PDF: tap Print / Save as PDF, then choose Save as PDF as the printer.</div>
       </div>
       <div className="nl-js-page">
-        <div className="nl-js-brand">NEXT LEVEL &middot; JOB SHEET</div>
+        <div className="nl-js-brand">FIELD &amp; DESK &middot; JOB SHEET</div>
         <div className="nl-js-title">{data.customer || data.name}</div>
         {info('Customer', data.customer)}
         {info('Date', data.date)}

@@ -51,8 +51,8 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
         <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--cream)' }}>{title}</div>
       </div>
       <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search jobs…" autoFocus style={{
-        padding: '12px 14px', borderRadius: '12px', border: '1px solid rgba(245,243,239,0.2)',
-        background: 'rgba(245,243,239,0.06)', color: 'var(--cream)', fontSize: '16px', marginBottom: '14px', outline: 'none',
+        padding: '12px 14px', borderRadius: '12px', border: '1px solid rgba(238,241,238,0.2)',
+        background: 'rgba(238,241,238,0.06)', color: 'var(--cream)', fontSize: '16px', marginBottom: '14px', outline: 'none',
       }} />
       {onNew && (
         <button onClick={onNew} style={{
@@ -62,7 +62,7 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
       )}
       {onGetFile && (
         <button onClick={onGetFile} style={{
-          padding: '14px', borderRadius: '14px', border: '1px solid rgba(245,243,239,0.3)', background: 'transparent',
+          padding: '14px', borderRadius: '14px', border: '1px solid rgba(238,241,238,0.3)', background: 'transparent',
           color: 'var(--cream)', fontSize: '16px', fontWeight: 700, cursor: 'pointer', marginBottom: '14px',
         }}>Get a job file</button>
       )}
@@ -74,14 +74,14 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
         ) : jobs.map(j => (
           <div key={j.id} style={{
             display: 'flex', alignItems: 'stretch', gap: '8px',
-            borderRadius: '14px', border: '1px solid rgba(245,243,239,0.14)', background: 'rgba(245,243,239,0.05)',
+            borderRadius: '14px', border: '1px solid rgba(238,241,238,0.14)', background: 'rgba(238,241,238,0.05)',
           }}>
             {confirmId === j.id ? (
               <div style={{ flex: 1, minWidth: 0, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ color: 'var(--cream)', fontSize: '15px', lineHeight: 1.4 }}>Delete <b>{j.name}</b>? This removes the whole job: pictures, notes, drawing, everything. It can&apos;t be undone.</div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button onClick={() => { window.NextLevel?.deleteJob(j.id); setConfirmId(null); }} style={{ flex: 1, minHeight: '48px', borderRadius: '10px', border: 'none', background: '#B42318', color: '#fff', fontSize: '16px', fontWeight: 800, cursor: 'pointer' }}>Yes, delete it</button>
-                  <button onClick={() => setConfirmId(null)} style={{ flex: 1, minHeight: '48px', borderRadius: '10px', border: '1px solid rgba(245,243,239,0.3)', background: 'transparent', color: 'var(--cream)', fontSize: '16px', fontWeight: 700, cursor: 'pointer' }}>Keep it</button>
+                  <button onClick={() => setConfirmId(null)} style={{ flex: 1, minHeight: '48px', borderRadius: '10px', border: '1px solid rgba(238,241,238,0.3)', background: 'transparent', color: 'var(--cream)', fontSize: '16px', fontWeight: 700, cursor: 'pointer' }}>Keep it</button>
                 </div>
               </div>
             ) : (
@@ -94,10 +94,10 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
                     <div style={{ fontSize: '16px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.name}</div>
                     <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px' }}>{j.category} &middot; {j.photoCount} photo{j.photoCount === 1 ? '' : 's'} &middot; {j.noteCount} note{j.noteCount === 1 ? '' : 's'}</div>
                   </span>
-                  <span style={{ color: 'var(--ember)', fontSize: '22px', flexShrink: 0 }}>&rsaquo;</span>
+                  <span style={{ color: 'var(--moss)', fontSize: '22px', flexShrink: 0 }}>&rsaquo;</span>
                 </button>
                 <button aria-label={'Delete ' + j.name} onClick={() => setConfirmId(j.id)} style={{
-                  flex: 'none', width: '64px', border: 'none', borderLeft: '1px solid rgba(245,243,239,0.14)', background: 'transparent',
+                  flex: 'none', width: '64px', border: 'none', borderLeft: '1px solid rgba(238,241,238,0.14)', background: 'transparent',
                   color: '#F0A59B', fontSize: '13px', fontWeight: 800, cursor: 'pointer',
                 }}>Delete</button>
               </>
@@ -188,7 +188,7 @@ function Launcher({ onPick }: { onPick: (door: 'new' | 'open' | 'just' | 'quick'
     display: 'flex', alignItems: 'center', gap: '16px', width: '100%',
     padding: '20px 24px', borderRadius: '16px', fontSize: '20px', fontWeight: 800,
     letterSpacing: '0.3px', cursor: 'pointer', textAlign: 'left',
-    border: '2px solid rgba(245,243,239,0.15)', background: 'rgba(245,243,239,0.04)',
+    border: '2px solid rgba(238,241,238,0.15)', background: 'rgba(238,241,238,0.04)',
     color: 'var(--cream)', transition: 'transform 0.08s ease, background 0.15s ease',
   };
   const iconWrap: CSSProperties = { fontSize: '30px', width: '40px', textAlign: 'center', flexShrink: 0 };
@@ -201,7 +201,7 @@ function Launcher({ onPick }: { onPick: (door: 'new' | 'open' | 'just' | 'quick'
       padding: '24px', boxSizing: 'border-box', overflowY: 'auto',
     }}>
       <div style={{ fontSize: '42px', fontWeight: 500, letterSpacing: '0.5px', marginBottom: '6px' }}>
-        <span style={{ color: 'var(--cream)' }}>Next </span><span style={{ color: 'var(--ember)' }}>Level</span>
+        <span style={{ color: 'var(--ember)' }}>Next </span><span style={{ color: 'var(--moss)' }}>Level</span>
       </div>
       <div style={{ fontSize: '22px', fontWeight: 300, letterSpacing: '3px', color: 'var(--cream)', marginBottom: '12px' }}>Field &amp; Desk</div>
       <div style={{ fontSize: '11px', letterSpacing: '3px', color: 'var(--muted)', marginBottom: '40px' }}>MEASURE &middot; DESIGN &middot; DELIVER</div>
@@ -209,7 +209,7 @@ function Launcher({ onPick }: { onPick: (door: 'new' | 'open' | 'just' | 'quick'
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '440px' }}>
         <button onClick={() => onPick('capture')} style={{ ...doorBtn, border: 'none', background: 'var(--ember)', color: 'var(--ink)' }}>
           <span style={iconWrap}>{'\u{1F4CB}'}</span>
-          <span>Capture<div style={{ ...sub, color: 'rgba(21,18,15,0.65)' }}>Start a new job</div></span>
+          <span>Capture<div style={{ ...sub, color: 'rgba(20,25,26,0.65)' }}>Start a new job</div></span>
         </button>
         <button onClick={() => onPick('open')} style={doorBtn}>
           <span style={iconWrap}>{'\u{1F4C2}'}</span>
@@ -241,15 +241,15 @@ function StageBar({ stage, setStage, onHome }: { stage: Stage; setStage: (s: Sta
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0,
-      background: 'var(--ink)', borderBottom: '1px solid rgba(245,243,239,0.12)',
+      background: 'var(--ink)', borderBottom: '1px solid rgba(238,241,238,0.12)',
       padding: '8px 12px', boxSizing: 'border-box',
     }}>
       <button onClick={onHome} title="Home — start or switch jobs" style={{
         flexShrink: 0, width: '40px', height: '40px', borderRadius: '10px', cursor: 'pointer',
-        border: '1px solid rgba(245,243,239,0.15)', background: 'rgba(245,243,239,0.05)',
+        border: '1px solid rgba(238,241,238,0.15)', background: 'rgba(238,241,238,0.05)',
         color: 'var(--cream)', fontSize: '18px',
       }}>🏠</button>
-      <div style={{ display: 'flex', flex: 1, gap: '4px', background: 'rgba(245,243,239,0.05)', padding: '4px', borderRadius: '12px' }}>
+      <div style={{ display: 'flex', flex: 1, gap: '4px', background: 'rgba(238,241,238,0.05)', padding: '4px', borderRadius: '12px' }}>
         {STAGES.map(s => (
           <button key={s} onClick={() => setStage(s)} style={tab(s)}>{STAGE_LABEL[s]}</button>
         ))}
@@ -262,7 +262,7 @@ function StageBar({ stage, setStage, onHome }: { stage: Stage; setStage: (s: Sta
       ) : (
         <button disabled style={{
           flexShrink: 0, padding: '10px 16px', fontSize: '14px', fontWeight: 800,
-          border: '2px solid rgba(245,243,239,0.15)', borderRadius: '10px', background: 'transparent',
+          border: '2px solid rgba(238,241,238,0.15)', borderRadius: '10px', background: 'transparent',
           color: 'var(--muted)', opacity: 0.6,
         }}>Finish</button>
       )}
@@ -282,7 +282,7 @@ function CanvasModeToggle({ onOpenCamera }: { onOpenCamera: () => void }) {
     width: '58px', padding: '9px 0', borderRadius: '12px', cursor: 'pointer',
     fontSize: '22px', fontWeight: 700, lineHeight: 1,
     border: active ? 'none' : '1px solid rgba(255,255,255,0.18)',
-    background: active ? 'var(--ember)' : 'rgba(21,18,15,0.82)',
+    background: active ? 'var(--ember)' : 'rgba(20,25,26,0.82)',
     color: active ? 'var(--ink)' : 'var(--cream)',
     boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
   });
@@ -290,7 +290,7 @@ function CanvasModeToggle({ onOpenCamera }: { onOpenCamera: () => void }) {
   const menuBtn: CSSProperties = {
     display: 'flex', alignItems: 'center', gap: '10px', whiteSpace: 'nowrap',
     padding: '14px 18px', borderRadius: '14px', cursor: 'pointer',
-    border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(21,18,15,0.96)',
+    border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(20,25,26,0.96)',
     color: 'var(--cream)', fontSize: '16px', fontWeight: 800,
     boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
   };
@@ -426,7 +426,7 @@ export default function App() {
         <div id="app">
       <aside id="sidebar">
         <div className="sidebar-header">
-          <h2 style={{ fontSize: '26px', letterSpacing: '0.5px', lineHeight: 1.1 }}><span style={{ color: 'var(--cream)' }}>Next </span><span style={{ color: 'var(--ember)' }}>Level</span></h2>
+          <h2 style={{ fontSize: '26px', letterSpacing: '0.5px', lineHeight: 1.1 }}><span style={{ color: 'var(--ember)' }}>Next </span><span style={{ color: 'var(--moss)' }}>Level</span></h2>
           <div style={{ fontSize: '12px', fontWeight: 400, letterSpacing: '2.5px', color: 'var(--muted)', marginTop: '3px' }}>FIELD &amp; DESK</div>
           <span id="sidebar-close" className="sidebar-close">&times;</span>
         </div>
@@ -1072,8 +1072,8 @@ export default function App() {
           </div>
           <p className="modal-sub" style={{ flex: 'none' }}>Jump straight to a job's canvas, or start a blank one</p>
           <div id="skip-category-cards" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', flex: 'none' }}>
-            <button className="skip-cat-card" data-skip-cat="Bathroom" style={{ padding: '18px 8px', fontSize: '17px', fontWeight: 800, cursor: 'pointer', background: 'rgba(232,98,44,0.08)', border: '1px solid var(--ink)', borderRadius: '8px', color: 'var(--ink)' }}>+ Bath</button>
-            <button className="skip-cat-card" data-skip-cat="Kitchen" style={{ padding: '18px 8px', fontSize: '17px', fontWeight: 800, cursor: 'pointer', background: 'rgba(232,98,44,0.08)', border: '1px solid var(--ink)', borderRadius: '8px', color: 'var(--ink)' }}>+ Kitchen</button>
+            <button className="skip-cat-card" data-skip-cat="Bathroom" style={{ padding: '18px 8px', fontSize: '17px', fontWeight: 800, cursor: 'pointer', background: 'rgba(160,138,88,0.08)', border: '1px solid var(--ink)', borderRadius: '8px', color: 'var(--ink)' }}>+ Bath</button>
+            <button className="skip-cat-card" data-skip-cat="Kitchen" style={{ padding: '18px 8px', fontSize: '17px', fontWeight: 800, cursor: 'pointer', background: 'rgba(160,138,88,0.08)', border: '1px solid var(--ink)', borderRadius: '8px', color: 'var(--ink)' }}>+ Kitchen</button>
           </div>
           <button id="skip-btn-full-setup" className="btn btn-sm btn-block" style={{ marginTop: '8px', flex: 'none', background: 'none', border: '1px dashed var(--border)', color: '#64748b', fontSize: '12px', fontWeight: 600 }}>🪄 Need client info first? Full Setup Wizard →</button>
           <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px', borderTop: '1px solid rgba(0,0,0,0.1)', marginTop: '12px', paddingTop: '10px', flex: 'none' }}>Or jump to an existing job</div>
@@ -1095,7 +1095,7 @@ export default function App() {
             <button id="wiz-btn-switch-job" className="btn btn-sm" style={{ fontSize: '11px', padding: '3px 8px' }}>🔍 Switch Job</button>
           </div>
           <div id="wiz-job-search-panel" className="hidden" style={{ marginBottom: '12px', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px' }}>
-            <button id="wiz-btn-new-job" className="btn btn-sm btn-block" style={{ marginBottom: '8px', background: 'rgba(232,98,44,0.08)', border: '1px solid var(--ink)', color: 'var(--ink)', fontWeight: 700 }}>+ Start a New Job</button>
+            <button id="wiz-btn-new-job" className="btn btn-sm btn-block" style={{ marginBottom: '8px', background: 'rgba(160,138,88,0.08)', border: '1px solid var(--ink)', color: 'var(--ink)', fontWeight: 700 }}>+ Start a New Job</button>
             <input type="text" id="wiz-job-search" placeholder="Or search an existing job..." style={{ width: '100%', padding: '7px 9px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px' }} />
             <div id="wiz-job-search-list" style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto' }}></div>
           </div>

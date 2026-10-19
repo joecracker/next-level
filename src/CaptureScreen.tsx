@@ -26,7 +26,7 @@ function readSize(): number {
 function writeSize(v: number) { try { localStorage.setItem(LABEL_KEY, String(v)); } catch { /* ignore */ } }
 function today(): string { const d = new Date(); return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`; }
 
-const INK = '#15120F', EMBER = '#E8622C', CREAM = '#F5F3EF', MUTED = '#6B665F', LINE = '#D9D5CE';
+const INK = '#14191A', EMBER = '#A08A58', MOSS = '#8A9A5C', CREAM = '#EEF1EE', MUTED = '#5E6968', LINE = '#D3DADA';
 
 const fieldLabel: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', fontWeight: 700, color: MUTED, minWidth: 0 };
 const fieldInput: CSSProperties = {
@@ -34,7 +34,7 @@ const fieldInput: CSSProperties = {
   padding: '0 12px', fontSize: '17px', background: '#FAF9F6', color: INK, fontFamily: 'inherit',
 };
 const card: CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' };
-const heading: CSSProperties = { margin: 0, fontSize: '13px', letterSpacing: '2px', fontWeight: 800, color: '#B8481C' };
+const heading: CSSProperties = { margin: 0, fontSize: '13px', letterSpacing: '2px', fontWeight: 800, color: '#4A5C2E' };
 const bigBtn: CSSProperties = { minHeight: '52px', borderRadius: '12px', fontSize: '16px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' };
 const outlineBtn: CSSProperties = { ...bigBtn, border: `2px solid ${INK}`, background: 'transparent', color: INK };
 const solidBtn: CSSProperties = { ...bigBtn, border: 'none', background: EMBER, color: INK };
@@ -156,20 +156,20 @@ function Viewer({ data, rev, startId, wide, onClose }: {
 // reminders, pictures with their captions and notes). "Print / Save as PDF" opens the phone's own print screen,
 // which has a Save as PDF choice. It replaces the old Boss report on the Capture screen.
 const JOBSHEET_CSS = [
-  '#nl-jobsheet-root{position:fixed;inset:0;z-index:9300;background:#fff;color:#15120F;overflow-y:auto;-webkit-overflow-scrolling:touch;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}',
-  '#nl-jobsheet-root .nl-js-bar{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:#15120F}',
+  '#nl-jobsheet-root{position:fixed;inset:0;z-index:9300;background:#fff;color:#14191A;overflow-y:auto;-webkit-overflow-scrolling:touch;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}',
+  '#nl-jobsheet-root .nl-js-bar{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:#14191A}',
   '#nl-jobsheet-root .nl-js-hint{flex-basis:100%;font-size:12px;color:#B9B4AC}',
   '#nl-jobsheet-root .nl-js-page{max-width:820px;margin:0 auto;padding:18px 16px 48px}',
-  '#nl-jobsheet-root .nl-js-brand{font-size:12px;letter-spacing:2px;font-weight:800;color:#B8481C}',
-  '#nl-jobsheet-root .nl-js-title{font-size:28px;font-weight:800;margin:2px 0 12px;border-bottom:2px solid #15120F;padding-bottom:10px;overflow-wrap:anywhere}',
+  '#nl-jobsheet-root .nl-js-brand{font-size:12px;letter-spacing:2px;font-weight:800;color:#4A5C2E}',
+  '#nl-jobsheet-root .nl-js-title{font-size:28px;font-weight:800;margin:2px 0 12px;border-bottom:2px solid #14191A;padding-bottom:10px;overflow-wrap:anywhere}',
   '#nl-jobsheet-root .nl-js-row{display:flex;gap:10px;font-size:15px;line-height:1.4;margin:4px 0}',
   '#nl-jobsheet-root .nl-js-k{flex:none;width:96px;font-weight:800;color:#555}',
   '#nl-jobsheet-root .nl-js-v{flex:1;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}',
-  '#nl-jobsheet-root .nl-js-h{font-size:13px;letter-spacing:2px;font-weight:800;color:#B8481C;margin:22px 0 8px;border-bottom:1px solid #D9D5CE;padding-bottom:4px}',
+  '#nl-jobsheet-root .nl-js-h{font-size:13px;letter-spacing:2px;font-weight:800;color:#4A5C2E;margin:22px 0 8px;border-bottom:1px solid #D3DADA;padding-bottom:4px}',
   '#nl-jobsheet-root .nl-js-text{font-size:15px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}',
   '#nl-jobsheet-root .nl-js-li{font-size:15px;line-height:1.45;margin:3px 0;overflow-wrap:anywhere}',
   '#nl-jobsheet-root .nl-js-photos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}',
-  '#nl-jobsheet-root .nl-js-fig{break-inside:avoid;page-break-inside:avoid;border:1px solid #D9D5CE;border-radius:8px;overflow:hidden;background:#fff}',
+  '#nl-jobsheet-root .nl-js-fig{break-inside:avoid;page-break-inside:avoid;border:1px solid #D3DADA;border-radius:8px;overflow:hidden;background:#fff}',
   '#nl-jobsheet-root .nl-js-cap{padding:8px 10px;font-size:14px;line-height:1.35}',
   '#nl-jobsheet-root .nl-js-note{margin-top:3px;white-space:pre-wrap;color:#333;overflow-wrap:anywhere}',
   '@media (max-width:560px){#nl-jobsheet-root .nl-js-photos{grid-template-columns:1fr}}',
@@ -434,7 +434,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
           )}
           {scratch.map(s => (
             <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-              <span style={{ marginTop: '17px', display: 'flex' }}>{dot('#8A857E')}</span>
+              <span style={{ marginTop: '17px', display: 'flex' }}>{dot('#8A9190')}</span>
               <AutoText value={s.text} onChange={v => editLine(s.id, v)} ariaLabel="Reminder"
                 style={{ flex: 1, minWidth: 0, minHeight: '44px', border: 'none', borderBottom: '1px solid #E6E2DB', background: 'transparent', fontSize: '18px', lineHeight: 1.35, color: INK, fontFamily: 'inherit', padding: '9px 0' }} />
               <button aria-label="Remove reminder" onClick={() => removeLine(s.id)} style={{ flex: 'none', width: '44px', height: '44px', border: 'none', background: 'transparent', color: MUTED, fontSize: '22px', cursor: 'pointer' }}>&times;</button>
@@ -442,9 +442,9 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
           ))}
           {withNotes.map(({ p, i }) => (
             <button key={p.id} onClick={() => setViewId(p.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', width: '100%', textAlign: 'left', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', color: INK }}>
-              <span style={{ marginTop: '8px', display: 'flex' }}>{dot('#8A857E')}</span>
+              <span style={{ marginTop: '8px', display: 'flex' }}>{dot('#8A9190')}</span>
               <span style={{ flex: 1, minWidth: 0, fontSize: '18px', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{p.note}</span>
-              <span style={{ flex: 'none', maxWidth: '38%', fontSize: '12px', fontWeight: 800, color: '#B8481C', border: '1px solid #E6C9BA', borderRadius: '8px', padding: '3px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.caption || 'Picture ' + (i + 1)}</span>
+              <span style={{ flex: 'none', maxWidth: '38%', fontSize: '12px', fontWeight: 800, color: '#4A5C2E', border: '1px solid #C9D2B3', borderRadius: '8px', padding: '3px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.caption || 'Picture ' + (i + 1)}</span>
             </button>
           ))}
         </>
@@ -542,7 +542,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
       <div style={{ background: INK, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
         <button onClick={onHome} style={headBtn}>&lsaquo; Jobs</button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '18px', fontWeight: 500 }}><span style={{ color: CREAM }}>Next </span><span style={{ color: EMBER }}>Level</span> <span style={{ color: CREAM, fontWeight: 800, letterSpacing: '1px', fontSize: '13px' }}>CAPTURE</span></div>
+          <div style={{ fontSize: '18px', fontWeight: 500 }}><span style={{ color: EMBER }}>Next </span><span style={{ color: MOSS }}>Level</span> <span style={{ color: CREAM, fontWeight: 800, letterSpacing: '1px', fontSize: '13px' }}>CAPTURE</span></div>
           <div style={{ fontSize: '12px', color: '#B9B4AC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.customer || data.name}</div>
           <div style={{ fontSize: '11px', color: '#9D978F', whiteSpace: 'nowrap' }}>{BUILD_STAMP}</div>
         </div>

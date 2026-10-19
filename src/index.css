@@ -3,14 +3,15 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 .hidden { display: none !important; }
 :root {
-  --ink: #15120F;
-  --ember: #E8622C;
-  --cream: #F5F3EF;
+  --ink: #14191A;
+  --ember: #A08A58;
+  --moss: #8A9A5C;
+  --cream: #EEF1EE;
   --bg: #f5f6f8;
   --panel: #fff;
   --border: #d1d5db;
   --text: #1a1a1a;
-  --muted: #8A857E;
+  --muted: #8A9190;
   --danger: #dc2626;
   --new-wall: #000;
   --exist-wall: #666;
@@ -34,10 +35,10 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
   transition: transform .2s ease;
   color: #fff;
 }
-.sidebar-header { padding: 16px 14px; font-weight: 800; font-size: 20px; color: var(--ember); border-bottom: 2px solid rgba(255,255,255,0.15); background: var(--ink); position: sticky; top: 0; z-index: 10; text-align: center; }
+.sidebar-header { padding: 16px 14px; font-weight: 800; font-size: 20px; color: var(--moss); border-bottom: 2px solid rgba(255,255,255,0.15); background: var(--ink); position: sticky; top: 0; z-index: 10; text-align: center; }
 .sidebar-header h2 { display: inline; }
 .sidebar-section { padding: 12px 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.15); }
-.section-title { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--ember); margin-bottom: 6px; font-weight: 700; }
+.section-title { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--moss); margin-bottom: 6px; font-weight: 700; }
 
 #sidebar input[type="text"],
 #sidebar input[type="number"],
@@ -49,7 +50,7 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
   font-size: 14px; background: rgba(255, 255, 255, 0.08); color: #fff; margin-bottom: 6px;
 }
 #sidebar input::placeholder, #sidebar textarea::placeholder { color: rgba(255, 255, 255, 0.5); }
-#sidebar input:focus, #sidebar select:focus, #sidebar textarea:focus { outline: none; border-color: var(--ember); box-shadow: 0 0 0 2px rgba(232,98,44,.25); }
+#sidebar input:focus, #sidebar select:focus, #sidebar textarea:focus { outline: none; border-color: var(--moss); box-shadow: 0 0 0 2px rgba(138,154,92,.28); }
 
 .btn-row { display: flex; gap: 6px; }
 .btn-row .btn { flex: 1; }
@@ -69,7 +70,7 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
 .btn-sm { padding: 6px 10px; font-size: 13px; min-height: 32px; }
 .btn-block { width: 100%; }
 .btn-accent { background: var(--ember); color: var(--ink); border-color: var(--ember); font-weight: 700; }
-.btn-accent:hover { background: #cf5623; border-color: #cf5623; color: var(--ink); }
+.btn-accent:hover { background: #8E7A4D; border-color: #8E7A4D; color: var(--ink); }
 .btn-danger { background: rgba(220, 38, 38, 0.15); color: #ff8a8a; border-color: rgba(220, 38, 38, 0.4); }
 .btn-danger:hover { background: rgba(220, 38, 38, 0.3); }
 .btn.active { background: var(--ember); color: var(--ink); border-color: var(--ember); font-weight: 700; }
@@ -194,7 +195,7 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
 .modal .btn-accent {
   background: var(--ember); color: var(--ink); border-color: var(--ember);
 }
-.modal .btn-accent:hover { background: #cf5623; border-color: #cf5623; }
+.modal .btn-accent:hover { background: #8E7A4D; border-color: #8E7A4D; }
 .modal .btn-danger { background: #fdecec; color: #c0392b; border-color: #f0b4b4; }
 .modal select, .modal input {
   background: #fff; color: var(--ink); border: 1px solid var(--border);
@@ -476,7 +477,7 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
   background: rgba(255,255,255,0.12); border-color: var(--ember); transform: translateY(-2px);
 }
 .wiz-cat-card.active {
-  background: rgba(232,98,44,0.15); border-color: var(--ember); box-shadow: 0 0 12px rgba(232,98,44,0.25);
+  background: rgba(160,138,88,0.15); border-color: var(--ember); box-shadow: 0 0 12px rgba(160,138,88,0.25);
 }
 
 /* ── Quick Actions Radial Menu ───────────────────── */

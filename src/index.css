@@ -7,10 +7,10 @@
   --ember: #A08A58;
   --moss: #8A9A5C;
   --cream: #EEF1EE;
-  --bg: #f5f6f8;
-  --panel: #fff;
-  --border: #d1d5db;
-  --text: #1a1a1a;
+  --bg: #14191A;
+  --panel: #1C2324;
+  --border: #2A3234;
+  --text: #EEF1EE;
   --muted: #8A9190;
   --danger: #dc2626;
   --new-wall: #000;
@@ -144,8 +144,8 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
 .conn-status { font-size: 14px; }
 .conn-online { color: #16a34a; }
 .conn-offline { color: #dc2626; }
-#toolbar .btn { color: var(--text); background: rgba(0,0,0,0.04); border-color: var(--border); }
-#toolbar .btn:hover { background: rgba(0,0,0,0.08); }
+#toolbar .btn { color: var(--text); background: rgba(255,255,255,0.06); border-color: var(--border); }
+#toolbar .btn:hover { background: rgba(255,255,255,0.12); }
 
 /* ── Canvas ───────────────────────────────────────── */
 #canvas-wrap { flex: 1; overflow: hidden; position: relative; background: #fff; cursor: crosshair; }
@@ -163,7 +163,7 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
   box-shadow: 0 4px 12px rgba(0,0,0,.3); cursor: pointer;
   transition: background .2s, transform .15s;
 }
-.voice-btn:hover { background: #001d3a; }
+.voice-btn:hover { background: #1C2324; }
 .voice-btn:active { transform: scale(.92); }
 .voice-btn.recording { background: var(--danger); animation: pulse 1s infinite; }
 .voice-label { display: none; }
@@ -186,28 +186,28 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
    for the dark sidebar. Re-skin them dark-on-light inside modals so inactive
    buttons/pills aren't invisible (white-on-white). Active/accent keep ember. */
 .modal .btn, .modal .pill {
-  background: #fff; color: var(--ink); border-color: var(--border);
+  background: rgba(255,255,255,0.08); color: var(--cream); border-color: rgba(255,255,255,0.2);
 }
 .modal .btn:hover, .modal .pill:hover {
-  background: #f0eeea; border-color: var(--muted);
+  background: rgba(255,255,255,0.15); border-color: var(--muted);
 }
 .modal .btn.active, .modal .pill.active,
 .modal .btn-accent {
   background: var(--ember); color: var(--ink); border-color: var(--ember);
 }
 .modal .btn-accent:hover { background: #8E7A4D; border-color: #8E7A4D; }
-.modal .btn-danger { background: #fdecec; color: #c0392b; border-color: #f0b4b4; }
+.modal .btn-danger { background: rgba(220,38,38,0.15); color: #ff8a8a; border-color: rgba(220,38,38,0.4); }
 .modal select, .modal input {
-  background: #fff; color: var(--ink); border: 1px solid var(--border);
+  background: #14191A; color: var(--cream); border: 1px solid var(--border);
 }
-.modal .calc-label { color: var(--ink); }
+.modal .calc-label { color: var(--cream); }
 .modal {
   background: var(--panel); border-radius: 12px; padding: 20px;
   width: 100%; max-width: 380px; max-height: 85vh; overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0,0,0,.3);
 }
 .modal-help { max-width: 560px; }
-.modal-title { font-size: 18px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.modal-title { font-size: 18px; font-weight: 700; color: var(--cream); margin-bottom: 4px; }
 .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
 .modal-body { margin-bottom: 16px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
@@ -216,14 +216,14 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
 /* ── Help Modal ───────────────────────────────────── */
 .help-body { max-height: 55vh; overflow-y: auto; }
 .help-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
-.help-link { padding: 5px 10px; background: #f0f1f3; border-radius: 6px; font-size: 12px; color: var(--ink); text-decoration: none; cursor: pointer; min-height: 30px; display: flex; align-items: center; }
-.help-link:hover { background: var(--ember); }
+.help-link { padding: 5px 10px; background: #2A3234; border-radius: 6px; font-size: 12px; color: var(--cream); text-decoration: none; cursor: pointer; min-height: 30px; display: flex; align-items: center; }
+.help-link:hover { background: var(--ember); color: var(--ink); }
 .help-section { margin-bottom: 16px; scroll-margin-top: 60px; }
-.help-section h3 { font-size: 15px; color: var(--ink); margin-bottom: 8px; border-bottom: 2px solid var(--ember); padding-bottom: 4px; }
+.help-section h3 { font-size: 15px; color: var(--cream); margin-bottom: 8px; border-bottom: 2px solid var(--ember); padding-bottom: 4px; }
 .help-section p, .help-section li { font-size: 13px; line-height: 1.5; margin-bottom: 6px; }
 .help-section ol, .help-section ul { padding-left: 20px; }
 .help-table { width: 100%; border-collapse: collapse; }
-.help-table td { padding: 4px 10px; font-size: 13px; border-bottom: 1px solid #eee; }
+.help-table td { padding: 4px 10px; font-size: 13px; border-bottom: 1px solid #2A3234; }
 .help-table td:first-child { font-weight: 600; width: 40%; }
 
 /* ── Wall Edit Panel ──────────────────────────────── */
@@ -233,13 +233,13 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
   padding: 14px; width: 220px; box-shadow: 0 4px 16px rgba(0,0,0,.12);
 }
 .wall-edit-panel.hidden { display: none; }
-.wall-edit-title { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+.wall-edit-title { font-size: 14px; font-weight: 700; color: var(--cream); margin-bottom: 10px; }
 #wall-edit-panel select,
 #wall-edit-panel input,
 #opening-edit-panel select,
 #opening-edit-panel input {
   width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px;
-  font-size: 13px; background: #fff; color: var(--text); margin-top: 3px;
+  font-size: 13px; background: #14191A; color: var(--text); margin-top: 3px;
 }
 /* These panels sit on a light card, so their labels must be dark (the base
    .calc-label is white for the dark sidebar). Same problem hits plain .btn
@@ -248,22 +248,22 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
    turns out .btn had the exact same issue the whole time, just harder to
    notice since it still had a visible border.) */
 #wall-edit-panel .calc-label,
-#opening-edit-panel .calc-label { color: var(--ink); }
+#opening-edit-panel .calc-label { color: var(--cream); }
 
 #wall-edit-panel .btn:not(.btn-accent):not(.btn-danger),
 #opening-edit-panel .btn:not(.btn-accent):not(.btn-danger) {
-  background: rgba(0,0,0,.05); color: var(--ink); border-color: var(--border);
+  background: rgba(255,255,255,.08); color: var(--cream); border-color: rgba(255,255,255,.2);
 }
 #wall-edit-panel .btn:not(.btn-accent):not(.btn-danger):hover,
 #opening-edit-panel .btn:not(.btn-accent):not(.btn-danger):hover {
-  background: rgba(0,0,0,.1);
+  background: rgba(255,255,255,.15);
 }
 #wall-edit-panel .btn-danger,
 #opening-edit-panel .btn-danger {
-  background: #fdecec; color: #c0392b; border-color: #f0b4b4;
+  background: rgba(220,38,38,0.15); color: #ff8a8a; border-color: rgba(220,38,38,0.4);
 }
 #wall-edit-panel .btn-danger:hover,
-#opening-edit-panel .btn-danger:hover { background: #fbd5d5; }
+#opening-edit-panel .btn-danger:hover { background: rgba(220,38,38,0.3); }
 
 /* ── Wall Type Swatches ───────────────────────────── */
 .wall-swatch { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 8px; }
@@ -300,7 +300,7 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
   border: none; background: none; text-align: left;
   font-size: 13px; color: var(--text); cursor: pointer;
 }
-.ctx-item:hover { background: rgba(0,39,76,0.08); }
+.ctx-item:hover { background: rgba(255,255,255,0.08); }
 .ctx-sep { height: 1px; background: var(--border); margin: 4px 0; }
 
 /* ── Asset Palette Catalog ────────────────────────── */
@@ -393,13 +393,13 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
 
 /* ── Photo Gallery (Google Keep Style) ─────────────── */
 .photo-card {
-  position: relative; background: #fff; border-radius: 6px; overflow: hidden;
+  position: relative; background: var(--panel); border-radius: 6px; overflow: hidden;
   border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 .photo-thumb { width: 100%; height: 80px; object-fit: cover; display: block; }
 .photo-caption-input {
   width: 100%; border: none; border-top: 1px solid var(--border);
-  padding: 4px 6px; font-size: 11px; background: #fafafa; color: var(--text);
+  padding: 4px 6px; font-size: 11px; background: #14191A; color: var(--text);
 }
 .photo-delete {
   position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.6); color: #fff;
@@ -413,6 +413,7 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
   background: #ffffff; color: #1f2937;
 }
 .modal-boss-report .modal-title { color: #0f172a; }
+.modal-boss-report .btn:not(.btn-accent):not(.btn-danger) { background: #fff; color: #1f2937; border-color: #d1d5db; }
 .report-header { border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 16px; }
 .report-title { font-size: 20px; font-weight: 800; color: #0f172a; }
 .report-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 13px; color: #4b5563; margin-top: 6px; }
@@ -510,8 +511,8 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
 .qa-btn {
   position: absolute;
   width: 42px; height: 42px;
-  background: #ffffff;
-  border: 2px solid var(--ink);
+  background: #1C2324;
+  border: 2px solid var(--ember);
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
@@ -522,7 +523,7 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
 .qa-btn:hover {
   background: var(--ember);
   transform: scale(1.15);
-  border-color: #d97706;
+  border-color: #8E7A4D;
 }
 .qa-btn-dup { top: 0px; left: 50%; transform: translateX(-50%); }
 .qa-btn-dup:hover { transform: translateX(-50%) scale(1.15); }

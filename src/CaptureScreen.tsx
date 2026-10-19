@@ -26,17 +26,18 @@ function readSize(): number {
 function writeSize(v: number) { try { localStorage.setItem(LABEL_KEY, String(v)); } catch { /* ignore */ } }
 function today(): string { const d = new Date(); return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`; }
 
-const INK = '#14191A', EMBER = '#A08A58', MOSS = '#8A9A5C', CREAM = '#EEF1EE', MUTED = '#5E6968', LINE = '#D3DADA';
+const INK = '#14191A', EMBER = '#A08A58', MOSS = '#8A9A5C', CREAM = '#EEF1EE', MUTED = '#9AA5A3', LINE = '#2A3234';
+const PAGE = '#14191A', CARD = '#1C2324', TEXT = '#EEF1EE';
 
 const fieldLabel: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', fontWeight: 700, color: MUTED, minWidth: 0 };
 const fieldInput: CSSProperties = {
-  boxSizing: 'border-box', width: '100%', minHeight: '46px', border: '1px solid #C9C4BC', borderRadius: '10px',
-  padding: '0 12px', fontSize: '17px', background: '#FAF9F6', color: INK, fontFamily: 'inherit',
+  boxSizing: 'border-box', width: '100%', minHeight: '46px', border: '1px solid #3A4446', borderRadius: '10px',
+  padding: '0 12px', fontSize: '17px', background: PAGE, color: TEXT, fontFamily: 'inherit',
 };
-const card: CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' };
-const heading: CSSProperties = { margin: 0, fontSize: '13px', letterSpacing: '2px', fontWeight: 800, color: '#4A5C2E' };
+const card: CSSProperties = { background: CARD, border: `1px solid ${LINE}`, borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' };
+const heading: CSSProperties = { margin: 0, fontSize: '13px', letterSpacing: '2px', fontWeight: 800, color: MOSS };
 const bigBtn: CSSProperties = { minHeight: '52px', borderRadius: '12px', fontSize: '16px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' };
-const outlineBtn: CSSProperties = { ...bigBtn, border: `2px solid ${INK}`, background: 'transparent', color: INK };
+const outlineBtn: CSSProperties = { ...bigBtn, border: `2px solid ${MOSS}`, background: 'transparent', color: TEXT };
 const solidBtn: CSSProperties = { ...bigBtn, border: 'none', background: EMBER, color: INK };
 const headBtn: CSSProperties = {
   minHeight: '40px', padding: '0 14px', borderRadius: '10px', border: '1px solid rgba(245,243,239,0.3)',
@@ -76,7 +77,7 @@ function Photo({ id, rev, style }: { id: string; rev: number; style?: CSSPropert
     window.NextLevel?.photoUrl(id).then(u => { if (on) setUrl(u); });
     return () => { on = false; };
   }, [id, rev]);
-  if (!url) return <div style={{ background: '#E6E2DB', ...style }} />;
+  if (!url) return <div style={{ background: '#2A3234', ...style }} />;
   return <img src={url} alt="" style={style} />;
 }
 
@@ -99,7 +100,7 @@ function Viewer({ data, rev, startId, wide, onClose }: {
   const imageArea = (
     <div style={{
       flex: wide ? 1.5 : 'none', height: wide ? 'auto' : '44vh', minHeight: 0, minWidth: 0, overflow: 'auto',
-      background: read ? CREAM : '#000', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: read ? PAGE : '#000', color: TEXT, display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: read ? '24px' : 0, boxSizing: 'border-box',
     }}>
       {read ? (
@@ -116,7 +117,7 @@ function Viewer({ data, rev, startId, wide, onClose }: {
   const panel = (
     <div style={{
       flex: wide ? 'none' : 1, width: wide ? '380px' : 'auto', minHeight: 0, overflowY: 'auto', boxSizing: 'border-box',
-      padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: CREAM,
+      padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: PAGE, color: TEXT,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button onClick={() => go(-1)} disabled={idx <= 0} style={{ ...outlineBtn, minHeight: '44px', padding: '0 14px', opacity: idx <= 0 ? 0.35 : 1 }}>&lsaquo;</button>
@@ -139,13 +140,13 @@ function Viewer({ data, rev, startId, wide, onClose }: {
         window.NextLevel?.deletePhoto(id);
         const next = data.photos[idx + 1] || data.photos[idx - 1];
         if (next) setId(next.id); else onClose();
-      }} style={{ ...outlineBtn, borderColor: '#B42318', color: '#B42318' }}>{confirmDel ? 'Tap again to delete' : 'Delete picture'}</button>
-      <button onClick={onClose} style={{ ...bigBtn, border: 'none', background: INK, color: CREAM }}>&larr; Back to thumbnails</button>
+      }} style={{ ...outlineBtn, borderColor: '#F0A59B', color: '#F0A59B' }}>{confirmDel ? 'Tap again to delete' : 'Delete picture'}</button>
+      <button onClick={onClose} style={{ ...bigBtn, border: 'none', background: '#2A3234', color: CREAM }}>&larr; Back to thumbnails</button>
     </div>
   );
 
   return (
-    <div id="nl-capture-viewer" style={{ position: 'fixed', inset: 0, zIndex: 9100, background: CREAM, display: 'flex', flexDirection: wide ? 'row' : 'column' }}>
+    <div id="nl-capture-viewer" style={{ position: 'fixed', inset: 0, zIndex: 9100, background: PAGE, color: TEXT, display: 'flex', flexDirection: wide ? 'row' : 'column' }}>
       {imageArea}
       {panel}
     </div>
@@ -302,7 +303,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
 
   if (!data) {
     return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: CREAM, padding: '24px', fontFamily: 'system-ui, sans-serif' }}>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: PAGE, color: TEXT, padding: '24px', fontFamily: 'system-ui, sans-serif' }}>
         <button onClick={onHome} style={{ ...outlineBtn, padding: '0 18px' }}>&larr; Home</button>
         <p style={{ fontSize: '18px' }}>No job is open yet.</p>
       </div>
@@ -361,9 +362,9 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
         <h2 style={heading}>PICTURES</h2>
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: MUTED }}>
           Number size
-          <button aria-label="Smaller numbers" onClick={() => bump(-2)} style={{ minWidth: '44px', minHeight: '36px', border: `1px solid ${INK}`, borderRadius: '8px', background: 'transparent', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>A-</button>
-          <span style={{ minWidth: '24px', textAlign: 'center', fontWeight: 800, color: INK }}>{size}</span>
-          <button aria-label="Bigger numbers" onClick={() => bump(2)} style={{ minWidth: '44px', minHeight: '36px', border: `1px solid ${INK}`, borderRadius: '8px', background: 'transparent', fontSize: '18px', fontWeight: 800, cursor: 'pointer' }}>A+</button>
+          <button aria-label="Smaller numbers" onClick={() => bump(-2)} style={{ minWidth: '44px', minHeight: '36px', border: `1px solid ${MOSS}`, borderRadius: '8px', background: 'transparent', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>A-</button>
+          <span style={{ minWidth: '24px', textAlign: 'center', fontWeight: 800, color: TEXT }}>{size}</span>
+          <button aria-label="Bigger numbers" onClick={() => bump(2)} style={{ minWidth: '44px', minHeight: '36px', border: `1px solid ${MOSS}`, borderRadius: '8px', background: 'transparent', fontSize: '18px', fontWeight: 800, cursor: 'pointer' }}>A+</button>
         </span>
       </div>
       <div style={{ display: 'flex', gap: '8px' }}>
@@ -378,8 +379,8 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
           {data.photos.map((p, i) => (
-            <button key={p.id} onClick={() => setViewId(p.id)} style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: 0, border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: INK, minWidth: 0 }}>
-              <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: '10px', overflow: 'hidden', background: '#E6E2DB' }}>
+            <button key={p.id} onClick={() => setViewId(p.id)} style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: 0, border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: TEXT, minWidth: 0 }}>
+              <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: '10px', overflow: 'hidden', background: '#2A3234' }}>
                 <Photo id={p.id} rev={rev} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 {p.note.trim() && (
                   <span style={{ position: 'absolute', right: '6px', top: '6px', width: '22px', height: '22px', borderRadius: '11px', background: EMBER, color: INK, fontSize: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>N</span>
@@ -417,7 +418,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
         {wide ? (
           <span style={{ fontSize: '12px', color: MUTED }}>quick reminders for yourself</span>
         ) : (
-          <button onClick={() => setNotesOpen(o => !o)} style={{ minHeight: '40px', padding: '0 12px', border: `1px solid ${INK}`, borderRadius: '8px', background: 'transparent', color: INK, fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={() => setNotesOpen(o => !o)} style={{ minHeight: '40px', padding: '0 12px', border: `1px solid ${MOSS}`, borderRadius: '8px', background: 'transparent', color: TEXT, fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
             {notesOpen ? 'Hide' : `Show (${noteCount})`}
           </button>
         )}
@@ -436,15 +437,15 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
             <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
               <span style={{ marginTop: '17px', display: 'flex' }}>{dot('#8A9190')}</span>
               <AutoText value={s.text} onChange={v => editLine(s.id, v)} ariaLabel="Reminder"
-                style={{ flex: 1, minWidth: 0, minHeight: '44px', border: 'none', borderBottom: '1px solid #E6E2DB', background: 'transparent', fontSize: '18px', lineHeight: 1.35, color: INK, fontFamily: 'inherit', padding: '9px 0' }} />
+                style={{ flex: 1, minWidth: 0, minHeight: '44px', border: 'none', borderBottom: '1px solid #2A3234', background: 'transparent', fontSize: '18px', lineHeight: 1.35, color: TEXT, fontFamily: 'inherit', padding: '9px 0' }} />
               <button aria-label="Remove reminder" onClick={() => removeLine(s.id)} style={{ flex: 'none', width: '44px', height: '44px', border: 'none', background: 'transparent', color: MUTED, fontSize: '22px', cursor: 'pointer' }}>&times;</button>
             </div>
           ))}
           {withNotes.map(({ p, i }) => (
-            <button key={p.id} onClick={() => setViewId(p.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', width: '100%', textAlign: 'left', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', color: INK }}>
+            <button key={p.id} onClick={() => setViewId(p.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', width: '100%', textAlign: 'left', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', color: TEXT }}>
               <span style={{ marginTop: '8px', display: 'flex' }}>{dot('#8A9190')}</span>
               <span style={{ flex: 1, minWidth: 0, fontSize: '18px', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{p.note}</span>
-              <span style={{ flex: 'none', maxWidth: '38%', fontSize: '12px', fontWeight: 800, color: '#4A5C2E', border: '1px solid #C9D2B3', borderRadius: '8px', padding: '3px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.caption || 'Picture ' + (i + 1)}</span>
+              <span style={{ flex: 'none', maxWidth: '38%', fontSize: '12px', fontWeight: 800, color: MOSS, border: '1px solid rgba(138,154,92,0.5)', borderRadius: '8px', padding: '3px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.caption || 'Picture ' + (i + 1)}</span>
             </button>
           ))}
         </>
@@ -490,24 +491,24 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
       </div>
       <textarea value={data.jobNotes} onChange={e => { if (data.polishUndo !== null) window.NextLevel?.setPolish({ undo: null }); set({ jobNotes: e.target.value }); }} rows={wide ? 12 : 8}
         placeholder="Say or type what happens on this job, start to finish. (Tip: use your keyboard's mic.)"
-        style={{ ...fieldInput, background: '#fff', fontSize: '17px', lineHeight: 1.45, padding: '14px', borderRadius: '14px', resize: 'vertical' }} />
+        style={{ ...fieldInput, background: PAGE, fontSize: '17px', lineHeight: 1.45, padding: '14px', borderRadius: '14px', resize: 'vertical' }} />
       <div style={{ fontSize: '12px', color: MUTED }}>The mic is your keyboard&apos;s voice typing, so it needs a signal. If it stops, keep typing. Nothing is lost.</div>
       <button onClick={runPolish} disabled={polishBusy} style={{ ...solidBtn, minHeight: '54px', fontSize: '17px', opacity: polishBusy ? 0.6 : 1 }}>{polishBusy ? 'Polishing...' : 'Polish'}</button>
       <div style={{ fontSize: '12px', color: MUTED }}>Polishes the Job notes only. Your customer info and reminders are not sent.</div>
-      {polishMsg && <div style={{ fontSize: '15px', color: INK, background: '#FFF4E5', border: '1px solid #F0D2A8', borderRadius: '10px', padding: '10px 12px' }}>{polishMsg}</div>}
+      {polishMsg && <div style={{ fontSize: '15px', color: TEXT, background: 'rgba(160,138,88,0.15)', border: '1px solid rgba(160,138,88,0.45)', borderRadius: '10px', padding: '10px 12px' }}>{polishMsg}</div>}
       {data.polishUndo !== null && !polishShown && (
         <button onClick={() => { set({ jobNotes: data.polishUndo || '' }); window.NextLevel?.setPolish({ undo: null }); refresh(); }} style={{ ...outlineBtn, minHeight: '46px' }}>Undo polish (put my words back)</button>
       )}
       {polishShown && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-start' }}>
-            <div style={{ flex: '1 1 260px', minWidth: 0, background: '#fff', border: '1px solid ' + LINE, borderRadius: '12px', padding: '12px' }}>
+            <div style={{ flex: '1 1 260px', minWidth: 0, background: CARD, border: '1px solid ' + LINE, borderRadius: '12px', padding: '12px' }}>
               <div style={{ ...heading, marginBottom: '6px' }}>YOUR WORDS</div>
-              <div style={{ fontSize: '16px', lineHeight: 1.45, whiteSpace: 'pre-wrap', color: INK }}>{data.jobNotes}</div>
+              <div style={{ fontSize: '16px', lineHeight: 1.45, whiteSpace: 'pre-wrap', color: TEXT }}>{data.jobNotes}</div>
             </div>
-            <div style={{ flex: '1 1 260px', minWidth: 0, background: '#fff', border: '2px solid ' + EMBER, borderRadius: '12px', padding: '12px' }}>
+            <div style={{ flex: '1 1 260px', minWidth: 0, background: CARD, border: '2px solid ' + EMBER, borderRadius: '12px', padding: '12px' }}>
               <div style={{ ...heading, marginBottom: '6px' }}>POLISHED</div>
-              <ol style={{ margin: 0, paddingLeft: '24px', fontSize: '16px', lineHeight: 1.45, color: INK }}>
+              <ol style={{ margin: 0, paddingLeft: '24px', fontSize: '16px', lineHeight: 1.45, color: TEXT }}>
                 {polishShown.map((t, i) => <li key={i} style={{ marginBottom: '4px' }}>{t}</li>)}
               </ol>
             </div>
@@ -523,7 +524,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
 
   const exportBtn = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', fontWeight: 700, color: '#1F6F3D', background: '#E8F5EC', border: '1px solid #BFE0C8', borderRadius: '10px', padding: '10px 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', fontWeight: 700, color: '#7FD6A0', background: 'rgba(31,111,61,0.25)', border: '1px solid rgba(127,214,160,0.4)', borderRadius: '10px', padding: '10px 12px' }}>
         <span aria-hidden="true">&#10003;</span>
         <span>Saved. Everything saves on this device as you type, so you can close the app any time.</span>
       </div>
@@ -538,8 +539,8 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   );
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: CREAM, color: INK, fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ background: INK, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: PAGE, color: TEXT, fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: INK, borderBottom: '1px solid #2A3234', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
         <button onClick={onHome} style={headBtn}>&lsaquo; Jobs</button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '18px', fontWeight: 500 }}><span style={{ color: EMBER }}>Next </span><span style={{ color: MOSS }}>Level</span> <span style={{ color: CREAM, fontWeight: 800, letterSpacing: '1px', fontSize: '13px' }}>CAPTURE</span></div>

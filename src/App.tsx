@@ -664,7 +664,7 @@ export default function App() {
             <span id="build-stamp" style={{ fontSize: '9px', opacity: 0.4, marginLeft: '6px' }} title="Build marker — bumps every push, confirms new code is live">{BUILD_STAMP}</span>
           </div>
         </div>
-        <div id="workflow-banner" style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', padding: '6px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: '#334155', flexWrap: 'wrap', gap: '6px', zIndex: 5 }}>
+        <div id="workflow-banner" style={{ background: 'var(--panel)', borderBottom: '1px solid var(--border)', padding: '6px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: '#9AA5A3', flexWrap: 'wrap', gap: '6px', zIndex: 5 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontWeight: '700', color: '#1e3a8a' }}>📍 Field Workflow:</span>
             <span>1️⃣ Measure &amp; Draw <b>Existing</b> walls first.</span>
@@ -1009,29 +1009,29 @@ export default function App() {
             <button id="takeoff-modal-close-x" className="btn btn-sm" style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--ink)' }}>&times;</button>
           </div>
           <p className="modal-sub">Adjust calculated numbers or add extra items (e.g. doors in other un-drawn rooms, extra materials) for this project report.</p>
-          <div className="modal-body" style={{ padding: '12px 0', color: '#1f2937' }}>
+          <div className="modal-body" style={{ padding: '12px 0', color: '#EEF1EE' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>Wall Sq Footage Adjustment (+/-)</label>
-                <input type="number" id="edit-adj-sqft" className="input-field" placeholder="e.g. 120" style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db', background: '#fff', color: '#1f2937' }} />
+                <input type="number" id="edit-adj-sqft" className="input-field" placeholder="e.g. 120" style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #2A3234', background: '#14191A', color: '#EEF1EE' }} />
               </div>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>Trim LF Adjustment (+/-)</label>
-                <input type="number" id="edit-adj-trim" className="input-field" placeholder="e.g. 24" style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db', background: '#fff', color: '#1f2937' }} />
+                <input type="number" id="edit-adj-trim" className="input-field" placeholder="e.g. 24" style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #2A3234', background: '#14191A', color: '#EEF1EE' }} />
               </div>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>Studs Adjustment (+/-)</label>
-                <input type="number" id="edit-adj-studs" className="input-field" placeholder="e.g. 6" style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db', background: '#fff', color: '#1f2937' }} />
+                <input type="number" id="edit-adj-studs" className="input-field" placeholder="e.g. 6" style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #2A3234', background: '#14191A', color: '#EEF1EE' }} />
               </div>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>Drywall Boards Adjustment (+/-)</label>
-                <input type="number" id="edit-adj-drywall" className="input-field" placeholder="e.g. 4" style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db', background: '#fff', color: '#1f2937' }} />
+                <input type="number" id="edit-adj-drywall" className="input-field" placeholder="e.g. 4" style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #2A3234', background: '#14191A', color: '#EEF1EE' }} />
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '12px', marginTop: '12px' }}>
+            <div style={{ borderTop: '1px solid #2A3234', paddingTop: '12px', marginTop: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', fontWeight: '700', color: '#1f2937' }}>Custom Material Line Items</span>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#EEF1EE' }}>Custom Material Line Items</span>
                 <button id="btn-add-custom-item" className="btn btn-sm" style={{ fontSize: '11px', padding: '2px 8px', background: 'var(--ember)', color: 'var(--ink)', border: 'none', cursor: 'pointer' }}>+ Add Item</button>
               </div>
               <div id="custom-items-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
@@ -1281,7 +1281,7 @@ export default function App() {
             <button id="notes-modal-close-x" className="btn btn-sm" style={{ background: 'none', border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer' }}>&times;</button>
           </div>
           <p className="modal-sub" style={{ margin: '0 0 10px 0', color: '#cbd5e1' }}>Type or view comprehensive site notes, measurements, and client requests in full detail.</p>
-          <textarea id="notes-modal-textarea" style={{ flex: 1, width: '100%', padding: '12px', borderRadius: '8px', background: '#001226', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '14px', resize: 'none', fontFamily: 'inherit' }} placeholder="Enter field notes..."></textarea>
+          <textarea id="notes-modal-textarea" style={{ flex: 1, width: '100%', padding: '12px', borderRadius: '8px', background: '#14191A', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '14px', resize: 'none', fontFamily: 'inherit' }} placeholder="Enter field notes..."></textarea>
           <div className="modal-actions" style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
             <button id="notes-modal-save" className="btn btn-sm btn-accent" style={{ background: 'var(--ember)', color: 'var(--ink)' }}>Done / Save</button>
           </div>

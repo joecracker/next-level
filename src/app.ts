@@ -3044,7 +3044,7 @@ export function initNextLevel() {
       const noteCount = p.pages.reduce((sum, pg) => sum + (pg.notes?.length || 0), 0) + (p.scratch?.length || 0) + (p.photos || []).filter(ph => ph.note && ph.note.trim()).length;
       const row = document.createElement('button');
       row.className = 'skip-existing-job-row';
-      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;width:100%;padding:10px;border-radius:8px;background:#f8fafc;border:1px solid var(--border);color:#1e293b;cursor:pointer;';
+      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;width:100%;padding:10px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid var(--border);color:#EEF1EE;cursor:pointer;';
       row.innerHTML = `
         <div style="min-width:0;">
           <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}</div>
@@ -3532,10 +3532,10 @@ export function initNextLevel() {
         const row = document.createElement('div');
         row.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 6px; align-items: center;';
         row.innerHTML = `
-          <input type="text" class="ci-name input-field" data-idx="${idx}" value="${item.name || ''}" placeholder="Item Name" style="padding: 4px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; color: #1f2937;" />
-          <input type="number" class="ci-qty input-field" data-idx="${idx}" value="${item.qty ?? 1}" placeholder="Qty" style="padding: 4px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; color: #1f2937;" />
-          <input type="text" class="ci-unit input-field" data-idx="${idx}" value="${item.unit || 'pcs'}" placeholder="Unit" style="padding: 4px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; color: #1f2937;" />
-          <input type="text" class="ci-notes input-field" data-idx="${idx}" value="${item.notes || ''}" placeholder="Notes" style="padding: 4px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; color: #1f2937;" />
+          <input type="text" class="ci-name input-field" data-idx="${idx}" value="${item.name || ''}" placeholder="Item Name" style="padding: 4px; font-size: 12px; border: 1px solid #2A3234; border-radius: 4px; background: #14191A; color: #EEF1EE;" />
+          <input type="number" class="ci-qty input-field" data-idx="${idx}" value="${item.qty ?? 1}" placeholder="Qty" style="padding: 4px; font-size: 12px; border: 1px solid #2A3234; border-radius: 4px; background: #14191A; color: #EEF1EE;" />
+          <input type="text" class="ci-unit input-field" data-idx="${idx}" value="${item.unit || 'pcs'}" placeholder="Unit" style="padding: 4px; font-size: 12px; border: 1px solid #2A3234; border-radius: 4px; background: #14191A; color: #EEF1EE;" />
+          <input type="text" class="ci-notes input-field" data-idx="${idx}" value="${item.notes || ''}" placeholder="Notes" style="padding: 4px; font-size: 12px; border: 1px solid #2A3234; border-radius: 4px; background: #14191A; color: #EEF1EE;" />
           <button type="button" class="btn btn-sm ci-del" data-idx="${idx}" style="background: #ef4444; color: #fff; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer;">&times;</button>
         `;
         listEl.appendChild(row);

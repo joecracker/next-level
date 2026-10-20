@@ -180,70 +180,77 @@ const JOBSHEET_CSS = [
 function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onClose: () => void }) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
-  const [busy, setBusy] = useState(false);
+  // The PDF and the job file are built as soon as the sheet opens. A phone only opens its share menu
+  // within a few seconds of a tap, and building a PDF with photos can take longer than that, so the
+  // Email button has to have everything ready BEFORE it is tapped.
+  const [prep, setPrep] = useState<{ pdf: File; job: File | null } | null>(null);
+  const [prepState, setPrepState] = useState<'working' | 'ready' | 'failed'>('working');
   const [msg, setMsg] = useState('');
-  // The job file when this phone would not share it together with the PDF: saved by its own tap
-  // (Chrome blocks two automatic downloads from one tap, so the second file gets its own button).
-  const [leftover, setLeftover] = useState<File | null>(null);
-  const saveLeftover = () => {
-    if (!leftover) return;
-    const url = URL.createObjectURL(leftover);
-    const a = document.createElement('a');
-    a.href = url; a.download = leftover.name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-    setMsg('Job file saved to your Downloads. Attach it to the email next to the PDF.');
-    setLeftover(null);
-  };
-  // Email PDF: build the Job Sheet as a real PDF file, then hand it to the phone's share menu
-  // (pick Gmail and the PDF is already attached). Where sharing files is not supported it downloads instead.
-  const emailPdf = async () => {
-    if (busy) return;
-    setBusy(true); setMsg(''); setLeftover(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const alive = useRef(true);
+  const runPrep = async () => {
+    setPrepState('working'); setMsg('');
     try {
       const { buildJobSheetPdf } = await import('./lib/jobSheetPdf');
       const { blob, filename } = await buildJobSheetPdf(data, id => window.NextLevel?.photoUrl(id) ?? Promise.resolve(null));
-      const file = new File([blob], filename, { type: 'application/pdf' });
-      // The job file (JSON) goes along with the PDF: the PDF is for reading, the job file is what XL imports.
-      const jobFile = (await window.NextLevel?.buildJobFile(false)) ?? null; // info only, the PDF already has the pictures
-      const subject = (data.customer || data.name || 'Job') + ' - Job Sheet';
-      const nav = navigator as any;
-      const can = (fs: File[]) => !!(nav.canShare && nav.canShare({ files: fs }));
-      // Try the best combination first. Some phones refuse .json files, so also try the job file
-      // labelled as plain text (same name, same contents), and finally the PDF on its own.
-      const variants: File[][] = [];
-      if (jobFile) {
-        variants.push([file, jobFile]);
-        variants.push([file, new File([jobFile], jobFile.name, { type: 'text/plain' })]);
-      }
-      variants.push([file]);
-      for (const files of variants) {
-        if (!can(files)) continue;
-        try {
-          await nav.share({ files, title: subject });
-          if (jobFile && files.length === 1) {
-            setLeftover(jobFile);
-            setMsg('The PDF went to the share menu, but this phone would not attach the job file with it. Tap Save job file below, then attach it to the same email.');
-          }
-          return;
-        } catch (err: any) {
-          if (err?.name === 'AbortError') return;
-        }
-      }
-      // Sharing files is not available at all (for example on a PC): save the PDF now and give the
-      // job file its own button.
-      const url = URL.createObjectURL(file);
-      const a = document.createElement('a');
-      a.href = url; a.download = file.name;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      if (jobFile) setLeftover(jobFile);
-      setMsg(jobFile ? 'PDF saved to your Downloads. Tap Save job file to save the second file, then attach both to an email.' : 'PDF saved to your Downloads. Attach it to an email.');
+      const pdf = new File([blob], filename, { type: 'application/pdf' });
+      // The job file (JSON) is what XL imports. Job info only: the PDF already has the pictures.
+      const job = (await window.NextLevel?.buildJobFile(false)) ?? null;
+      if (!alive.current) return;
+      setPrep({ pdf, job });
+      setPrepState('ready');
     } catch {
-      setMsg('Could not build the PDF. Try Print / Save as PDF instead.');
-    } finally {
-      setBusy(false);
+      if (alive.current) setPrepState('failed');
     }
+  };
+  useEffect(() => {
+    alive.current = true;
+    runPrep();
+    return () => { alive.current = false; };
+  }, []);
+  const download = (file: File) => {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url; a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  };
+  // Save both files to the phone's Downloads (one tap).
+  const saveBoth = () => {
+    if (!prep) return;
+    download(prep.pdf);
+    if (prep.job) setTimeout(() => download(prep.job as File), 600);
+    setMsg('Saved to your Downloads: the PDF' + (prep.job ? ' and the job file.' : '.'));
+    setMenuOpen(false);
+  };
+  // Email job: hand both files to the phone's share menu. share() is called straight from the tap
+  // (nothing awaited first) so the phone still allows it.
+  const emailJob = () => {
+    if (!prep) return;
+    const { pdf, job } = prep;
+    const subject = (data.customer || data.name || 'Job') + ' - Job Sheet';
+    const nav = navigator as any;
+    const can = (fs: File[]) => !!(nav.canShare && nav.canShare({ files: fs }));
+    // Best combination first. Some phones refuse .json files, so also try the job file labelled as plain
+    // text (same name, same contents), and finally the PDF on its own.
+    const variants: File[][] = [];
+    if (job) {
+      variants.push([pdf, job]);
+      variants.push([pdf, new File([job], job.name, { type: 'text/plain' })]);
+    }
+    variants.push([pdf]);
+    const files = variants.find(can);
+    if (!files) {
+      saveBoth();
+      setMsg('This browser cannot open the share menu, so both files were saved to your Downloads. Attach them to an email.');
+      return;
+    }
+    nav.share({ files, title: subject }).then(() => {
+      if (job && files.length === 1) setMsg('Only the PDF went to the share menu: this phone would not attach the job file with it. Tap Print / Save job, then Save PDF + job file, and attach both from Downloads.');
+    }).catch((err: any) => {
+      if (err?.name === 'AbortError') return;
+      setMsg('The share menu would not open (' + (err?.name || 'error') + '). Tap Print / Save job, then Save PDF + job file, and attach both from Downloads.');
+    });
   };
   // Back (phone button or swipe) closes the sheet first, like the big-picture viewer.
   useEffect(() => {
@@ -272,10 +279,15 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
       <style>{JOBSHEET_CSS}</style>
       <div className="nl-js-bar">
         <button onClick={close} aria-label="Back" style={{ ...headBtn, padding: '0 18px', fontSize: '22px', lineHeight: 1 }}>&larr;</button>
-        <button onClick={emailPdf} disabled={busy} style={{ ...headBtn, flex: '1 1 0', background: EMBER, color: INK, border: 'none', fontWeight: 800, opacity: busy ? 0.6 : 1 }}>{busy ? 'Packing up...' : 'Email PDF + job file'}</button>
-        <button onClick={() => window.print()} style={{ ...headBtn, flexBasis: '100%', background: EMBER, color: INK, border: 'none', fontWeight: 800 }}>Print / Save as PDF</button>
-        {leftover && <button onClick={saveLeftover} style={{ ...headBtn, flexBasis: '100%', background: '#FFFFFF', color: INK, border: 'none', fontWeight: 800 }}>Save job file</button>}
-        <div className="nl-js-hint">{msg || 'Email PDF + job file opens your share menu with both attached (the PDF to read, the job file for XL). Pick Gmail. Or tap Print / Save as PDF.'}</div>
+        <button onClick={prepState === 'failed' ? runPrep : emailJob} disabled={prepState === 'working'} style={{ ...headBtn, flex: '1 1 0', background: EMBER, color: INK, border: 'none', fontWeight: 800, opacity: prepState === 'working' ? 0.6 : 1 }}>{prepState === 'working' ? 'Getting ready...' : prepState === 'failed' ? 'Could not build. Tap to retry' : 'Email job'}</button>
+        <button onClick={() => setMenuOpen(o => !o)} style={{ ...headBtn, flexBasis: '100%', background: EMBER, color: INK, border: 'none', fontWeight: 800 }}>Print / Save job</button>
+        {menuOpen && (
+          <>
+            <button onClick={() => { setMenuOpen(false); window.print(); }} style={{ ...headBtn, flex: '1 1 0', background: '#FFFFFF', color: INK, border: 'none', fontWeight: 800 }}>Print the PDF</button>
+            <button onClick={saveBoth} disabled={prepState !== 'ready'} style={{ ...headBtn, flex: '1 1 0', background: '#FFFFFF', color: INK, border: 'none', fontWeight: 800, opacity: prepState === 'ready' ? 1 : 0.6 }}>Save PDF + job file</button>
+          </>
+        )}
+        <div className="nl-js-hint">{msg || (prepState === 'working' ? 'Getting the PDF and job file ready. Email job turns on when they are.' : 'Email job opens your share menu with the PDF and the job file attached. Pick Gmail.')}</div>
       </div>
       <div className="nl-js-page">
         <div className="nl-js-brand">FIELD &amp; DESK &middot; JOB SHEET</div>

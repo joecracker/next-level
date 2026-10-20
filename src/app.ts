@@ -2218,7 +2218,7 @@ export function initNextLevel() {
     const search = searchEl ? searchEl.value.toLowerCase() : '';
     if (list) {
       list.innerHTML = '';
-      projects.filter(pr => !search || pr.name.toLowerCase().includes(search)).forEach(pr => {
+      projects.filter(pr => !search || pr.name.toLowerCase().includes(search)).reverse().forEach(pr => { // newest job first (jobs are stored oldest to newest)
         const li = document.createElement('li');
         li.className = pr.id===currentProjectId ? 'active' : '';
         li.innerHTML = '<span>'+pr.name+'</span><span class="project-cat">'+pr.category+'</span><span class="del-project" data-id="'+pr.id+'">&times;</span>';
@@ -3032,7 +3032,7 @@ export function initNextLevel() {
     const filtered = projects
       .filter(p => !excludeId || p.id !== excludeId)
       .filter(p => !term || p.name.toLowerCase().includes(term))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .reverse(); // newest job first (jobs are stored oldest to newest)
 
     if (filtered.length === 0) {
       const msg = projects.length === 0 ? 'No jobs yet — start one above' : 'No jobs match that search';

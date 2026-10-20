@@ -599,10 +599,6 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
 
   const exportBtn = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', fontWeight: 700, color: '#7FD6A0', background: 'rgba(31,111,61,0.25)', border: '1px solid rgba(127,214,160,0.4)', borderRadius: '10px', padding: '10px 12px' }}>
-        <span aria-hidden="true">&#10003;</span>
-        <span>Saved. Everything saves on this device as you type, so you can close the app any time.</span>
-      </div>
       <button onClick={() => setSheetOpen(true)} style={{ ...solidBtn, minHeight: '56px', fontSize: '17px' }}>Job Sheet (read, print, save as PDF)</button>
       <button onClick={onHome} style={{ ...outlineBtn, minHeight: '52px', fontSize: '16px' }}>Done &mdash; back to Jobs</button>
       <div style={{ borderTop: '1px solid ' + LINE, paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>

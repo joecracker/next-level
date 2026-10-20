@@ -106,6 +106,7 @@ export function initNextLevel() {
     address?: string;
     category: string;
     scope: string;
+    lastUsed?: number;  // when the job was last created, opened or edited (for the job lists' order)
     pages: Page[];
     ceilingH?: number;
     studSpacing?: number;
@@ -763,6 +764,32 @@ export function initNextLevel() {
       category: cat||'Kitchen', scope: 'Full Build',
       pages: [newPage()], ceilingH: 96, studSpacing: 16, waste: 1.10, photos: []
     };
+  }
+
+  // A job that was started but never filled in (tapping "Start a new job" saves a blank one straight away).
+  // These pile up on top of the list, so the job lists skip them. Nothing is deleted.
+  function isBlankJob(p: Project): boolean {
+    if (p.name !== 'New Project') return false;
+    if (p.customer || p.phone || p.email || p.address || p.jobDesc || p.jobNotes) return false;
+    if ((p.photos || []).length || (p.scratch || []).length || p.canvas || (p as any).polished) return false;
+    if ((p.pages || []).length !== 1) return false;
+    const pg = p.pages[0];
+    if (pg.doors.length || pg.windows.length || pg.assets.length || (pg.notes || []).length) return false;
+    const sig = (ws: any[]) => JSON.stringify(ws.map(w => [w.start.x, w.start.y, w.end.x, w.end.y, w.wallType]));
+    return sig(pg.walls) === sig(newPage().walls);
+  }
+  // Most recently used job first. A job counts as used when it is created, opened or edited; jobs from
+  // before this existed keep their old order (newest created first) until they are opened.
+  function recentFirst(list: Project[]): Project[] {
+    return list
+      .map((p, i) => ({ p, i }))
+      .sort((a, b) => ((b.p.lastUsed || 0) - (a.p.lastUsed || 0)) || (b.i - a.i))
+      .map(x => x.p);
+  }
+  // What every job list shows: blanks hidden, most recently used on top. The side list on the PC keeps
+  // the job you are in even while it is still blank; the phone's Open Job list does not.
+  function visibleJobs(keepCurrent = true): Project[] {
+    return recentFirst(projects.filter(p => (keepCurrent && p.id === currentProjectId) || !isBlankJob(p)));
   }
 
   /* ── History ──────────────────────────────────────── */
@@ -2218,7 +2245,7 @@ export function initNextLevel() {
     const search = searchEl ? searchEl.value.toLowerCase() : '';
     if (list) {
       list.innerHTML = '';
-      projects.filter(pr => !search || pr.name.toLowerCase().includes(search)).reverse().forEach(pr => { // newest job first (jobs are stored oldest to newest)
+      visibleJobs().filter(pr => !search || pr.name.toLowerCase().includes(search)).forEach(pr => { // most recently used job first
         const li = document.createElement('li');
         li.className = pr.id===currentProjectId ? 'active' : '';
         li.innerHTML = '<span>'+pr.name+'</span><span class="project-cat">'+pr.category+'</span><span class="del-project" data-id="'+pr.id+'">&times;</span>';
@@ -3029,10 +3056,9 @@ export function initNextLevel() {
   function renderJobPickerList(listEl: HTMLElement, searchTerm: string, onSelect: (id: string) => void, excludeId?: string) {
     listEl.innerHTML = '';
     const term = searchTerm.trim().toLowerCase();
-    const filtered = projects
+    const filtered = visibleJobs()
       .filter(p => !excludeId || p.id !== excludeId)
-      .filter(p => !term || p.name.toLowerCase().includes(term))
-      .reverse(); // newest job first (jobs are stored oldest to newest)
+      .filter(p => !term || p.name.toLowerCase().includes(term)); // most recently used job first
 
     if (filtered.length === 0) {
       const msg = projects.length === 0 ? 'No jobs yet — start one above' : 'No jobs match that search';
@@ -5217,6 +5243,7 @@ export function initNextLevel() {
   (window as any).NextLevel = {
     newJob(): string {
       const p = newProject();
+      p.lastUsed = Date.now();
       projects.push(p);
       currentProjectId = p.id;
       currentPageIdx = 0;
@@ -5227,7 +5254,7 @@ export function initNextLevel() {
       return p.id;
     },
     listJobs(): Array<{ id: string; name: string; category: string; photoCount: number; noteCount: number }> {
-      return projects.map(p => ({
+      return visibleJobs(false).map(p => ({
         id: p.id,
         name: p.name,
         category: p.category,
@@ -5238,6 +5265,7 @@ export function initNextLevel() {
     openJob(id: string): void {
       const p = projects.find(x => x.id === id);
       if (!p) return;
+      p.lastUsed = Date.now();
       currentProjectId = p.id;
       currentPageIdx = 0;
       selectedWallIdx = -1;
@@ -5263,6 +5291,7 @@ export function initNextLevel() {
     setCapture(patch: Record<string, string>): void {
       const p = getProject();
       if (!p) return;
+      p.lastUsed = Date.now();
       const prevCustomer = p.customer || '';
       (['customer', 'phone', 'address', 'date', 'jobDesc', 'jobNotes', 'email'] as const).forEach(k => {
         if (typeof patch[k] === 'string') (p as any)[k] = patch[k];

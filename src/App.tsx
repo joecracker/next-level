@@ -40,8 +40,7 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
   const [confirmId, setConfirmId] = useState<string | null>(null);
   useEffect(() => window.NextLevel?.onCapture(() => setTick(t => t + 1)), []);
   const jobs = (window.NextLevel?.listJobs() || [])
-    .filter(j => !q.trim() || j.name.toLowerCase().includes(q.trim().toLowerCase()))
-    .reverse(); // newest job first (jobs are stored oldest to newest)
+    .filter(j => !q.trim() || j.name.toLowerCase().includes(q.trim().toLowerCase())); // already most recently used first
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9998, background: 'var(--ink)',

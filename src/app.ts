@@ -3475,9 +3475,27 @@ export function initNextLevel() {
     // A newly captured/selected file opens the booth right away — mark it up or
     // just save it. Nothing is forced. (savePhotoBlob/editExistingPhoto are
     // defined at init scope so the gallery can reach them too.)
-    function onPhotoFile(file: File){
+    // Apple phones save pictures as HEIC, which Chrome cannot show (black screen, broken-picture icon).
+    // Turn those into a normal JPEG before the booth opens. The converter only loads when it is needed.
+    async function onPhotoFile(file: File){
       const id = uid();
-      openPhotoBooth({ imageBlob: file, onSave: (blob) => savePhotoBlob(id, blob, true) });
+      let src: Blob = file;
+      const t = (file.type || '').toLowerCase();
+      const plain = t === 'image/jpeg' || t === 'image/png' || t === 'image/webp' || t === 'image/gif';
+      const byName = /hei[cf]$/i.test(file.name || '') || /hei[cf]/.test(t);
+      try {
+        if(byName || !plain){
+          const lib = await import('heic-to');
+          if(byName || await lib.isHeic(file)){
+            toast('Converting picture…');
+            src = await lib.heicTo({ blob: file, type: 'image/jpeg', quality: 0.9 });
+          }
+        }
+      } catch {
+        toast('This picture could not be read');
+        return;
+      }
+      openPhotoBooth({ imageBlob: src, onSave: (blob) => savePhotoBlob(id, blob, true) });
     }
 
     const camInput = document.getElementById('photo-input-camera') as HTMLInputElement;

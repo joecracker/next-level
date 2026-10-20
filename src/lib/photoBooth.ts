@@ -1017,6 +1017,10 @@ export function openPhotoBooth(opts: PhotoBoothOptions): void {
   if (currentObjectURL) URL.revokeObjectURL(currentObjectURL);
   currentObjectURL = URL.createObjectURL(opts.imageBlob);
   photo.onload = () => { setCanvasSize(); ctx.clearRect(0, 0, canvas.width, canvas.height); };
+  photo.onerror = () => {
+    toast("This picture couldn't be opened");
+    setTimeout(() => close(), 1800);
+  };
   photo.src = currentObjectURL;
   // In case the image is cached and onload doesn't refire:
   if (photo.complete) { setCanvasSize(); }

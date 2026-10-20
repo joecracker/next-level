@@ -191,18 +191,23 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
       const { buildJobSheetPdf } = await import('./lib/jobSheetPdf');
       const { blob, filename } = await buildJobSheetPdf(data, id => window.NextLevel?.photoUrl(id) ?? Promise.resolve(null));
       const file = new File([blob], filename, { type: 'application/pdf' });
+      // The job file (JSON) goes along with the PDF: the PDF is for reading, the job file is what XL imports.
+      const jobFile = (await window.NextLevel?.buildJobFile()) ?? null;
+      const files = jobFile ? [file, jobFile] : [file];
       const subject = (data.customer || data.name || 'Job') + ' - Job Sheet';
       const nav = navigator as any;
-      if (nav.canShare && nav.canShare({ files: [file] })) {
-        try { await nav.share({ files: [file], title: subject }); return; }
+      if (nav.canShare && nav.canShare({ files })) {
+        try { await nav.share({ files, title: subject }); return; }
         catch (err: any) { if (err?.name === 'AbortError') return; }
       }
-      const url = URL.createObjectURL(file);
-      const a = document.createElement('a');
-      a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      setMsg('PDF saved to your Downloads. Attach it to an email.');
+      for (const f of files) {
+        const url = URL.createObjectURL(f);
+        const a = document.createElement('a');
+        a.href = url; a.download = f.name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+      }
+      setMsg('PDF and job file saved to your Downloads. Attach both to an email.');
     } catch {
       setMsg('Could not build the PDF. Try Print / Save as PDF instead.');
     } finally {
@@ -236,9 +241,9 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
       <style>{JOBSHEET_CSS}</style>
       <div className="nl-js-bar">
         <button onClick={close} style={headBtn}>&larr; Back</button>
-        <button onClick={emailPdf} disabled={busy} style={{ ...headBtn, background: EMBER, color: INK, border: 'none', fontWeight: 800, opacity: busy ? 0.6 : 1 }}>{busy ? 'Building PDF...' : 'Email PDF'}</button>
+        <button onClick={emailPdf} disabled={busy} style={{ ...headBtn, background: EMBER, color: INK, border: 'none', fontWeight: 800, opacity: busy ? 0.6 : 1 }}>{busy ? 'Packing up...' : 'Email PDF + job file'}</button>
         <button onClick={() => window.print()} style={{ ...headBtn, background: EMBER, color: INK, border: 'none', fontWeight: 800 }}>Print / Save as PDF</button>
-        <div className="nl-js-hint">{msg || 'Email PDF builds the PDF and opens your share menu: pick Gmail and it is already attached. Or tap Print / Save as PDF.'}</div>
+        <div className="nl-js-hint">{msg || 'Email PDF + job file opens your share menu with both attached (the PDF to read, the job file for XL). Pick Gmail. Or tap Print / Save as PDF.'}</div>
       </div>
       <div className="nl-js-page">
         <div className="nl-js-brand">FIELD &amp; DESK &middot; JOB SHEET</div>

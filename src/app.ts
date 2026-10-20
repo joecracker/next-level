@@ -5062,21 +5062,28 @@ export function initNextLevel() {
   // no accounts, no server, no "JSON" anywhere in the UI. Under the hood
   // it's still a small data file — that part doesn't change — but nothing
   // about how it's presented looks like a developer export tool.
-  async function sendCurrentJob(){
+  // Builds the single-job file (photos included) that XL or another device can import.
+  async function buildCurrentJobFile(): Promise<File | null>{
     const p = getProject();
-    if(!p){ toast('No job selected'); return; }
+    if(!p){ toast('No job selected'); return null; }
     toast('Packing up the job…');
     let hydrated;
     try {
       hydrated = (await hydrateProjects([p]))[0]; // pull photo bytes in so the file is self-contained
     } catch {
-      toast('Could not prepare the job file'); return;
+      toast('Could not prepare the job file'); return null;
     }
     const envelope = { type: 'nextlevel-job', version: 1, project: hydrated };
     const json = JSON.stringify(envelope);
     const safeName = (p.name || 'Job').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'Job';
-    const filename = `${safeName}.json`;
-    const file = new File([json], filename, { type: 'application/json' });
+    return new File([json], `${safeName}.json`, { type: 'application/json' });
+  }
+
+  async function sendCurrentJob(){
+    const p = getProject();
+    const file = await buildCurrentJobFile();
+    if(!p || !file) return;
+    const filename = file.name;
 
     // Prefer the device's native share sheet (text/email/AirDrop/etc) when available.
     const nav = navigator as any;
@@ -5314,6 +5321,8 @@ export function initNextLevel() {
     exportReport(): void { openBossReportModal(); },
     // Same single-job send / open used by the full app's side menu, reachable from Capture and the job lists.
     sendJob(): void { sendCurrentJob(); },
+    // The job file (JSON) on its own, so the Job Sheet's email button can attach it next to the PDF.
+    buildJobFile(): Promise<File | null> { return buildCurrentJobFile(); },
     pickJobFile(): void { document.getElementById('job-file-input')?.click(); },
   };
 }

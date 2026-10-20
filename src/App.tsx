@@ -29,6 +29,7 @@ declare global {
       exportReport: () => void;
       sendJob: () => void;
       pickJobFile: () => void;
+  buildJobFile: () => Promise<File | null>;
     };
   }
 }

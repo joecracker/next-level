@@ -194,7 +194,7 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
       const subject = (data.customer || data.name || 'Job') + ' - Job Sheet';
       const nav = navigator as any;
       if (nav.canShare && nav.canShare({ files: [file] })) {
-        try { await nav.share({ files: [file], title: subject, text: subject }); return; }
+        try { await nav.share({ files: [file], title: subject }); return; }
         catch (err: any) { if (err?.name === 'AbortError') return; }
       }
       const url = URL.createObjectURL(file);

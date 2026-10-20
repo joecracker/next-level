@@ -192,7 +192,7 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
       const { blob, filename } = await buildJobSheetPdf(data, id => window.NextLevel?.photoUrl(id) ?? Promise.resolve(null));
       const file = new File([blob], filename, { type: 'application/pdf' });
       // The job file (JSON) goes along with the PDF: the PDF is for reading, the job file is what XL imports.
-      const jobFile = (await window.NextLevel?.buildJobFile()) ?? null;
+      const jobFile = (await window.NextLevel?.buildJobFile(false)) ?? null; // info only, the PDF already has the pictures
       const files = jobFile ? [file, jobFile] : [file];
       const subject = (data.customer || data.name || 'Job') + ' - Job Sheet';
       const nav = navigator as any;

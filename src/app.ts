@@ -5063,13 +5063,19 @@ export function initNextLevel() {
   // it's still a small data file — that part doesn't change — but nothing
   // about how it's presented looks like a developer export tool.
   // Builds the single-job file (photos included) that XL or another device can import.
-  async function buildCurrentJobFile(): Promise<File | null>{
+  // withPhotos=false gives a small file with the job info only (what XL imports); the PDF already carries the pictures.
+  async function buildCurrentJobFile(withPhotos = true): Promise<File | null>{
     const p = getProject();
     if(!p){ toast('No job selected'); return null; }
     toast('Packing up the job…');
     let hydrated;
     try {
-      hydrated = (await hydrateProjects([p]))[0]; // pull photo bytes in so the file is self-contained
+      if(withPhotos){
+        hydrated = (await hydrateProjects([p]))[0]; // pull photo bytes in so the file is self-contained
+      } else {
+        hydrated = JSON.parse(JSON.stringify(p));
+        hydrated.photos = [];
+      }
     } catch {
       toast('Could not prepare the job file'); return null;
     }
@@ -5322,7 +5328,7 @@ export function initNextLevel() {
     // Same single-job send / open used by the full app's side menu, reachable from Capture and the job lists.
     sendJob(): void { sendCurrentJob(); },
     // The job file (JSON) on its own, so the Job Sheet's email button can attach it next to the PDF.
-    buildJobFile(): Promise<File | null> { return buildCurrentJobFile(); },
+    buildJobFile(withPhotos?: boolean): Promise<File | null> { return buildCurrentJobFile(withPhotos); },
     pickJobFile(): void { document.getElementById('job-file-input')?.click(); },
   };
 }

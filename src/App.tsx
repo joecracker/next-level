@@ -29,7 +29,7 @@ declare global {
       exportReport: () => void;
       sendJob: () => void;
       pickJobFile: () => void;
-  buildJobFile: () => Promise<File | null>;
+  buildJobFile: (withPhotos?: boolean) => Promise<File | null>;
     };
   }
 }

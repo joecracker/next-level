@@ -5082,6 +5082,9 @@ export function initNextLevel() {
     const envelope = { type: 'nextlevel-job', version: 1, project: hydrated };
     const json = JSON.stringify(envelope);
     const safeName = (p.name || 'Job').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'Job';
+    // The photo-free copy goes out through the phone's share menu, which only accepts certain file types
+    // (PDF and plain text are fine, .json is refused), so it is a .txt file. The contents are the same.
+    if(!withPhotos) return new File([json], `${safeName}-job-info.txt`, { type: 'text/plain' });
     return new File([json], `${safeName}.json`, { type: 'application/json' });
   }
 

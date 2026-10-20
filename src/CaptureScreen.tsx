@@ -231,13 +231,9 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
     const subject = (data.customer || data.name || 'Job') + ' - Job Sheet';
     const nav = navigator as any;
     const can = (fs: File[]) => !!(nav.canShare && nav.canShare({ files: fs }));
-    // Best combination first. Some phones refuse .json files, so also try the job file labelled as plain
-    // text (same name, same contents), and finally the PDF on its own.
+    // Best combination first (PDF + job info), then the PDF on its own.
     const variants: File[][] = [];
-    if (job) {
-      variants.push([pdf, job]);
-      variants.push([pdf, new File([job], job.name, { type: 'text/plain' })]);
-    }
+    if (job) variants.push([pdf, job]);
     variants.push([pdf]);
     const files = variants.find(can);
     if (!files) {

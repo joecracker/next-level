@@ -180,6 +180,35 @@ const JOBSHEET_CSS = [
 function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onClose: () => void }) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  // Email PDF: build the Job Sheet as a real PDF file, then hand it to the phone's share menu
+  // (pick Gmail and the PDF is already attached). Where sharing files is not supported it downloads instead.
+  const emailPdf = async () => {
+    if (busy) return;
+    setBusy(true); setMsg('');
+    try {
+      const { buildJobSheetPdf } = await import('./lib/jobSheetPdf');
+      const { blob, filename } = await buildJobSheetPdf(data, id => window.NextLevel?.photoUrl(id) ?? Promise.resolve(null));
+      const file = new File([blob], filename, { type: 'application/pdf' });
+      const subject = (data.customer || data.name || 'Job') + ' - Job Sheet';
+      const nav = navigator as any;
+      if (nav.canShare && nav.canShare({ files: [file] })) {
+        try { await nav.share({ files: [file], title: subject, text: subject }); return; }
+        catch (err: any) { if (err?.name === 'AbortError') return; }
+      }
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      setMsg('PDF saved to your Downloads. Attach it to an email.');
+    } catch {
+      setMsg('Could not build the PDF. Try Print / Save as PDF instead.');
+    } finally {
+      setBusy(false);
+    }
+  };
   // Back (phone button or swipe) closes the sheet first, like the big-picture viewer.
   useEffect(() => {
     window.history.pushState({ nl: 'sheet' }, '');
@@ -207,8 +236,9 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
       <style>{JOBSHEET_CSS}</style>
       <div className="nl-js-bar">
         <button onClick={close} style={headBtn}>&larr; Back</button>
+        <button onClick={emailPdf} disabled={busy} style={{ ...headBtn, background: EMBER, color: INK, border: 'none', fontWeight: 800, opacity: busy ? 0.6 : 1 }}>{busy ? 'Building PDF...' : 'Email PDF'}</button>
         <button onClick={() => window.print()} style={{ ...headBtn, background: EMBER, color: INK, border: 'none', fontWeight: 800 }}>Print / Save as PDF</button>
-        <div className="nl-js-hint">To make a PDF: tap Print / Save as PDF, then choose Save as PDF as the printer.</div>
+        <div className="nl-js-hint">{msg || 'Email PDF builds the PDF and opens your share menu: pick Gmail and it is already attached. Or tap Print / Save as PDF.'}</div>
       </div>
       <div className="nl-js-page">
         <div className="nl-js-brand">FIELD &amp; DESK &middot; JOB SHEET</div>

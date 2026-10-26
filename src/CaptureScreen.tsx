@@ -229,7 +229,7 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
   const emailJob = () => {
     if (!prep) return;
     const { pdf, job } = prep;
-    const subject = (data.customer || data.name || 'Job') + ' - Job Sheet';
+    const subject = (data.customer || data.name || 'Job') + ' - Field Report';
     const nav = navigator as any;
     const can = (fs: File[]) => !!(nav.canShare && nav.canShare({ files: fs }));
     // Best combination first (PDF + job info), then the PDF on its own.
@@ -259,7 +259,7 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
   // A saved PDF is named after the page title, so give it the customer's name while the sheet is open.
   useEffect(() => {
     const prev = document.title;
-    document.title = (data.customer || data.name || 'Job') + ' - Job Sheet';
+    document.title = (data.customer || data.name || 'Job') + ' - Field Report';
     return () => { document.title = prev; };
   }, [data.customer, data.name]);
   const close = () => {
@@ -287,7 +287,7 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
         <div className="nl-js-hint">{msg || (prepState === 'working' ? 'Getting the PDF and job file ready. Email job turns on when they are.' : 'Email job opens your share menu with the PDF and the job file attached. Pick Gmail.')}</div>
       </div>
       <div className="nl-js-page">
-        <div className="nl-js-brand">FIELD &amp; DESK &middot; JOB SHEET</div>
+        <div className="nl-js-brand">FIELD &amp; DESK &middot; FIELD REPORT</div>
         <div className="nl-js-title">{data.customer || data.name}</div>
         {info('Customer', data.customer)}
         {info('Date', data.date)}
@@ -570,9 +570,8 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
       <textarea value={data.jobNotes} onChange={e => { if (data.polishUndo !== null) window.NextLevel?.setPolish({ undo: null }); set({ jobNotes: e.target.value }); }} rows={wide ? 12 : 8}
         placeholder="Say or type what happens on this job, start to finish. (Tip: use your keyboard's mic.)"
         style={{ ...fieldInput, background: PAGE, fontSize: '17px', lineHeight: 1.45, padding: '14px', borderRadius: '14px', resize: 'vertical' }} />
-      <div style={{ fontSize: '12px', color: MUTED }}>The mic is your keyboard&apos;s voice typing, so it needs a signal. If it stops, keep typing. Nothing is lost.</div>
       <button onClick={runPolish} disabled={polishBusy} style={{ ...solidBtn, minHeight: '54px', fontSize: '17px', opacity: polishBusy ? 0.6 : 1 }}>{polishBusy ? 'Polishing...' : 'Polish'}</button>
-      <div style={{ fontSize: '12px', color: MUTED }}>Polishes the Job notes only. Your customer info and reminders are not sent.</div>
+      <div style={{ fontSize: '12px', color: MUTED }}>Polish sees only these notes. Voice typing needs a signal; if it stops, keep typing.</div>
       {polishMsg && <div style={{ fontSize: '15px', color: TEXT, background: 'rgba(160,138,88,0.15)', border: '1px solid rgba(160,138,88,0.45)', borderRadius: '10px', padding: '10px 12px' }}>{polishMsg}</div>}
       {data.polishUndo !== null && !polishShown && (
         <button onClick={() => { set({ jobNotes: data.polishUndo || '' }); window.NextLevel?.setPolish({ undo: null }); refresh(); }} style={{ ...outlineBtn, minHeight: '46px' }}>Undo polish (put my words back)</button>
@@ -619,23 +618,16 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
     onHome();
   };
 
+  const driveOn = Boolean(window.NextLevel?.driveState().configured);
   const exportBtn = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <button onClick={() => setSheetOpen(true)} style={{ ...solidBtn, minHeight: '56px', fontSize: '17px' }}>Job Sheet (read, print, save as PDF)</button>
-      <button onClick={leave} style={{ ...outlineBtn, minHeight: '52px', fontSize: '16px' }}>Done &mdash; back to Jobs</button>
-      {window.NextLevel?.driveState().configured && (
-        <div style={{ borderTop: '1px solid ' + LINE, paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={heading}>GOOGLE DRIVE</div>
-          <button onClick={saveToDrive} disabled={driveBusy} style={{ ...outlineBtn, minHeight: '46px', fontSize: '15px', opacity: driveBusy ? 0.6 : 1 }}>{driveBusy ? 'Saving to Drive...' : 'Save this job to Google Drive'}</button>
-          <div style={{ fontSize: '13px', color: driveMsg ? TEXT : MUTED }}>{driveMsg || driveSavedLine}</div>
-          <div style={{ fontSize: '12px', color: MUTED }}>Puts a copy where your tablet or laptop can pick it up. Once Drive is connected, leaving the job saves it again by itself.</div>
-        </div>
-      )}
-      <div style={{ borderTop: '1px solid ' + LINE, paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={heading}>MOVE THIS JOB</div>
-        <button onClick={() => window.NextLevel?.sendJob()} style={{ ...outlineBtn, minHeight: '46px', fontSize: '15px' }}>Move this job to another device</button>
-        <div style={{ fontSize: '12px', color: MUTED }}>Packs the whole job (photos, notes, sketches, customer info) into one file that your tablet or laptop can open and pick up as a job. It is not a readable page. Use the Job Sheet for that.</div>
+      <button onClick={() => setSheetOpen(true)} style={{ ...solidBtn, minHeight: '56px', fontSize: '17px' }}>Field Report (read, print, save as PDF)</button>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        {driveOn && <button onClick={saveToDrive} disabled={driveBusy} style={{ ...outlineBtn, flex: 1, minWidth: 0, minHeight: '50px', fontSize: '15px', opacity: driveBusy ? 0.6 : 1 }}>{driveBusy ? 'Saving...' : 'Save to Drive'}</button>}
+        <button onClick={() => window.NextLevel?.sendJob()} style={{ ...outlineBtn, flex: 1, minWidth: 0, minHeight: '50px', fontSize: '15px' }}>Send as a file</button>
       </div>
+      {driveOn && <div style={{ fontSize: '13px', color: driveMsg ? TEXT : MUTED, marginTop: '-4px' }}>{driveMsg || driveSavedLine}</div>}
+      <button onClick={leave} style={{ ...outlineBtn, minHeight: '52px', fontSize: '16px' }}>Done &mdash; back to Jobs</button>
     </div>
   );
 

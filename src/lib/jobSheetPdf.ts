@@ -132,7 +132,7 @@ export async function buildJobSheetPdf(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(...GREEN);
-  doc.text('FIELD & DESK  -  JOB SHEET', MARGIN, y);
+  doc.text('FIELD & DESK  -  FIELD REPORT', MARGIN, y);
   y += 8;
   const title = data.customer || data.name || 'Job';
   const titleLines = wrapped(title, contentW, 20, 'bold');
@@ -249,6 +249,6 @@ export async function buildJobSheetPdf(
 
   const base = fileSafe(data.customer || data.name || 'Job') || 'Job';
   const datePart = fileSafe(data.date);
-  const filename = base + ' - Job Sheet' + (datePart ? ' - ' + datePart : '') + '.pdf';
+  const filename = base + ' - Field Report' + (datePart ? ' - ' + datePart : '') + '.pdf';
   return { blob: doc.output('blob'), filename };
 }

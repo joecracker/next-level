@@ -712,6 +712,11 @@ export function initNextLevel() {
   // daily check is plenty. (Bump AUTO_BACKUP_INTERVAL_MS if weekly's
   // preferred instead.)
   const LAST_DRIVE_BACKUP_KEY = 'nextlevel_last_drive_backup';
+  // Jobs deleted on THIS device. The Drive copy stays in Drive, so without this the automatic pull would keep bringing them back.
+  const DRIVE_SKIP_KEY = 'nextlevel_drive_skip';
+  function driveSkipList(): string[] { try { return JSON.parse(localStorage.getItem(DRIVE_SKIP_KEY) || '[]'); } catch { return []; } }
+  function driveSkipAdd(id: string){ try { const l = driveSkipList(); if(!l.includes(id)){ l.push(id); localStorage.setItem(DRIVE_SKIP_KEY, JSON.stringify(l)); } } catch { /* ignore */ } }
+  function driveSkipRemove(id: string){ try { localStorage.setItem(DRIVE_SKIP_KEY, JSON.stringify(driveSkipList().filter(x => x !== id))); } catch { /* ignore */ } }
   const AUTO_BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // once a day
   let driveAutoBackupTimer: ReturnType<typeof setTimeout> | null = null;
   function maybeAutoBackup(){
@@ -2253,6 +2258,7 @@ export function initNextLevel() {
           const target = e.target as HTMLElement;
           if(target.classList.contains('del-project')){
             if(!window.confirm(`Delete "${pr.name}"? This removes the whole job — walls, photos, notes, everything. Can't be undone.`)) return;
+            driveSkipAdd(pr.id);
             projects = projects.filter(x=>x.id!==pr.id);
             if(currentProjectId===pr.id){ currentProjectId=projects[0]?.id||null; currentPageIdx=0; }
             save(); renderSidebar(); render(); return;
@@ -5322,6 +5328,7 @@ export function initNextLevel() {
       const p = projects.find(x => x.id === id);
       if (!p) return;
       (p.photos || []).forEach(ph => { try { Promise.resolve(deletePhotoBlob(ph.id)).catch(() => { /* ignore */ }); } catch { /* ignore */ } });
+      driveSkipAdd(id);
       projects = projects.filter(x => x.id !== id);
       if (currentProjectId === id) { currentProjectId = projects[0]?.id || null; currentPageIdx = 0; selectedWallIdx = -1; }
       save();
@@ -5379,11 +5386,12 @@ export function initNextLevel() {
         localStorage.setItem('nextlevel_job_drive_saved', JSON.stringify(m));
       } catch { /* ignore */ }
     },
-    async listDriveJobs(): Promise<Array<{ fileId: string; jobId: string; name: string; modified: string; onDevice: boolean }>> {
+    async listDriveJobs(): Promise<Array<{ fileId: string; jobId: string; name: string; modified: string; onDevice: boolean; skipped: boolean }>> {
       const files = await listJobBackups();
       return files.map(f => {
         const jobId = f.appProperties?.jobId || f.name.replace(/^job-/, '').replace(/\.json$/, '');
-        return { fileId: f.id, jobId, name: f.appProperties?.jobName || 'Job', modified: f.modifiedTime, onDevice: projects.some(x => x.id === jobId) };
+        const onDevice = projects.some(x => x.id === jobId);
+        return { fileId: f.id, jobId, name: f.appProperties?.jobName || 'Job', modified: f.modifiedTime, onDevice, skipped: !onDevice && driveSkipList().includes(jobId) };
       });
     },
     // Brings one Drive job onto this device. Keeps the job's own id so a later save from the phone lines up with it.
@@ -5413,6 +5421,7 @@ export function initNextLevel() {
         projects.push(incoming);
       }
       if (!currentProjectId) { currentProjectId = incoming.id; currentPageIdx = 0; }
+      driveSkipRemove(incoming.id);
       save(); renderSidebar(); render(); notifyCapture();
       return idx >= 0 ? 'replaced' : 'added';
     },

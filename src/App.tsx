@@ -10,7 +10,7 @@ import { driveError } from './lib/driveError';
 // On snap: feed the photo into the existing #photo-input-camera pipeline
 // (Photo Booth markup → savePhotoBlob → IndexedDB) — zero app.ts changes.
 type JobSummary = { id: string; name: string; category: string; photoCount: number; noteCount: number };
-type DriveJob = { fileId: string; jobId: string; name: string; modified: string; onDevice: boolean };
+type DriveJob = { fileId: string; jobId: string; name: string; modified: string; onDevice: boolean; skipped: boolean };
 declare global {
   interface Window {
     NextLevel?: {
@@ -51,14 +51,38 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
   const [driveBusy, setDriveBusy] = useState(false);
   const [driveMsg, setDriveMsg] = useState('');
   const [driveJobs, setDriveJobs] = useState<DriveJob[] | null>(null);
+  // Brings in every Drive job this device does not have (never replaces one, never re-adds one deleted here).
+  const pulling = useRef(false);
+  const pullNew = async (list: DriveJob[]) => {
+    const nl = window.NextLevel; if (!nl || pulling.current) return;
+    const todo = list.filter(j => !j.onDevice && !j.skipped);
+    if (!todo.length) return;
+    pulling.current = true;
+    setDriveBusy(true);
+    let done = 0;
+    try {
+      for (const j of todo) {
+        setDriveMsg('Bringing in ' + (done + 1) + ' of ' + todo.length + ': ' + j.name + '...');
+        await nl.importDriveJob(j.fileId, false);
+        done++;
+      }
+      setDriveJobs(await nl.listDriveJobs());
+      setDriveMsg(done + ' new job' + (done === 1 ? '' : 's') + ' brought in.');
+    } catch (e) { setDriveMsg((done ? done + ' brought in, then it stopped. ' : '') + driveError(e)); }
+    pulling.current = false;
+    setDriveBusy(false);
+  };
   const loadDrive = async () => {
     const nl = window.NextLevel; if (!nl) return;
     setDriveBusy(true); setDriveMsg('');
+    let list: DriveJob[] | null = null;
     try {
       if (!nl.driveState().connected) await nl.driveConnect();
-      setDriveJobs(await nl.listDriveJobs());
+      list = await nl.listDriveJobs();
+      setDriveJobs(list);
     } catch (e) { setDriveMsg(driveError(e)); }
     setDriveBusy(false);
+    if (list && !IS_PHONE) await pullNew(list); // PC and tablet: new phone jobs just arrive
   };
   const bringIn = async (j: DriveJob) => {
     const nl = window.NextLevel; if (!nl) return;
@@ -71,19 +95,13 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
     } catch (e) { setDriveMsg(driveError(e)); }
     setDriveBusy(false);
   };
-  const bringAllNew = async () => {
-    const nl = window.NextLevel; if (!nl || !driveJobs) return;
-    const todo = driveJobs.filter(j => !j.onDevice);
-    setDriveBusy(true); setDriveMsg('');
-    let done = 0;
-    try {
-      for (const j of todo) { await nl.importDriveJob(j.fileId, false); done++; }
-      setDriveJobs(await nl.listDriveJobs());
-      setDriveMsg(done + ' job' + (done === 1 ? '' : 's') + ' brought in.');
-    } catch (e) { setDriveMsg((done ? done + ' brought in, then it stopped. ' : '') + driveError(e)); }
-    setDriveBusy(false);
-  };
-  const newOnes = (driveJobs || []).filter(j => !j.onDevice);
+  const bringAllNew = () => (driveJobs ? pullNew(driveJobs) : Promise.resolve());
+  // PC and tablet: if Google is already connected this session, check Drive as soon as the list opens.
+  useEffect(() => {
+    const st = window.NextLevel?.driveState();
+    if (!IS_PHONE && st?.configured && st.connected) { setDriveOpen(true); loadDrive(); }
+  }, []);
+  const newOnes = (driveJobs || []).filter(j => !j.onDevice && !j.skipped);
   const driveBtn: CSSProperties = { minHeight: '48px', borderRadius: '10px', border: '1px solid rgba(238,241,238,0.3)', background: 'transparent', color: 'var(--cream)', fontSize: '16px', fontWeight: 700, cursor: 'pointer', padding: '0 14px' };
   const jobs = (window.NextLevel?.listJobs() || [])
     .filter(j => !q.trim() || j.name.toLowerCase().includes(q.trim().toLowerCase())); // already most recently used first
@@ -141,7 +159,7 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
               }}>
                 <span style={{ minWidth: 0 }}>
                   <div style={{ fontSize: '16px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.name}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px' }}>Saved {new Date(j.modified).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} &middot; {j.onDevice ? 'already on this device' : 'new'}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px' }}>Saved {new Date(j.modified).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} &middot; {j.onDevice ? 'already on this device' : j.skipped ? 'deleted from this device' : 'new'}</div>
                 </span>
                 <span style={{ color: 'var(--moss)', fontSize: '14px', fontWeight: 800, flexShrink: 0 }}>{j.onDevice ? 'Replace' : 'Bring in'}</span>
               </button>

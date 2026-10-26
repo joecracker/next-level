@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { driveError } from './lib/driveError';
 import { createPortal } from 'react-dom';
 import { BUILD_STAMP } from './buildStamp';
 
@@ -340,6 +341,8 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   const [polishBusy, setPolishBusy] = useState(false);
   const [polishMsg, setPolishMsg] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [driveBusy, setDriveBusy] = useState(false);
+  const [driveMsg, setDriveMsg] = useState('');
   const [w, setW] = useState(window.innerWidth);
   const wide = w >= 900;
 
@@ -597,10 +600,37 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
     </section>
   );
 
+  const driveSavedAt = data ? (window.NextLevel?.driveSavedAt(data.id) || 0) : 0;
+  const driveSavedLine = driveSavedAt ? 'Last saved to Drive: ' + new Date(driveSavedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Not saved to Drive yet.';
+  const saveToDrive = async () => {
+    const nl = window.NextLevel; if (!nl || !data) return;
+    setDriveBusy(true); setDriveMsg('');
+    try {
+      if (!nl.driveState().connected) await nl.driveConnect();
+      await nl.saveJobToDrive(data.id);
+      setDriveMsg('Saved to Google Drive at ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.');
+    } catch (e) { setDriveMsg(driveError(e)); }
+    setDriveBusy(false);
+  };
+  // Leaving the job: if Drive is already connected, quietly save a fresh copy first.
+  const leave = () => {
+    const nl = window.NextLevel;
+    if (nl && data && nl.driveState().connected) nl.saveJobToDrive(data.id).catch(() => { /* quiet: the Save button shows errors */ });
+    onHome();
+  };
+
   const exportBtn = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <button onClick={() => setSheetOpen(true)} style={{ ...solidBtn, minHeight: '56px', fontSize: '17px' }}>Job Sheet (read, print, save as PDF)</button>
-      <button onClick={onHome} style={{ ...outlineBtn, minHeight: '52px', fontSize: '16px' }}>Done &mdash; back to Jobs</button>
+      <button onClick={leave} style={{ ...outlineBtn, minHeight: '52px', fontSize: '16px' }}>Done &mdash; back to Jobs</button>
+      {window.NextLevel?.driveState().configured && (
+        <div style={{ borderTop: '1px solid ' + LINE, paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={heading}>GOOGLE DRIVE</div>
+          <button onClick={saveToDrive} disabled={driveBusy} style={{ ...outlineBtn, minHeight: '46px', fontSize: '15px', opacity: driveBusy ? 0.6 : 1 }}>{driveBusy ? 'Saving to Drive...' : 'Save this job to Google Drive'}</button>
+          <div style={{ fontSize: '13px', color: driveMsg ? TEXT : MUTED }}>{driveMsg || driveSavedLine}</div>
+          <div style={{ fontSize: '12px', color: MUTED }}>Puts a copy where your tablet or laptop can pick it up. Once Drive is connected, leaving the job saves it again by itself.</div>
+        </div>
+      )}
       <div style={{ borderTop: '1px solid ' + LINE, paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={heading}>MOVE THIS JOB</div>
         <button onClick={() => window.NextLevel?.sendJob()} style={{ ...outlineBtn, minHeight: '46px', fontSize: '15px' }}>Move this job to another device</button>
@@ -612,7 +642,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: PAGE, color: TEXT, fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', display: 'flex', flexDirection: 'column' }}>
       <div style={{ background: INK, borderBottom: '1px solid #2A3234', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-        <button onClick={onHome} style={headBtn}>&lsaquo; Jobs</button>
+        <button onClick={leave} style={headBtn}>&lsaquo; Jobs</button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '18px', fontWeight: 500 }}><span style={{ color: EMBER }}>Next </span><span style={{ color: MOSS }}>Level</span> <span style={{ color: CREAM, fontWeight: 800, letterSpacing: '1px', fontSize: '13px' }}>CAPTURE</span></div>
           <div style={{ fontSize: '12px', color: '#B9B4AC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.customer || data.name}</div>

@@ -1,4 +1,4 @@
-import { driveConfigured, isDriveConnected, connectBackup, saveBackup, restoreBackup } from './lib/backup';
+import { driveConfigured, isDriveConnected, connectBackup, saveBackup, restoreBackup, saveJobBackup, listJobBackups, loadJobBackup } from './lib/backup';
 import {
   putPhoto, deletePhotoBlob, getDisplayURL, getPhotoBlob, downscaleImage,
   dehydrateProjects, hydrateProjects, estimateStorage, revokeURL, clearAllPhotos,
@@ -5361,6 +5361,61 @@ export function initNextLevel() {
     sendJob(): void { sendCurrentJob(); },
     // The job file (JSON) on its own, so the Job Sheet's email button can attach it next to the PDF.
     buildJobFile(withPhotos?: boolean): Promise<File | null> { return buildCurrentJobFile(withPhotos); },
+    // Google Drive hand-off: the phone saves each job as its own Drive file; the PC lists them and pulls them in.
+    driveState(): { configured: boolean; connected: boolean } { return { configured: driveConfigured, connected: isDriveConnected() }; },
+    async driveConnect(): Promise<void> { await connectBackup(); },
+    driveSavedAt(id: string): number {
+      try { return Number(JSON.parse(localStorage.getItem('nextlevel_job_drive_saved') || '{}')[id]) || 0; } catch { return 0; }
+    },
+    async saveJobToDrive(id?: string): Promise<void> {
+      const p = id ? projects.find(x => x.id === id) : getProject();
+      if (!p) throw new Error('No job selected');
+      if (isBlankJob(p)) throw new Error('Nothing to save yet. Add something to the job first.');
+      const hydrated = (await hydrateProjects([p]))[0]; // pull picture bytes in so the Drive copy is complete
+      await saveJobBackup(p.id, p.name || 'Job', { type: 'nextlevel-job', version: 1, project: hydrated });
+      try {
+        const m = JSON.parse(localStorage.getItem('nextlevel_job_drive_saved') || '{}');
+        m[p.id] = Date.now();
+        localStorage.setItem('nextlevel_job_drive_saved', JSON.stringify(m));
+      } catch { /* ignore */ }
+    },
+    async listDriveJobs(): Promise<Array<{ fileId: string; jobId: string; name: string; modified: string; onDevice: boolean }>> {
+      const files = await listJobBackups();
+      return files.map(f => {
+        const jobId = f.appProperties?.jobId || f.name.replace(/^job-/, '').replace(/\.json$/, '');
+        return { fileId: f.id, jobId, name: f.appProperties?.jobName || 'Job', modified: f.modifiedTime, onDevice: projects.some(x => x.id === jobId) };
+      });
+    },
+    // Brings one Drive job onto this device. Keeps the job's own id so a later save from the phone lines up with it.
+    // Returns 'exists' (and changes nothing) when the job is already here and replace is false.
+    async importDriveJob(fileId: string, replace: boolean): Promise<'added' | 'replaced' | 'exists'> {
+      const parsed: any = await loadJobBackup<any>(fileId);
+      const incoming = parsed?.type === 'nextlevel-job' ? parsed.project : null;
+      if (!incoming || !incoming.pages || !incoming.id) throw new Error('That Drive file is not a Field & Desk job');
+      const idx = projects.findIndex(x => x.id === incoming.id);
+      if (idx >= 0 && !replace) return 'exists';
+      incoming.photos = incoming.photos || [];
+      incoming.pages.forEach((pg: any) => {
+        pg.walls = pg.walls || []; pg.doors = pg.doors || []; pg.windows = pg.windows || [];
+        pg.assets = pg.assets || []; pg.notes = pg.notes || []; pg.history = pg.history || [];
+        pg.historyIdx = pg.historyIdx ?? -1;
+      });
+      try { await dehydrateProjects([incoming]); } catch { /* private mode etc: pictures stay inline and still show */ }
+      incoming.lastUsed = Date.now();
+      if (idx >= 0) {
+        const keep = new Set<string>(incoming.photos.map((ph: any) => ph.id));
+        (projects[idx].photos || []).forEach((ph: any) => {
+          if (!keep.has(ph.id)) { try { Promise.resolve(deletePhotoBlob(ph.id)).catch(() => { /* ignore */ }); } catch { /* ignore */ } }
+        });
+        projects[idx] = incoming;
+        if (currentProjectId === incoming.id) currentPageIdx = 0;
+      } else {
+        projects.push(incoming);
+      }
+      if (!currentProjectId) { currentProjectId = incoming.id; currentPageIdx = 0; }
+      save(); renderSidebar(); render(); notifyCapture();
+      return idx >= 0 ? 'replaced' : 'added';
+    },
     pickJobFile(): void { document.getElementById('job-file-input')?.click(); },
   };
 }

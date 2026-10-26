@@ -3,12 +3,14 @@ import Webcam from 'react-webcam';
 import { initNextLevel } from './app';
 import CaptureScreen, { type CaptureData, type CapturePatch, type ScratchItem } from './CaptureScreen';
 import { BUILD_STAMP } from './buildStamp';
+import { driveError } from './lib/driveError';
 
 // Live-camera modal. Works on desktop (Surface) AND phones via getUserMedia,
 // unlike the native <input capture> which desktop browsers ignore.
 // On snap: feed the photo into the existing #photo-input-camera pipeline
 // (Photo Booth markup → savePhotoBlob → IndexedDB) — zero app.ts changes.
 type JobSummary = { id: string; name: string; category: string; photoCount: number; noteCount: number };
+type DriveJob = { fileId: string; jobId: string; name: string; modified: string; onDevice: boolean };
 declare global {
   interface Window {
     NextLevel?: {
@@ -30,6 +32,12 @@ declare global {
       sendJob: () => void;
       pickJobFile: () => void;
   buildJobFile: (withPhotos?: boolean) => Promise<File | null>;
+      driveState: () => { configured: boolean; connected: boolean };
+      driveConnect: () => Promise<void>;
+      driveSavedAt: (id: string) => number;
+      saveJobToDrive: (id?: string) => Promise<void>;
+      listDriveJobs: () => Promise<DriveJob[]>;
+      importDriveJob: (fileId: string, replace: boolean) => Promise<'added' | 'replaced' | 'exists'>;
     };
   }
 }
@@ -39,6 +47,44 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
   const [, setTick] = useState(0);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   useEffect(() => window.NextLevel?.onCapture(() => setTick(t => t + 1)), []);
+  const [driveOpen, setDriveOpen] = useState(false);
+  const [driveBusy, setDriveBusy] = useState(false);
+  const [driveMsg, setDriveMsg] = useState('');
+  const [driveJobs, setDriveJobs] = useState<DriveJob[] | null>(null);
+  const loadDrive = async () => {
+    const nl = window.NextLevel; if (!nl) return;
+    setDriveBusy(true); setDriveMsg('');
+    try {
+      if (!nl.driveState().connected) await nl.driveConnect();
+      setDriveJobs(await nl.listDriveJobs());
+    } catch (e) { setDriveMsg(driveError(e)); }
+    setDriveBusy(false);
+  };
+  const bringIn = async (j: DriveJob) => {
+    const nl = window.NextLevel; if (!nl) return;
+    if (j.onDevice && !window.confirm('"' + j.name + '" is already on this device. Replace it with the copy from Google Drive? Any changes made here since then will be lost.')) return;
+    setDriveBusy(true); setDriveMsg('');
+    try {
+      await nl.importDriveJob(j.fileId, true);
+      setDriveJobs(await nl.listDriveJobs());
+      setDriveMsg('"' + j.name + '" is on this device now.');
+    } catch (e) { setDriveMsg(driveError(e)); }
+    setDriveBusy(false);
+  };
+  const bringAllNew = async () => {
+    const nl = window.NextLevel; if (!nl || !driveJobs) return;
+    const todo = driveJobs.filter(j => !j.onDevice);
+    setDriveBusy(true); setDriveMsg('');
+    let done = 0;
+    try {
+      for (const j of todo) { await nl.importDriveJob(j.fileId, false); done++; }
+      setDriveJobs(await nl.listDriveJobs());
+      setDriveMsg(done + ' job' + (done === 1 ? '' : 's') + ' brought in.');
+    } catch (e) { setDriveMsg((done ? done + ' brought in, then it stopped. ' : '') + driveError(e)); }
+    setDriveBusy(false);
+  };
+  const newOnes = (driveJobs || []).filter(j => !j.onDevice);
+  const driveBtn: CSSProperties = { minHeight: '48px', borderRadius: '10px', border: '1px solid rgba(238,241,238,0.3)', background: 'transparent', color: 'var(--cream)', fontSize: '16px', fontWeight: 700, cursor: 'pointer', padding: '0 14px' };
   const jobs = (window.NextLevel?.listJobs() || [])
     .filter(j => !q.trim() || j.name.toLowerCase().includes(q.trim().toLowerCase())); // already most recently used first
   return (
@@ -66,7 +112,42 @@ function OpenJobPicker({ onOpen, onCancel, title = 'Open Job', onNew, onGetFile 
           color: 'var(--cream)', fontSize: '16px', fontWeight: 700, cursor: 'pointer', marginBottom: '14px',
         }}>Get a job file</button>
       )}
+      {window.NextLevel?.driveState().configured && (
+        <button onClick={() => { const o = !driveOpen; setDriveOpen(o); if (o && driveJobs === null && window.NextLevel?.driveState().connected) loadDrive(); }} style={{
+          padding: '14px', borderRadius: '14px', border: '1px solid rgba(138,154,92,0.6)', background: driveOpen ? 'rgba(138,154,92,0.12)' : 'transparent',
+          color: 'var(--cream)', fontSize: '16px', fontWeight: 700, cursor: 'pointer', marginBottom: '14px',
+        }}>Jobs from Google Drive</button>
+      )}
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {driveOpen && (
+          <div style={{ borderRadius: '14px', border: '1px solid rgba(138,154,92,0.5)', background: 'rgba(138,154,92,0.08)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ color: 'var(--cream)', fontSize: '15px', fontWeight: 800 }}>Jobs saved to Google Drive</div>
+            {driveMsg && <div style={{ color: 'var(--cream)', fontSize: '14px', lineHeight: 1.4 }}>{driveMsg}</div>}
+            {driveBusy && <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Working... this can take a minute when a job has many pictures.</div>}
+            {!driveBusy && driveJobs === null && (
+              <button onClick={loadDrive} style={driveBtn}>Connect Google Drive</button>
+            )}
+            {!driveBusy && driveJobs !== null && driveJobs.length === 0 && (
+              <div style={{ color: 'var(--muted)', fontSize: '14px', lineHeight: 1.4 }}>Nothing saved to Drive yet. On the phone, open a job and tap Save this job to Google Drive.</div>
+            )}
+            {!driveBusy && newOnes.length > 1 && (
+              <button onClick={bringAllNew} style={{ ...driveBtn, background: 'var(--ember)', color: 'var(--ink)', border: 'none', fontWeight: 800 }}>Bring in all new jobs ({newOnes.length})</button>
+            )}
+            {driveJobs && driveJobs.map(j => (
+              <button key={j.fileId} disabled={driveBusy} onClick={() => bringIn(j)} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', textAlign: 'left',
+                padding: '12px 14px', borderRadius: '12px', border: '1px solid rgba(238,241,238,0.14)', background: 'rgba(238,241,238,0.05)',
+                color: 'var(--cream)', cursor: 'pointer', opacity: driveBusy ? 0.6 : 1,
+              }}>
+                <span style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '16px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.name}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px' }}>Saved {new Date(j.modified).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} &middot; {j.onDevice ? 'already on this device' : 'new'}</div>
+                </span>
+                <span style={{ color: 'var(--moss)', fontSize: '14px', fontWeight: 800, flexShrink: 0 }}>{j.onDevice ? 'Replace' : 'Bring in'}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {jobs.length === 0 ? (
           <div style={{ color: 'var(--muted)', textAlign: 'center', marginTop: '30px', fontSize: '14px' }}>
             {q.trim() ? 'No jobs match that search' : 'No jobs yet — start one with Capture'}

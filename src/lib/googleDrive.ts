@@ -230,3 +230,77 @@ export async function loadFromDrive<T = unknown>(cfg: DriveBackupConfig): Promis
   if (!res.ok) throw new Error(`Drive load failed (${res.status})`);
   return (await res.json()) as T;
 }
+
+// ---- One file per item (used for per-job saves) -------------------------------------------
+export interface DriveFolderConfig {
+  clientId: string;
+  folderName: string;
+}
+
+export interface DriveFileInfo {
+  id: string;
+  name: string;
+  modifiedTime: string;
+  appProperties?: Record<string, string>;
+}
+
+export async function saveNamedFile(
+  cfg: DriveFolderConfig,
+  fileName: string,
+  data: unknown,
+  appProperties?: Record<string, string>,
+): Promise<DriveSaveResult> {
+  const accessToken = await ensureToken(cfg.clientId);
+  const folderId = await findOrCreateFolder(accessToken, cfg.folderName);
+  const existingId = await findFile(accessToken, folderId, fileName);
+  const content = JSON.stringify(data); // compact: jobs carry their pictures
+  const metadata: Record<string, unknown> = existingId ? { name: fileName } : { name: fileName, parents: [folderId] };
+  if (appProperties) metadata.appProperties = appProperties;
+
+  const boundary = 'gdrive_job_boundary_' + Math.random().toString(36).slice(2);
+  const body =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\nContent-Type: application/json\r\n\r\n${content}\r\n` +
+    `--${boundary}--`;
+  const url = existingId
+    ? `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart`
+    : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+  const res = await fetch(url, {
+    method: existingId ? 'PATCH' : 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
+  });
+  if (!res.ok) throw new Error(`Drive save failed (${res.status}): ${await res.text()}`);
+  const json = await res.json();
+  return { fileId: json.id, savedAt: new Date().toISOString() };
+}
+
+export async function listNamedFiles(cfg: DriveFolderConfig, namePrefix: string): Promise<DriveFileInfo[]> {
+  const accessToken = await ensureToken(cfg.clientId);
+  const folderId = await findOrCreateFolder(accessToken, cfg.folderName);
+  const escaped = namePrefix.replace(/'/g, "\\'");
+  const q = encodeURIComponent(`'${folderId}' in parents and name contains '${escaped}' and trashed = false`);
+  const out: DriveFileInfo[] = [];
+  let pageToken = '';
+  do {
+    const url =
+      `https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=modifiedTime%20desc&pageSize=100` +
+      `&fields=nextPageToken,files(id,name,modifiedTime,appProperties)` +
+      (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '');
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) throw new Error(`Drive list failed (${res.status})`);
+    const json = await res.json();
+    out.push(...((json.files || []) as DriveFileInfo[]));
+    pageToken = json.nextPageToken || '';
+  } while (pageToken);
+  return out.filter(f => f.name.startsWith(namePrefix));
+}
+
+export async function loadFileById<T = unknown>(clientId: string, fileId: string): Promise<T> {
+  const accessToken = await ensureToken(clientId);
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Drive load failed (${res.status})`);
+  return (await res.json()) as T;
+}

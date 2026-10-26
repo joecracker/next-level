@@ -1,4 +1,4 @@
-import { driveConfigured, isDriveConnected, connectBackup, saveBackup, restoreBackup, saveJobBackup, listJobBackups, loadJobBackup } from './lib/backup';
+import { driveConfigured, isDriveConnected, connectBackup, saveBackup, restoreBackup, saveJobFolder, listJobBackups, loadJobBackup } from './lib/backup';
 import {
   putPhoto, deletePhotoBlob, getDisplayURL, getPhotoBlob, downscaleImage,
   dehydrateProjects, hydrateProjects, estimateStorage, revokeURL, clearAllPhotos,
@@ -3963,6 +3963,19 @@ export function initNextLevel() {
     } else if(isDriveConnected()){
       setDriveStatus('Connected to Google Drive');
     }
+    document.getElementById('btn-drive-save-job')?.addEventListener('click', async () => {
+      const st = document.getElementById('drive-job-status');
+      const say = (m: string) => { if(st) st.textContent = m; };
+      say('Saving this job to Drive...');
+      try {
+        if(!isDriveConnected()) await connectBackup();
+        await (window as any).NextLevel.saveJobToDrive(undefined, { pdf: true });
+        say('Saved to Google Drive just now.');
+        toast('Saved to Google Drive');
+      } catch(err){
+        say(err instanceof Error ? err.message : 'Save failed');
+      }
+    });
     document.getElementById('btn-drive-connect')?.addEventListener('click', async () => {
       setDriveStatus('Connecting…');
       try {
@@ -5374,12 +5387,29 @@ export function initNextLevel() {
     driveSavedAt(id: string): number {
       try { return Number(JSON.parse(localStorage.getItem('nextlevel_job_drive_saved') || '{}')[id]) || 0; } catch { return 0; }
     },
-    async saveJobToDrive(id?: string): Promise<void> {
+    // Saves the job into its own Drive folder. With opts.pdf the Field Report PDF is rebuilt and saved beside it
+    // (the Save to Drive button); leaving a job saves just the job file, which is quick.
+    async saveJobToDrive(id?: string, opts?: { pdf?: boolean }): Promise<void> {
       const p = id ? projects.find(x => x.id === id) : getProject();
       if (!p) throw new Error('No job selected');
       if (isBlankJob(p)) throw new Error('Nothing to save yet. Add something to the job first.');
       const hydrated = (await hydrateProjects([p]))[0]; // pull picture bytes in so the Drive copy is complete
-      await saveJobBackup(p.id, p.name || 'Job', { type: 'nextlevel-job', version: 1, project: hydrated });
+      let pdf: Blob | undefined;
+      if (opts?.pdf) {
+        const { buildJobSheetPdf } = await import('./lib/jobSheetPdf');
+        const built = await buildJobSheetPdf({
+          name: p.name || '', customer: p.customer || '', date: p.date || '', phone: p.phone || '', email: p.email || '',
+          address: p.address || '', jobDesc: p.jobDesc || '', jobNotes: p.jobNotes || '',
+          scratch: (p.scratch || []).map(s => ({ id: s.id, text: s.text })),
+          photos: (p.photos || []).map(ph => ({ id: ph.id, caption: ph.caption || '', note: ph.note || '' })),
+        }, async (pid: string) => {
+          const ph = (p.photos || []).find(x => x.id === pid);
+          if (!ph) return null;
+          try { return (await getDisplayURL(ph)) || null; } catch { return null; }
+        });
+        pdf = built.blob;
+      }
+      await saveJobFolder({ id: p.id, name: p.name || '', customer: p.customer || '', jobDesc: p.jobDesc || '' }, { type: 'nextlevel-job', version: 1, project: hydrated }, pdf);
       try {
         const m = JSON.parse(localStorage.getItem('nextlevel_job_drive_saved') || '{}');
         m[p.id] = Date.now();
@@ -5387,11 +5417,10 @@ export function initNextLevel() {
       } catch { /* ignore */ }
     },
     async listDriveJobs(): Promise<Array<{ fileId: string; jobId: string; name: string; modified: string; onDevice: boolean; skipped: boolean }>> {
-      const files = await listJobBackups();
-      return files.map(f => {
-        const jobId = f.appProperties?.jobId || f.name.replace(/^job-/, '').replace(/\.json$/, '');
-        const onDevice = projects.some(x => x.id === jobId);
-        return { fileId: f.id, jobId, name: f.appProperties?.jobName || 'Job', modified: f.modifiedTime, onDevice, skipped: !onDevice && driveSkipList().includes(jobId) };
+      const entries = await listJobBackups();
+      return entries.map(f => {
+        const onDevice = projects.some(x => x.id === f.jobId);
+        return { fileId: f.fileId, jobId: f.jobId, name: f.name, modified: f.modified, onDevice, skipped: !onDevice && driveSkipList().includes(f.jobId) };
       });
     },
     // Brings one Drive job onto this device. Keeps the job's own id so a later save from the phone lines up with it.

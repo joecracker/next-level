@@ -4,11 +4,12 @@ import {
   isDriveConnected,
   saveToDrive,
   loadFromDrive,
-  saveNamedFile,
-  listNamedFiles,
+  ensureJobFolder,
+  saveFileInFolder,
+  listJobEntries,
   loadFileById,
   type DriveBackupConfig,
-  type DriveFileInfo,
+  type DriveJobEntry,
 } from './googleDrive';
 
 // Auto-created (or found) by name inside whichever Google account is
@@ -52,25 +53,40 @@ export async function restoreBackup<T = unknown>(): Promise<T | null> {
   return loadFromDrive<T>(cfg());
 }
 
-// ---- One Drive file per job (phone saves, PC lists and pulls) -----------------------------
-// Separate folder from the whole-device backup above, so the two never touch each other.
+// ---- One Drive folder per job (the job file, the Field Report PDF, and later the estimate) -----
+// Separate from the whole-device backup above, so the two never touch each other.
 const JOBS_FOLDER_NAME = 'Next Level Jobs';
-const JOB_FILE_PREFIX = 'job-';
 function jobsCfg() {
   return { clientId: CLIENT_ID, folderName: JOBS_FOLDER_NAME };
 }
 
-export type { DriveFileInfo };
+export type { DriveJobEntry };
 
-export async function saveJobBackup(jobId: string, jobName: string, data: unknown) {
-  return saveNamedFile(jobsCfg(), `${JOB_FILE_PREFIX}${jobId}.json`, data, {
-    jobId,
-    jobName: (jobName || 'Job').slice(0, 40), // Drive caps a property at 124 bytes, key included
-  });
+// Folder titles read like "Smith - Hall bathroom remodel"; characters Drive or Windows dislike are dropped.
+function folderTitle(customer: string, name: string, desc: string): string {
+  const who = (customer || name || 'Job').trim();
+  const what = (desc || '').trim();
+  const t = (what && what.toLowerCase() !== who.toLowerCase() ? `${who} - ${what}` : who)
+    .replace(/[\\/:*?"<>|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return t.slice(0, 80) || 'Job';
 }
 
-export async function listJobBackups(): Promise<DriveFileInfo[]> {
-  return listNamedFiles(jobsCfg(), JOB_FILE_PREFIX);
+/** Saves the job file (and the Field Report PDF when given) into this job's folder, replacing the older copies. */
+export async function saveJobFolder(
+  job: { id: string; name: string; customer: string; jobDesc: string },
+  envelope: unknown,
+  pdf?: Blob,
+): Promise<void> {
+  const title = folderTitle(job.customer, job.name, job.jobDesc);
+  const folderId = await ensureJobFolder(jobsCfg(), job.id, title, title.slice(0, 40));
+  await saveFileInFolder(CLIENT_ID, folderId, 'job.json', 'application/json', JSON.stringify(envelope));
+  if (pdf) await saveFileInFolder(CLIENT_ID, folderId, 'Field Report.pdf', 'application/pdf', pdf);
+}
+
+export async function listJobBackups(): Promise<DriveJobEntry[]> {
+  return listJobEntries(jobsCfg());
 }
 
 export async function loadJobBackup<T = unknown>(fileId: string): Promise<T> {

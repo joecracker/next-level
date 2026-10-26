@@ -35,7 +35,7 @@ declare global {
       driveState: () => { configured: boolean; connected: boolean };
       driveConnect: () => Promise<void>;
       driveSavedAt: (id: string) => number;
-      saveJobToDrive: (id?: string) => Promise<void>;
+      saveJobToDrive: (id?: string, opts?: { pdf?: boolean }) => Promise<void>;
       listDriveJobs: () => Promise<DriveJob[]>;
       importDriveJob: (fileId: string, replace: boolean) => Promise<'added' | 'replaced' | 'exists'>;
     };
@@ -724,6 +724,10 @@ export default function App() {
           </div>
         </section>
         <section className="sidebar-section stage-section s-review">
+          <button id="btn-drive-save-job" className="btn btn-block btn-accent" style={{ background: 'var(--ember)', color: 'var(--ink)', marginBottom: '6px' }}>Save this job to Google Drive</button>
+          <div id="drive-job-status" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', minHeight: '14px', marginBottom: '8px' }}></div>
+          <details style={{ marginBottom: '8px' }}>
+          <summary style={{ cursor: 'pointer', fontSize: '12px', color: 'rgba(255,255,255,0.65)', marginBottom: '8px' }}>More: send, open, whole-device backup</summary>
           <button id="btn-export-boss" className="btn btn-block btn-accent" style={{ background: 'var(--ember)', color: 'var(--ink)', marginBottom: '6px' }}>📋 Send to Laptop (Boss Report)</button>
           <div className="btn-row" style={{ marginTop: '6px' }}>
             <button id="btn-send-job" className="btn btn-sm btn-block" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid var(--border)' }} title="Send this one job — walls, photos, notes, everything — to someone else, by text/email/AirDrop/whatever's easiest">📤 Send This Job</button>
@@ -737,6 +741,7 @@ export default function App() {
           </div>
           <button id="btn-drive-restore" className="btn btn-block" style={{ fontSize: '11px', opacity: 0.9, marginTop: '6px' }}>Restore from Drive</button>
           <div id="drive-status" style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '6px', minHeight: '14px' }}></div>
+          </details>
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', marginTop: '14px', paddingTop: '10px' }}>
             <button id="btn-clear-all-data" className="btn btn-sm btn-block" style={{ background: 'rgba(220,38,38,0.15)', color: '#fca5a5', border: '1px solid rgba(220,38,38,0.4)' }} title="Wipe every project and photo — for starting over clean, e.g. after testing">🗑 Clear All Data</button>
           </div>

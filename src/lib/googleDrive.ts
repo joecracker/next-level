@@ -304,3 +304,165 @@ export async function loadFileById<T = unknown>(clientId: string, fileId: string
   if (!res.ok) throw new Error(`Drive load failed (${res.status})`);
   return (await res.json()) as T;
 }
+
+// ---- One folder per job (job file, Field Report PDF, the estimate Excel all live together) ---------------
+// Everything is created by this app's Google client, so the drive.file scope can see it from every
+// Next Level app that uses the same client. Folders are found by the job id stored on them, so renaming a
+// folder or changing the customer name never loses track of it.
+const FOLDER_MIME = 'application/vnd.google-apps.folder';
+const escQ = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+async function listAllFiles<T>(accessToken: string, baseUrl: string, what: string): Promise<T[]> {
+  const out: T[] = [];
+  let page = '';
+  do {
+    const url = baseUrl + (page ? `&pageToken=${encodeURIComponent(page)}` : '');
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) throw new Error(`Drive ${what} failed (${res.status})`);
+    const json = await res.json();
+    out.push(...((json.files || []) as T[]));
+    page = json.nextPageToken || '';
+  } while (page);
+  return out;
+}
+
+/** Finds (or makes) the folder for one job and returns its id. The folder is renamed if the title changed. */
+export async function ensureJobFolder(cfg: DriveFolderConfig, jobId: string, folderTitle: string, jobName: string): Promise<string> {
+  const accessToken = await ensureToken(cfg.clientId);
+  const rootId = await findOrCreateFolder(accessToken, cfg.folderName);
+  const q = encodeURIComponent(
+    `'${rootId}' in parents and mimeType='${FOLDER_MIME}' and appProperties has { key='jobId' and value='${escQ(jobId)}' } and trashed=false`,
+  );
+  const found = await listAllFiles<{ id: string; name: string }>(
+    accessToken,
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name)&pageSize=10`,
+    'folder lookup',
+  );
+  if (found.length) {
+    const f = found[0];
+    if (f.name !== folderTitle) {
+      try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: folderTitle, appProperties: { jobId, jobName } }),
+        });
+      } catch {
+        /* a failed rename is not worth stopping the save for */
+      }
+    }
+    return f.id;
+  }
+  const res = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: folderTitle, mimeType: FOLDER_MIME, parents: [rootId], appProperties: { jobId, jobName } }),
+  });
+  if (!res.ok) throw new Error(`Drive folder create failed (${res.status})`);
+  return (await res.json()).id as string;
+}
+
+/** Saves (or replaces) one file inside a job folder. Text or a Blob (PDF, Excel) both work. */
+export async function saveFileInFolder(
+  clientId: string,
+  folderId: string,
+  fileName: string,
+  mime: string,
+  data: string | Blob,
+): Promise<string> {
+  const accessToken = await ensureToken(clientId);
+  const existingId = await findFile(accessToken, folderId, fileName);
+  const metadata = existingId ? { name: fileName } : { name: fileName, parents: [folderId] };
+  const boundary = 'gdrive_folder_boundary_' + Math.random().toString(36).slice(2);
+  const head =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`;
+  const body = new Blob([head, data, `\r\n--${boundary}--`]);
+  const url = existingId
+    ? `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart`
+    : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+  const res = await fetch(url, {
+    method: existingId ? 'PATCH' : 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
+  });
+  if (!res.ok) throw new Error(`Drive save failed (${res.status}): ${await res.text()}`);
+  return (await res.json()).id as string;
+}
+
+export interface DriveJobEntry {
+  jobId: string;
+  name: string;
+  modified: string;
+  /** The job file (job.json in a job folder, or an older single job-xxxx.json file). */
+  fileId: string;
+  /** The job's folder, or null for an older single-file job. */
+  folderId: string | null;
+  /** Estimate.xlsx in the job's folder, if XL has saved one. */
+  estimateFileId: string | null;
+}
+
+/** Every job this Google client has saved, newest first. Older single-file jobs are included until a folder exists. */
+export async function listJobEntries(cfg: DriveFolderConfig): Promise<DriveJobEntry[]> {
+  const accessToken = await ensureToken(cfg.clientId);
+  const rootId = await findOrCreateFolder(accessToken, cfg.folderName);
+  const base = 'https://www.googleapis.com/drive/v3/files?pageSize=100';
+
+  const folders = await listAllFiles<{ id: string; name: string; appProperties?: Record<string, string> }>(
+    accessToken,
+    `${base}&q=${encodeURIComponent(`'${rootId}' in parents and mimeType='${FOLDER_MIME}' and trashed=false`)}&fields=nextPageToken,files(id,name,appProperties)`,
+    'folder list',
+  );
+  const byName = async (name: string) =>
+    listAllFiles<{ id: string; parents?: string[]; modifiedTime: string }>(
+      accessToken,
+      `${base}&q=${encodeURIComponent(`name = '${name}' and trashed = false`)}&fields=nextPageToken,files(id,parents,modifiedTime)`,
+      'file list',
+    );
+  const [jobFiles, estimateFiles] = await Promise.all([byName('job.json'), byName('Estimate.xlsx')]);
+  const jobIn = new Map<string, { id: string; modifiedTime: string }>();
+  jobFiles.forEach(f => (f.parents || []).forEach(p => jobIn.set(p, f)));
+  const estIn = new Map<string, string>();
+  estimateFiles.forEach(f => (f.parents || []).forEach(p => estIn.set(p, f.id)));
+
+  const out: DriveJobEntry[] = [];
+  const seen = new Set<string>();
+  for (const fo of folders) {
+    const jobId = fo.appProperties?.jobId;
+    const jf = jobId ? jobIn.get(fo.id) : undefined;
+    if (!jobId || !jf) continue;
+    seen.add(jobId);
+    out.push({ jobId, name: fo.name, modified: jf.modifiedTime, fileId: jf.id, folderId: fo.id, estimateFileId: estIn.get(fo.id) || null });
+  }
+
+  // Older layout: one job-xxxx.json file straight in the main folder.
+  const legacy = await listAllFiles<{ id: string; name: string; modifiedTime: string; appProperties?: Record<string, string> }>(
+    accessToken,
+    `${base}&q=${encodeURIComponent(`'${rootId}' in parents and name contains 'job-' and trashed=false`)}&fields=nextPageToken,files(id,name,modifiedTime,appProperties)`,
+    'older file list',
+  );
+  for (const f of legacy) {
+    if (!f.name.startsWith('job-') || !f.name.endsWith('.json')) continue;
+    const jobId = f.appProperties?.jobId || f.name.replace(/^job-/, '').replace(/\.json$/, '');
+    if (seen.has(jobId)) continue;
+    seen.add(jobId);
+    out.push({ jobId, name: f.appProperties?.jobName || 'Job', modified: f.modifiedTime, fileId: f.id, folderId: null, estimateFileId: null });
+  }
+  return out.sort((a, b) => (a.modified < b.modified ? 1 : -1));
+}
+
+/** The file with this name inside a folder, or null. */
+export async function findFileInFolder(clientId: string, folderId: string, fileName: string): Promise<string | null> {
+  const accessToken = await ensureToken(clientId);
+  return findFile(accessToken, folderId, fileName);
+}
+
+/** Downloads a file's bytes (the Excel, a PDF). */
+export async function downloadFile(clientId: string, fileId: string): Promise<Blob> {
+  const accessToken = await ensureToken(clientId);
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Drive download failed (${res.status})`);
+  return res.blob();
+}

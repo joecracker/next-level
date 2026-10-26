@@ -181,10 +181,10 @@ const JOBSHEET_CSS = [
 function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onClose: () => void }) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
-  // The PDF and the job file are built as soon as the sheet opens. A phone only opens its share menu
-  // within a few seconds of a tap, and building a PDF with photos can take longer than that, so the
-  // Email button has to have everything ready BEFORE it is tapped.
-  const [prep, setPrep] = useState<{ pdf: File; job: File | null } | null>(null);
+  // The PDF is built as soon as the sheet opens. A phone only opens its share menu within a few seconds
+  // of a tap, and building a PDF with photos can take longer than that, so the Email button has to have
+  // the PDF ready BEFORE it is tapped. (The job itself travels through Google Drive, not through this email.)
+  const [prep, setPrep] = useState<{ pdf: File } | null>(null);
   const [prepState, setPrepState] = useState<'working' | 'ready' | 'failed'>('working');
   const [msg, setMsg] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -195,10 +195,8 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
       const { buildJobSheetPdf } = await import('./lib/jobSheetPdf');
       const { blob, filename } = await buildJobSheetPdf(data, id => window.NextLevel?.photoUrl(id) ?? Promise.resolve(null));
       const pdf = new File([blob], filename, { type: 'application/pdf' });
-      // The job file (JSON) is what XL imports. Job info only: the PDF already has the pictures.
-      const job = (await window.NextLevel?.buildJobFile(false)) ?? null;
       if (!alive.current) return;
-      setPrep({ pdf, job });
+      setPrep({ pdf });
       setPrepState('ready');
     } catch {
       if (alive.current) setPrepState('failed');
@@ -216,37 +214,28 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   };
-  // Save both files to the phone's Downloads (one tap).
-  const saveBoth = () => {
+  // Save the PDF to the phone's Downloads (one tap).
+  const savePdf = () => {
     if (!prep) return;
     download(prep.pdf);
-    if (prep.job) setTimeout(() => download(prep.job as File), 600);
-    setMsg('Saved to your Downloads: the PDF' + (prep.job ? ' and the job file.' : '.'));
+    setMsg('Saved to your Downloads: the PDF.');
     setMenuOpen(false);
   };
-  // Email job: hand both files to the phone's share menu. share() is called straight from the tap
+  // Email report: hand the PDF to the phone's share menu. share() is called straight from the tap
   // (nothing awaited first) so the phone still allows it.
-  const emailJob = () => {
+  const emailReport = () => {
     if (!prep) return;
-    const { pdf, job } = prep;
+    const { pdf } = prep;
     const subject = (data.customer || data.name || 'Job') + ' - Field Report';
     const nav = navigator as any;
-    const can = (fs: File[]) => !!(nav.canShare && nav.canShare({ files: fs }));
-    // Best combination first (PDF + job info), then the PDF on its own.
-    const variants: File[][] = [];
-    if (job) variants.push([pdf, job]);
-    variants.push([pdf]);
-    const files = variants.find(can);
-    if (!files) {
-      saveBoth();
-      setMsg('This browser cannot open the share menu, so both files were saved to your Downloads. Attach them to an email.');
+    if (!(nav.canShare && nav.canShare({ files: [pdf] }))) {
+      savePdf();
+      setMsg('This browser cannot open the share menu, so the PDF was saved to your Downloads. Attach it to an email.');
       return;
     }
-    nav.share({ files, title: subject }).then(() => {
-      if (job && files.length === 1) setMsg('Only the PDF went to the share menu: this phone would not attach the job file with it. Tap Print / Save job, then Save PDF + job file, and attach both from Downloads.');
-    }).catch((err: any) => {
+    nav.share({ files: [pdf], title: subject }).catch((err: any) => {
       if (err?.name === 'AbortError') return;
-      setMsg('The share menu would not open (' + (err?.name || 'error') + '). Tap Print / Save job, then Save PDF + job file, and attach both from Downloads.');
+      setMsg('The share menu would not open (' + (err?.name || 'error') + '). Tap Print / Save, then Save PDF, and attach it from Downloads.');
     });
   };
   // Back (phone button or swipe) closes the sheet first, like the big-picture viewer.
@@ -276,15 +265,15 @@ function JobSheet({ data, rev, onClose }: { data: CaptureData; rev: number; onCl
       <style>{JOBSHEET_CSS}</style>
       <div className="nl-js-bar">
         <button onClick={close} aria-label="Back" style={{ ...headBtn, padding: '0 18px', fontSize: '22px', lineHeight: 1 }}>&larr;</button>
-        <button onClick={prepState === 'failed' ? runPrep : emailJob} disabled={prepState === 'working'} style={{ ...headBtn, flex: '1 1 0', background: EMBER, color: INK, border: 'none', fontWeight: 800, opacity: prepState === 'working' ? 0.6 : 1 }}>{prepState === 'working' ? 'Getting ready...' : prepState === 'failed' ? 'Could not build. Tap to retry' : 'Email job'}</button>
-        <button onClick={() => setMenuOpen(o => !o)} style={{ ...headBtn, flexBasis: '100%', background: EMBER, color: INK, border: 'none', fontWeight: 800 }}>Print / Save job</button>
+        <button onClick={prepState === 'failed' ? runPrep : emailReport} disabled={prepState === 'working'} style={{ ...headBtn, flex: '1 1 0', background: EMBER, color: INK, border: 'none', fontWeight: 800, opacity: prepState === 'working' ? 0.6 : 1 }}>{prepState === 'working' ? 'Getting ready...' : prepState === 'failed' ? 'Could not build. Tap to retry' : 'Email report'}</button>
+        <button onClick={() => setMenuOpen(o => !o)} style={{ ...headBtn, flexBasis: '100%', background: EMBER, color: INK, border: 'none', fontWeight: 800 }}>Print / Save</button>
         {menuOpen && (
           <>
             <button onClick={() => { setMenuOpen(false); window.print(); }} style={{ ...headBtn, flex: '1 1 0', background: '#FFFFFF', color: INK, border: 'none', fontWeight: 800 }}>Print the PDF</button>
-            <button onClick={saveBoth} disabled={prepState !== 'ready'} style={{ ...headBtn, flex: '1 1 0', background: '#FFFFFF', color: INK, border: 'none', fontWeight: 800, opacity: prepState === 'ready' ? 1 : 0.6 }}>Save PDF + job file</button>
+            <button onClick={savePdf} disabled={prepState !== 'ready'} style={{ ...headBtn, flex: '1 1 0', background: '#FFFFFF', color: INK, border: 'none', fontWeight: 800, opacity: prepState === 'ready' ? 1 : 0.6 }}>Save PDF</button>
           </>
         )}
-        <div className="nl-js-hint">{msg || (prepState === 'working' ? 'Getting the PDF and job file ready. Email job turns on when they are.' : 'Email job opens your share menu with the PDF and the job file attached. Pick Gmail.')}</div>
+        <div className="nl-js-hint">{msg || (prepState === 'working' ? 'Getting the PDF ready. Email report turns on when it is.' : 'Email report opens your share menu with the PDF attached. Pick Gmail.')}</div>
       </div>
       <div className="nl-js-page">
         <div className="nl-js-brand">FIELD &amp; DESK &middot; FIELD REPORT</div>
@@ -606,7 +595,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
     setDriveBusy(true); setDriveMsg('');
     try {
       if (!nl.driveState().connected) await nl.driveConnect();
-      await nl.saveJobToDrive(data.id);
+      await nl.saveJobToDrive(data.id, { pdf: true }); // job file + Field Report PDF, side by side in the job's Drive folder
       setDriveMsg('Saved to Google Drive at ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.');
     } catch (e) { setDriveMsg(driveError(e)); }
     setDriveBusy(false);
@@ -621,13 +610,11 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
   const driveOn = Boolean(window.NextLevel?.driveState().configured);
   const exportBtn = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <button onClick={() => setSheetOpen(true)} style={{ ...solidBtn, minHeight: '56px', fontSize: '17px' }}>Field Report (read, print, save as PDF)</button>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        {driveOn && <button onClick={saveToDrive} disabled={driveBusy} style={{ ...outlineBtn, flex: 1, minWidth: 0, minHeight: '50px', fontSize: '15px', opacity: driveBusy ? 0.6 : 1 }}>{driveBusy ? 'Saving...' : 'Save to Drive'}</button>}
-        <button onClick={() => window.NextLevel?.sendJob()} style={{ ...outlineBtn, flex: 1, minWidth: 0, minHeight: '50px', fontSize: '15px' }}>Send as a file</button>
-      </div>
+      <button onClick={() => setSheetOpen(true)} style={{ ...solidBtn, minHeight: '56px', fontSize: '17px' }}>Field Report (read, email, print)</button>
+      {driveOn && <button onClick={saveToDrive} disabled={driveBusy} style={{ ...outlineBtn, minHeight: '52px', fontSize: '16px', opacity: driveBusy ? 0.6 : 1 }}>{driveBusy ? 'Saving to Drive...' : 'Save to Google Drive'}</button>}
       {driveOn && <div style={{ fontSize: '13px', color: driveMsg ? TEXT : MUTED, marginTop: '-4px' }}>{driveMsg || driveSavedLine}</div>}
       <button onClick={leave} style={{ ...outlineBtn, minHeight: '52px', fontSize: '16px' }}>Done &mdash; back to Jobs</button>
+      <button onClick={() => window.NextLevel?.sendJob()} style={{ background: 'none', border: 'none', color: MUTED, textDecoration: 'underline', fontSize: '13px', cursor: 'pointer', padding: '6px', fontFamily: 'inherit' }}>No signal? Send the job as a file instead</button>
     </div>
   );
 

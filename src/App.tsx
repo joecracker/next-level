@@ -17,7 +17,6 @@ declare global {
       newJob: () => string;
       listJobs: () => JobSummary[];
       openJob: (id: string) => void;
-      openSkipCategory: () => void;
       getCapture: () => CaptureData | null;
       setCapture: (patch: CapturePatch) => void;
       setScratch: (items: ScratchItem[]) => void;
@@ -282,7 +281,7 @@ function CameraModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Launcher({ onPick }: { onPick: (door: 'new' | 'open' | 'just' | 'quick' | 'capture' | 'design') => void }) {
+function Launcher({ onPick }: { onPick: (door: 'open' | 'capture' | 'design') => void }) {
   const doorBtn: CSSProperties = {
     display: 'flex', alignItems: 'center', gap: '16px', width: '100%',
     padding: '20px 24px', borderRadius: '16px', fontSize: '20px', fontWeight: 800,
@@ -450,7 +449,7 @@ export default function App() {
     if (sb) sb.dataset.stage = stage;
   }, [stage, showLauncher]);
 
-  const pickDoor = (door: 'new' | 'open' | 'just' | 'quick' | 'capture' | 'design') => {
+  const pickDoor = (door: 'open' | 'capture' | 'design') => {
     if (door === 'capture') { newCapture(); return; } // a fresh job, straight into Capture
     if (door === 'open') { // the job list; the job you pick opens in Capture
       window.history.pushState({ nl: 'picker' }, '');
@@ -463,15 +462,6 @@ export default function App() {
       setOpenPicker(true);
       return;
     }
-    setStage(door === 'just' || door === 'quick' ? 'draw' : 'capture');
-    setShowLauncher(false);
-    setTimeout(() => {
-      if (door === 'new') {
-        window.NextLevel?.newJob();
-      } else if (door === 'just' || door === 'quick') {
-        window.NextLevel?.openSkipCategory();
-      }
-    }, 60);
   };
 
   const openExistingJob = (id: string) => {
@@ -1055,7 +1045,6 @@ export default function App() {
               <p>When you start a job on site, choose your preferred setup mode:</p>
               <ul>
                 <li><b>🪄 Project Wizard:</b> Step-by-step guided setup that asks for Client Name, Phone Number, Email Address, Job Site Address, Project Room Title, Category, Ceiling Height, and Stud Spacing. Auto-tailors your canvas and catalogs!</li>
-                <li><b>✏️ Skip to Drawing:</b> Jump straight to an existing job's canvas (skip hunting the project list), or start a blank Bathroom/Kitchen with no client info needed.</li>
                 <li><b>Sidebar Contact Info:</b> Enter or update complete contact info (Name, Phone, Email, and Address) anytime directly in the left sidebar.</li>
               </ul>
             </div>
@@ -1165,24 +1154,6 @@ export default function App() {
             <button id="boss-report-print" className="btn btn-sm btn-accent" style={{ background: 'var(--ember)', color: 'var(--ink)' }}>🖨️ Print / Save PDF</button>
             <button id="boss-report-close" className="btn btn-sm">Close</button>
           </div>
-        </div>
-      </div>
-
-      <div id="skip-category-modal" className="modal-overlay hidden">
-        <div className="modal" style={{ maxWidth: '420px', width: '90%', maxHeight: '82vh', display: 'flex', flexDirection: 'column' }}>
-          <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 'none' }}>
-            <span>New / Open Project</span>
-            <button id="skip-category-close-x" className="btn btn-sm" style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--ink)' }}>&times;</button>
-          </div>
-          <p className="modal-sub" style={{ flex: 'none' }}>Jump straight to a job's canvas, or start a blank one</p>
-          <div id="skip-category-cards" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', flex: 'none' }}>
-            <button className="skip-cat-card" data-skip-cat="Bathroom" style={{ padding: '18px 8px', fontSize: '17px', fontWeight: 800, cursor: 'pointer', background: 'rgba(160,138,88,0.08)', border: '1px solid var(--ink)', borderRadius: '8px', color: 'var(--ink)' }}>+ Bath</button>
-            <button className="skip-cat-card" data-skip-cat="Kitchen" style={{ padding: '18px 8px', fontSize: '17px', fontWeight: 800, cursor: 'pointer', background: 'rgba(160,138,88,0.08)', border: '1px solid var(--ink)', borderRadius: '8px', color: 'var(--ink)' }}>+ Kitchen</button>
-          </div>
-          <button id="skip-btn-full-setup" className="btn btn-sm btn-block" style={{ marginTop: '8px', flex: 'none', background: 'none', border: '1px dashed var(--border)', color: '#64748b', fontSize: '12px', fontWeight: 600 }}>🪄 Need client info first? Full Setup Wizard →</button>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px', borderTop: '1px solid rgba(0,0,0,0.1)', marginTop: '12px', paddingTop: '10px', flex: 'none' }}>Or jump to an existing job</div>
-          <input type="text" id="skip-job-search" placeholder="Search jobs..." style={{ marginTop: '6px', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', flex: 'none' }} />
-          <div id="skip-existing-jobs-list" style={{ flex: 1, overflowY: 'auto', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '6px' }}></div>
         </div>
       </div>
 

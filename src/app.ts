@@ -2875,7 +2875,7 @@ export function initNextLevel() {
   }
 
   // Picking a job from the Wizard's "Switch Job" search — same idea as
-  // jumpToExistingJob, but stays inside the Wizard instead of closing it,
+  // opening that job on the canvas, but stays inside the Wizard instead of closing it,
   // since the whole point here is reviewing/editing that job's details.
   function selectWizardJob(id: string) {
     const p = projects.find(x => x.id === id);
@@ -3007,58 +3007,9 @@ export function initNextLevel() {
     toast(existing ? `✅ "${projTitle}" updated for ${custName}!` : `🎉 "${projTitle}" created for ${custName}!`);
   }
 
-  // Shared "arrive at the drawing desk" landing sequence — used by both a
-  // brand-new blank project (needs the tools/catalog open, nothing in the
-  // rail yet) and jumping to an EXISTING job (skip the tool-drawer forcing,
-  // but open the reference rail since that's the whole point — the info's
-  // already there, waiting).
-  function landOnDrawingDesk(opts: { openTools?: boolean; openRail?: boolean }) {
-    pushHistory();
-    save();
-    renderSidebar();
-    render();
-    if (opts.openTools) {
-      const openIfClosed = (contentId: string, btnId: string) => {
-        const content = document.getElementById(contentId);
-        if (content?.classList.contains('hidden')) (document.getElementById(btnId) as HTMLElement)?.click();
-      };
-      openIfClosed('tools-drawer-content', 'btn-tools-drawer');
-      openIfClosed('assets-drawer-content', 'btn-assets-drawer');
-    }
-    closeMobileSidebar(); // on phone/small tablet, drop the sidebar so the canvas is front and center
-    if (opts.openRail) {
-      document.getElementById('reference-rail')?.classList.remove('hidden');
-      renderReferenceRail();
-    }
-  }
-
-  // Bypasses the whole intro/wizard: pick a category → blank project →
-  // straight to canvas with the drawing tools and matching catalog already
-  // open. Built for anyone (kitchen designer, or bath-focused you/boss) who's
-  // just laying out from known numbers and has zero use for client-info/notes.
-  //
-  // Category → asset-tab mapping lives in one place (CATEGORY_ASSET_MAP) so
-  // adding Deck / Pole Barn / Addition later is just: (1) a new button in the
-  // #skip-category-cards grid in App.tsx, (2) a new entry here.
-  const CATEGORY_ASSET_MAP: Record<string, string> = {
-    'Bathroom': 'plumbing',
-    'Kitchen': 'cabinet',
-    // 'Deck': 'custom',
-    // 'Pole Barn': 'custom',
-    // 'Addition': 'cabinet',
-  };
-
-  function openSkipCategoryModal() {
-    renderSkipExistingJobsList();
-    document.getElementById('skip-category-modal')?.classList.remove('hidden');
-  }
-  function closeSkipCategoryModal() {
-    document.getElementById('skip-category-modal')?.classList.add('hidden');
-  }
-
   // Shared searchable job-picker — one row-rendering implementation reused
-  // by Skip to Drawing's "jump to an existing job" list AND the Wizard's
-  // "switch job" panel, instead of two near-identical copies drifting apart.
+  // for the Wizard's "switch job" panel (one row-rendering implementation),
+  // instead of near-identical copies drifting apart.
   function renderJobPickerList(listEl: HTMLElement, searchTerm: string, onSelect: (id: string) => void, excludeId?: string) {
     listEl.innerHTML = '';
     const term = searchTerm.trim().toLowerCase();
@@ -3089,47 +3040,6 @@ export function initNextLevel() {
     });
   }
 
-  // The "Or jump to an existing job" list inside the Skip to Drawing popup —
-  // this is the desk-side use case: you already collected a couple jobs in
-  // the field (notes/photos/measurements are already there), you just don't
-  // want to hunt through the sidebar list to find the right one.
-  function renderSkipExistingJobsList() {
-    const listEl = document.getElementById('skip-existing-jobs-list');
-    if (!listEl) return;
-    const searchInput = document.getElementById('skip-job-search') as HTMLInputElement;
-    renderJobPickerList(listEl, searchInput?.value || '', jumpToExistingJob);
-  }
-
-  // Land on an existing job's canvas — same reset the sidebar project-list
-  // click does (deselect wall/opening, close mobile sidebar) — with the
-  // reference rail already open since that's the whole point of this path.
-  function jumpToExistingJob(id: string) {
-    const p = projects.find(x => x.id === id);
-    if (!p) return;
-    currentProjectId = p.id;
-    currentPageIdx = 0;
-    selectedWallIdx = -1;
-    document.getElementById('wall-edit-panel')?.classList.add('hidden');
-    selectedOpening = null;
-    hideOpeningEdit();
-    closeSkipCategoryModal();
-    landOnDrawingDesk({ openTools: false, openRail: true });
-    toast(`📂 ${p.name}`);
-  }
-
-  function skipToDrawing(category: string) {
-    const p = newProject(`New ${category} Project`, category);
-    currentCategory = category;
-    activeAssetCat = CATEGORY_ASSET_MAP[category] || 'cabinet';
-
-    projects.push(p);
-    currentProjectId = p.id;
-    currentPageIdx = 0;
-
-    landOnDrawingDesk({ openTools: true, openRail: false });
-    toast(`🎨 Blank ${category} project ready — start drawing`);
-  }
-
   function initEvents(){
     canvas.addEventListener('mousedown', onCanvasDown);
     canvas.addEventListener('mousemove', onCanvasMove);
@@ -3146,18 +3056,6 @@ export function initNextLevel() {
 
     document.getElementById('btn-open-wizard')?.addEventListener('click', ()=>{
       openWizardModal();
-    });
-    document.getElementById('btn-skip-to-drawing')?.addEventListener('click', ()=>{
-      openSkipCategoryModal();
-    });
-    document.getElementById('skip-category-close-x')?.addEventListener('click', closeSkipCategoryModal);
-    document.getElementById('skip-category-cards')?.addEventListener('click', e => {
-      const target = e.target as HTMLElement;
-      const card = target.closest('.skip-cat-card') as HTMLElement;
-      if (!card) return;
-      const cat = card.dataset.skipCat || 'Bathroom';
-      closeSkipCategoryModal();
-      skipToDrawing(cat);
     });
 
     // Reference rail: pull-tab open, X close. Measurement fields refresh the
@@ -3228,7 +3126,6 @@ export function initNextLevel() {
         document.getElementById('project-list')?.classList.remove('open');
       }
     });
-    document.getElementById('skip-job-search')?.addEventListener('input', ()=> renderSkipExistingJobsList());
 
     document.getElementById('wiz-btn-switch-job')?.addEventListener('click', () => {
       const panel = document.getElementById('wiz-job-search-panel');
@@ -3261,10 +3158,6 @@ export function initNextLevel() {
       document.getElementById('project-wizard-modal')?.classList.remove('hidden');
     }
     document.getElementById('wiz-btn-new-job')?.addEventListener('click', startNewJobInWizard);
-    document.getElementById('skip-btn-full-setup')?.addEventListener('click', () => {
-      closeSkipCategoryModal();
-      startNewJobInWizard();
-    });
 
     document.getElementById('btn-send-job')?.addEventListener('click', sendCurrentJob);
     document.getElementById('btn-open-job')?.addEventListener('click', ()=>{
@@ -5226,7 +5119,7 @@ export function initNextLevel() {
     pushHistory();
   }
   // else: genuinely empty — no fake seed project. currentProjectId stays
-  // null and Skip to Drawing / Wizard become the actual first move, instead
+  // null and the start screen / Wizard become the actual first move, instead
   // of forcing everyone to first delete a "Sample Kitchen Remodel / John
   // Doe" placeholder that was never theirs.
 
@@ -5292,7 +5185,6 @@ export function initNextLevel() {
       renderSidebar();
       render();
     },
-    openSkipCategory(): void { openSkipCategoryModal(); },
 
     // â”€â”€ Capture screen bridge (new) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     getCapture() {

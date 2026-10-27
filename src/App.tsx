@@ -35,7 +35,7 @@ declare global {
       driveState: () => { configured: boolean; connected: boolean };
       driveConnect: () => Promise<void>;
       driveSavedAt: (id: string) => number;
-      saveJobToDrive: (id?: string, opts?: { pdf?: boolean }) => Promise<void>;
+      saveJobToDrive: (id?: string) => Promise<void>;
       listDriveJobs: () => Promise<DriveJob[]>;
       importDriveJob: (fileId: string, replace: boolean) => Promise<'added' | 'replaced' | 'exists'>;
     };

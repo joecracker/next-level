@@ -326,12 +326,61 @@ async function listAllFiles<T>(accessToken: string, baseUrl: string, what: strin
   return out;
 }
 
-/** Finds (or makes) the folder for one job and returns its id. The folder is renamed if the title changed. */
-export async function ensureJobFolder(cfg: DriveFolderConfig, jobId: string, folderTitle: string, jobName: string): Promise<string> {
-  const accessToken = await ensureToken(cfg.clientId);
-  const rootId = await findOrCreateFolder(accessToken, cfg.folderName);
+// Layout 2: JQC Jobs > year > job folder. Every folder made this way carries layout:'2', so the older
+// "Next Level Jobs" folders (which have no mark) are never listed, moved or changed.
+const LAYOUT = '2';
+
+/** The year a job is filed under: taken from its Date text (any common format), else this year. */
+export function jobYear(dateText?: string): string {
+  const s = (dateText || '').trim();
+  const now = new Date().getFullYear();
+  const four = s.match(/\b(?:19|20)\d{2}\b/);
+  if (four && Number(four[0]) <= now + 1) return four[0];
+  const two = s.match(/^\d{1,2}[\/.-]\d{1,2}[\/.-](\d{2})$/);
+  if (two) return String(2000 + Number(two[1]));
+  const t = Date.parse(s);
+  if (!isNaN(t)) {
+    const y = new Date(t).getFullYear();
+    if (y >= 1990 && y <= now + 1) return String(y);
+  }
+  return String(now);
+}
+
+/** Finds (or makes) a year folder inside the main folder. Not cached, so a folder deleted in Drive is simply made again. */
+async function findOrCreateYearFolder(accessToken: string, parentId: string, name: string): Promise<string> {
   const q = encodeURIComponent(
-    `'${rootId}' in parents and mimeType='${FOLDER_MIME}' and appProperties has { key='jobId' and value='${escQ(jobId)}' } and trashed=false`,
+    `'${parentId}' in parents and mimeType='${FOLDER_MIME}' and name='${escQ(name)}' and trashed=false`,
+  );
+  const found = await listAllFiles<{ id: string }>(
+    accessToken,
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id)&orderBy=createdTime&pageSize=10`,
+    'year folder lookup',
+  );
+  if (found.length) return found[0].id;
+  const res = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId], appProperties: { layout: LAYOUT, kind: 'year' } }),
+  });
+  if (!res.ok) throw new Error(`Drive year folder create failed (${res.status})`);
+  return (await res.json()).id as string;
+}
+
+/**
+ * Finds (or makes) the folder for one job and returns its id. New jobs are filed under main folder > year
+ * (year comes from the job's Date); a job that already has a folder keeps it, so it stays in the year it started.
+ * The folder is renamed if the title changed.
+ */
+export async function ensureJobFolder(
+  cfg: DriveFolderConfig,
+  jobId: string,
+  folderTitle: string,
+  jobName: string,
+  year?: string,
+): Promise<string> {
+  const accessToken = await ensureToken(cfg.clientId);
+  const q = encodeURIComponent(
+    `mimeType='${FOLDER_MIME}' and appProperties has { key='jobId' and value='${escQ(jobId)}' } and appProperties has { key='layout' and value='${LAYOUT}' } and trashed=false`,
   );
   const found = await listAllFiles<{ id: string; name: string }>(
     accessToken,
@@ -345,7 +394,7 @@ export async function ensureJobFolder(cfg: DriveFolderConfig, jobId: string, fol
         await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: folderTitle, appProperties: { jobId, jobName } }),
+          body: JSON.stringify({ name: folderTitle, appProperties: { jobId, jobName, layout: LAYOUT } }),
         });
       } catch {
         /* a failed rename is not worth stopping the save for */
@@ -353,10 +402,12 @@ export async function ensureJobFolder(cfg: DriveFolderConfig, jobId: string, fol
     }
     return f.id;
   }
+  const rootId = await findOrCreateFolder(accessToken, cfg.folderName);
+  const yearId = await findOrCreateYearFolder(accessToken, rootId, year || jobYear());
   const res = await fetch('https://www.googleapis.com/drive/v3/files', {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: folderTitle, mimeType: FOLDER_MIME, parents: [rootId], appProperties: { jobId, jobName } }),
+    body: JSON.stringify({ name: folderTitle, mimeType: FOLDER_MIME, parents: [yearId], appProperties: { jobId, jobName, layout: LAYOUT } }),
   });
   if (!res.ok) throw new Error(`Drive folder create failed (${res.status})`);
   return (await res.json()).id as string;
@@ -402,15 +453,14 @@ export interface DriveJobEntry {
   estimateFileId: string | null;
 }
 
-/** Every job this Google client has saved, newest first. Older single-file jobs are included until a folder exists. */
+/** Every job filed in the JQC Jobs > year > job layout, newest first. Older "Next Level Jobs" folders are not listed. */
 export async function listJobEntries(cfg: DriveFolderConfig): Promise<DriveJobEntry[]> {
   const accessToken = await ensureToken(cfg.clientId);
-  const rootId = await findOrCreateFolder(accessToken, cfg.folderName);
   const base = 'https://www.googleapis.com/drive/v3/files?pageSize=100';
 
   const folders = await listAllFiles<{ id: string; name: string; appProperties?: Record<string, string> }>(
     accessToken,
-    `${base}&q=${encodeURIComponent(`'${rootId}' in parents and mimeType='${FOLDER_MIME}' and trashed=false`)}&fields=nextPageToken,files(id,name,appProperties)`,
+    `${base}&q=${encodeURIComponent(`mimeType='${FOLDER_MIME}' and appProperties has { key='layout' and value='${LAYOUT}' } and trashed=false`)}&fields=nextPageToken,files(id,name,appProperties)`,
     'folder list',
   );
   const byName = async (name: string) =>
@@ -428,25 +478,11 @@ export async function listJobEntries(cfg: DriveFolderConfig): Promise<DriveJobEn
   const out: DriveJobEntry[] = [];
   const seen = new Set<string>();
   for (const fo of folders) {
-    const jobId = fo.appProperties?.jobId;
+    const jobId = fo.appProperties?.jobId; // year folders have no jobId, so they are skipped here
     const jf = jobId ? jobIn.get(fo.id) : undefined;
-    if (!jobId || !jf) continue;
+    if (!jobId || !jf || seen.has(jobId)) continue;
     seen.add(jobId);
     out.push({ jobId, name: fo.name, modified: jf.modifiedTime, fileId: jf.id, folderId: fo.id, estimateFileId: estIn.get(fo.id) || null });
-  }
-
-  // Older layout: one job-xxxx.json file straight in the main folder.
-  const legacy = await listAllFiles<{ id: string; name: string; modifiedTime: string; appProperties?: Record<string, string> }>(
-    accessToken,
-    `${base}&q=${encodeURIComponent(`'${rootId}' in parents and name contains 'job-' and trashed=false`)}&fields=nextPageToken,files(id,name,modifiedTime,appProperties)`,
-    'older file list',
-  );
-  for (const f of legacy) {
-    if (!f.name.startsWith('job-') || !f.name.endsWith('.json')) continue;
-    const jobId = f.appProperties?.jobId || f.name.replace(/^job-/, '').replace(/\.json$/, '');
-    if (seen.has(jobId)) continue;
-    seen.add(jobId);
-    out.push({ jobId, name: f.appProperties?.jobName || 'Job', modified: f.modifiedTime, fileId: f.id, folderId: null, estimateFileId: null });
   }
   return out.sort((a, b) => (a.modified < b.modified ? 1 : -1));
 }

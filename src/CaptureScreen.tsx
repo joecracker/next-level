@@ -595,7 +595,7 @@ export default function CaptureScreen({ onHome, onFull, onTakePhoto }: {
     setDriveBusy(true); setDriveMsg('');
     try {
       if (!nl.driveState().connected) await nl.driveConnect();
-      await nl.saveJobToDrive(data.id, { pdf: true }); // job file + Field Report PDF, side by side in the job's Drive folder
+      await nl.saveJobToDrive(data.id); // job file + Field Report PDF, side by side in the job's Drive folder
       setDriveMsg('Saved to Google Drive at ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.');
     } catch (e) { setDriveMsg(driveError(e)); }
     setDriveBusy(false);

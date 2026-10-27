@@ -5,6 +5,7 @@ import {
   saveToDrive,
   loadFromDrive,
   ensureJobFolder,
+  jobYear,
   saveFileInFolder,
   listJobEntries,
   loadFileById,
@@ -55,7 +56,7 @@ export async function restoreBackup<T = unknown>(): Promise<T | null> {
 
 // ---- One Drive folder per job (the job file, the Field Report PDF, and later the estimate) -----
 // Separate from the whole-device backup above, so the two never touch each other.
-const JOBS_FOLDER_NAME = 'Next Level Jobs';
+const JOBS_FOLDER_NAME = 'JQC Jobs'; // JQC Jobs > year > job folder (the older 'Next Level Jobs' folder is ignored)
 function jobsCfg() {
   return { clientId: CLIENT_ID, folderName: JOBS_FOLDER_NAME };
 }
@@ -73,14 +74,14 @@ function folderTitle(customer: string, name: string, desc: string): string {
   return t.slice(0, 80) || 'Job';
 }
 
-/** Saves the job file (and the Field Report PDF when given) into this job's folder, replacing the older copies. */
+/** Saves the job file (and the Field Report PDF) into this job's folder under its year, replacing the older copies. */
 export async function saveJobFolder(
-  job: { id: string; name: string; customer: string; jobDesc: string },
+  job: { id: string; name: string; customer: string; jobDesc: string; date?: string },
   envelope: unknown,
   pdf?: Blob,
 ): Promise<void> {
   const title = folderTitle(job.customer, job.name, job.jobDesc);
-  const folderId = await ensureJobFolder(jobsCfg(), job.id, title, title.slice(0, 40));
+  const folderId = await ensureJobFolder(jobsCfg(), job.id, title, title.slice(0, 40), jobYear(job.date));
   await saveFileInFolder(CLIENT_ID, folderId, 'job.json', 'application/json', JSON.stringify(envelope));
   if (pdf) await saveFileInFolder(CLIENT_ID, folderId, 'Field Report.pdf', 'application/pdf', pdf);
 }

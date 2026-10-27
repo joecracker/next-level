@@ -3969,7 +3969,7 @@ export function initNextLevel() {
       say('Saving this job to Drive...');
       try {
         if(!isDriveConnected()) await connectBackup();
-        await (window as any).NextLevel.saveJobToDrive(undefined, { pdf: true });
+        await (window as any).NextLevel.saveJobToDrive();
         say('Saved to Google Drive just now.');
         toast('Saved to Google Drive');
       } catch(err){
@@ -5387,15 +5387,15 @@ export function initNextLevel() {
     driveSavedAt(id: string): number {
       try { return Number(JSON.parse(localStorage.getItem('nextlevel_job_drive_saved') || '{}')[id]) || 0; } catch { return 0; }
     },
-    // Saves the job into its own Drive folder. With opts.pdf the Field Report PDF is rebuilt and saved beside it
-    // (the Save to Drive button); leaving a job saves just the job file, which is quick.
-    async saveJobToDrive(id?: string, opts?: { pdf?: boolean }): Promise<void> {
+    // Saves the job into its own Drive folder (JQC Jobs > year > job). The job file and a freshly built Field Report PDF
+    // are saved together every time.
+    async saveJobToDrive(id?: string): Promise<void> {
       const p = id ? projects.find(x => x.id === id) : getProject();
       if (!p) throw new Error('No job selected');
       if (isBlankJob(p)) throw new Error('Nothing to save yet. Add something to the job first.');
       const hydrated = (await hydrateProjects([p]))[0]; // pull picture bytes in so the Drive copy is complete
       let pdf: Blob | undefined;
-      if (opts?.pdf) {
+      {
         const { buildJobSheetPdf } = await import('./lib/jobSheetPdf');
         const built = await buildJobSheetPdf({
           name: p.name || '', customer: p.customer || '', date: p.date || '', phone: p.phone || '', email: p.email || '',
@@ -5409,7 +5409,7 @@ export function initNextLevel() {
         });
         pdf = built.blob;
       }
-      await saveJobFolder({ id: p.id, name: p.name || '', customer: p.customer || '', jobDesc: p.jobDesc || '' }, { type: 'nextlevel-job', version: 1, project: hydrated }, pdf);
+      await saveJobFolder({ id: p.id, name: p.name || '', customer: p.customer || '', jobDesc: p.jobDesc || '', date: p.date || '' }, { type: 'nextlevel-job', version: 1, project: hydrated }, pdf);
       try {
         const m = JSON.parse(localStorage.getItem('nextlevel_job_drive_saved') || '{}');
         m[p.id] = Date.now();

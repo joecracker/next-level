@@ -2,6 +2,7 @@
 // picture (PNG) and a cabinet takeoff (CSV). All are built from the saved design alone, so they work from
 // the studio, from Capture's Save-to-Drive, or anywhere else with the studio closed.
 import { KINDS, T, corners, fmtIn, frame, isCab, seg, type DItem, type Design } from './model';
+import { fixtureShape } from './shapes';
 
 const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const INK = '#14191A';
@@ -9,6 +10,9 @@ const INK = '#14191A';
 function itemShape(it: DItem, S: number, sel: boolean, fs: number): string {
   const k = KINDS[it.kind]; const hw = it.w / 2, hd = it.d / 2; const sw = 1.5 / S;
   const stroke = sel ? '#E8731A' : INK; const strokeW = sel ? 3 / S : sw;
+  const lab0 = isCab(it.kind) && it.code ? it.code : it.label || k.name;
+  const fx = fixtureShape(it, S, fs, stroke, strokeW, lab0);
+  if (fx !== null) return fx;
   let body = '';
   const text = (s: string, y = 0, size = fs) => `<text x="0" y="${y + size * 0.35}" font-size="${size}" text-anchor="middle" fill="${INK}">${esc(s)}</text>`;
   if (it.kind === 'door') {
@@ -36,7 +40,7 @@ function itemShape(it: DItem, S: number, sel: boolean, fs: number): string {
 }
 
 /** The inner drawing: floor, walls, wall lengths, items. `S` = pixels per inch (keeps text a steady size). */
-export function designBody(d: Design, S: number, selId?: string | null, title?: string, tl?: { x: number; y: number }): string {
+export function designBody(d: Design, S: number, selId?: string | null, title?: string, tl?: { x: number; y: number }, flags?: Record<string, 'fix' | 'tight'>): string {
   const pts = d.pts || []; const fs = 12 / S; const out: string[] = [];
   if (title && tl) out.push(`<text x="${tl.x}" y="${tl.y}" font-size="${fs * 1.5}" font-weight="700" fill="${INK}">${esc(title)}</text>`);
   if (pts.length >= 3) {
@@ -48,7 +52,9 @@ export function designBody(d: Design, S: number, selId?: string | null, title?: 
   const items = (d.items || []).slice().sort((a, b) => order.indexOf(KINDS[a.kind].layer) - order.indexOf(KINDS[b.kind].layer));
   for (const it of items) {
     const f = frame(it, pts);
-    out.push(`<g transform="translate(${f.cx} ${f.cy}) rotate(${f.rot})">${itemShape(it, S, it.id === selId, fs)}</g>`);
+    const fl = flags?.[it.id];
+    const ring = fl ? `<rect x="${-it.w / 2 - 1.5}" y="${-it.d / 2 - 1.5}" width="${it.w + 3}" height="${it.d + 3}" fill="none" stroke="${fl === 'fix' ? '#d9482b' : '#d9a441'}" stroke-width="${3 / S}" stroke-dasharray="${6 / S} ${4 / S}"/>` : '';
+    out.push(`<g transform="translate(${f.cx} ${f.cy}) rotate(${f.rot})">${itemShape(it, S, it.id === selId, fs)}${ring}</g>`);
   }
   if (pts.length >= 3) { // wall lengths, outside the wall
     pts.forEach((p, i) => {

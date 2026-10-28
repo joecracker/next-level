@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Poin
 import JobPanel from './JobPanel';
 import { designBody, designBounds, takeoffRows } from './exports';
 import {
-  GROUPS, KINDS, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, seg, snapTo, template,
-  type DItem, type Design, type Pt,
+  CATS, KINDS, catLabel, kindsFor, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, seg, snapTo, template,
+  type Cat, type DItem, type Design, type Pt,
 } from './model';
 
 type Sel = { type: 'item'; id: string } | { type: 'wall'; i: number } | { type: 'corner'; i: number } | null;
@@ -92,7 +92,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [nudge, setNudge] = useState(0.25);
   const [addOpen, setAddOpen] = useState(false);
-  const [addGroup, setAddGroup] = useState('Bath');
+  const [addGroup, setAddGroup] = useState<Cat>('Walls');
   const [saveOpen, setSaveOpen] = useState(false);
   const [msg, setMsg] = useState('');
   const [armed, setArmed] = useState(false);
@@ -410,11 +410,11 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         <div onClick={() => setAddOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '640px', maxHeight: '78vh', overflowY: 'auto', background: '#1d2425', borderRadius: '16px 16px 0 0', padding: '14px' }}>
             <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
-              {GROUPS.map(g => <button key={g} style={addGroup === g ? btnOn : btn} onClick={() => setAddGroup(g)}>{g}</button>)}
+              {CATS.filter(c => kindsFor(c, d.mode).length).map(c => <button key={c} style={addGroup === c ? btnOn : btn} onClick={() => setAddGroup(c)}>{catLabel(c, d.mode)}</button>)}
               <button style={{ ...btn, marginLeft: 'auto' }} onClick={() => setAddOpen(false)}>Close</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px' }}>
-              {Object.entries(KINDS).filter(([, k]) => k.group === addGroup).map(([key, k]) => (
+              {kindsFor(addGroup, d.mode).map(([key, k]) => (
                 <button key={key} style={{ ...btn, minHeight: '56px', textAlign: 'left' }} onClick={() => addItem(key)}>{k.name}<div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>{fmtIn(k.w)} × {fmtIn(k.d)}</div></button>))}
             </div>
           </div>

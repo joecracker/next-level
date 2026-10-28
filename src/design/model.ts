@@ -25,48 +25,54 @@ export interface Design {
 }
 
 export type Layer = 'floor' | 'hung' | 'inwall' | 'ceiling';
-export interface Kind { name: string; layer: Layer; snap: boolean; w: number; d: number; h?: number; cab?: boolean; group: string }
+export type Cat = 'Walls' | 'Plumbing' | 'Electrical' | 'Cabinets' | 'Accessories';
+export type Mode = 'bath' | 'kitchen';
+export interface Kind { name: string; layer: Layer; snap: boolean; w: number; d: number; h?: number; cab?: boolean; cat: Cat; modes: Mode[] }
 export const T = 4.5; // wall thickness
 
 export const KINDS: Record<string, Kind> = {
-  shower:   { name: 'Shower', layer: 'floor', snap: true, w: 60, d: 32, group: 'Bath' },
-  tub:      { name: 'Tub', layer: 'floor', snap: true, w: 60, d: 30, group: 'Bath' },
-  toilet:   { name: 'Toilet', layer: 'floor', snap: true, w: 20, d: 29, group: 'Bath' },
-  vanity:   { name: 'Vanity', layer: 'floor', snap: true, w: 36, d: 21, h: 34.5, cab: true, group: 'Bath' },
-  linen:    { name: 'Linen tower', layer: 'floor', snap: true, w: 18, d: 21, h: 84, cab: true, group: 'Bath' },
-  pedestal: { name: 'Pedestal sink', layer: 'floor', snap: true, w: 20, d: 17, group: 'Bath' },
-  desk:     { name: 'Powder desk', layer: 'floor', snap: true, w: 30, d: 21, h: 32, cab: true, group: 'Bath' },
-  utility:  { name: 'Utility cabinet', layer: 'floor', snap: true, w: 18, d: 12, h: 84, cab: true, group: 'Bath' },
-  base:     { name: 'Base cabinet', layer: 'floor', snap: true, w: 24, d: 24, h: 34.5, cab: true, group: 'Kitchen' },
-  sinkbase: { name: 'Sink base', layer: 'floor', snap: true, w: 36, d: 24, h: 34.5, cab: true, group: 'Kitchen' },
-  drawer:   { name: 'Drawer base', layer: 'floor', snap: true, w: 18, d: 24, h: 34.5, cab: true, group: 'Kitchen' },
-  pantry:   { name: 'Tall pantry', layer: 'floor', snap: true, w: 24, d: 24, h: 84, cab: true, group: 'Kitchen' },
-  fridge:   { name: 'Refrigerator', layer: 'floor', snap: true, w: 36, d: 30, group: 'Kitchen' },
-  range:    { name: 'Range', layer: 'floor', snap: true, w: 30, d: 26, group: 'Kitchen' },
-  dw:       { name: 'Dishwasher', layer: 'floor', snap: true, w: 24, d: 24, group: 'Kitchen' },
-  island:   { name: 'Island', layer: 'floor', snap: false, w: 60, d: 36, h: 34.5, cab: true, group: 'Kitchen' },
-  endpanel: { name: 'Fridge end panel', layer: 'floor', snap: true, w: 1, d: 27, cab: true, group: 'Kitchen' },
-  upper:    { name: 'Upper cabinet', layer: 'hung', snap: true, w: 30, d: 12, h: 30, cab: true, group: 'Kitchen' },
-  hood:     { name: 'Range hood', layer: 'hung', snap: true, w: 30, d: 20, group: 'Kitchen' },
-  microwave:{ name: 'Space-saver microwave', layer: 'hung', snap: true, w: 30, d: 16, group: 'Kitchen' },
-  valance:  { name: 'Valance', layer: 'hung', snap: true, w: 36, d: 4, cab: true, group: 'Kitchen' },
-  mirror:   { name: 'Mirror', layer: 'hung', snap: true, w: 24, d: 1.5, group: 'Bath' },
-  medcab:   { name: 'Medicine cabinet', layer: 'hung', snap: true, w: 16, d: 4, group: 'Bath' },
-  grab:     { name: 'Grab bar', layer: 'hung', snap: true, w: 24, d: 3, group: 'Bath' },
-  door:     { name: 'Door', layer: 'inwall', snap: true, w: 30, d: T, group: 'Openings' },
-  window:   { name: 'Window', layer: 'inwall', snap: true, w: 36, d: T, group: 'Openings' },
-  partition:{ name: 'Inside wall', layer: 'floor', snap: false, w: 48, d: 4.5, group: 'Openings' },
-  vlight:   { name: 'Vanity light', layer: 'hung', snap: true, w: 24, d: 2, group: 'Electrical' },
-  outlet:   { name: 'Outlet', layer: 'hung', snap: true, w: 4, d: 4, group: 'Electrical' },
-  gfci:     { name: 'GFCI outlet', layer: 'hung', snap: true, w: 5, d: 4, group: 'Electrical' },
-  switch:   { name: 'Switch', layer: 'hung', snap: true, w: 4, d: 4, group: 'Electrical' },
-  fan:      { name: 'Exhaust fan', layer: 'ceiling', snap: false, w: 10, d: 10, group: 'Electrical' },
-  can:      { name: 'Can light', layer: 'ceiling', snap: false, w: 6, d: 6, group: 'Electrical' },
-  wet:      { name: 'Shower light (wet rated)', layer: 'ceiling', snap: false, w: 6, d: 6, group: 'Electrical' },
-  pendant:  { name: 'Pendant', layer: 'ceiling', snap: false, w: 8, d: 8, group: 'Electrical' },
-  soffit:   { name: 'Soffit', layer: 'ceiling', snap: true, w: 48, d: 24, group: 'Openings' },
+  shower:   { name: 'Shower', layer: 'floor', snap: true, w: 60, d: 32, cat: 'Plumbing', modes: ['bath'] },
+  tub:      { name: 'Tub', layer: 'floor', snap: true, w: 60, d: 30, cat: 'Plumbing', modes: ['bath'] },
+  toilet:   { name: 'Toilet', layer: 'floor', snap: true, w: 20, d: 29, cat: 'Plumbing', modes: ['bath'] },
+  vanity:   { name: 'Vanity', layer: 'floor', snap: true, w: 36, d: 21, h: 34.5, cab: true, cat: 'Cabinets', modes: ['bath'] },
+  linen:    { name: 'Linen tower', layer: 'floor', snap: true, w: 18, d: 21, h: 84, cab: true, cat: 'Cabinets', modes: ['bath'] },
+  pedestal: { name: 'Pedestal sink', layer: 'floor', snap: true, w: 20, d: 17, cat: 'Plumbing', modes: ['bath'] },
+  desk:     { name: 'Powder desk', layer: 'floor', snap: true, w: 30, d: 21, h: 32, cab: true, cat: 'Cabinets', modes: ['bath'] },
+  utility:  { name: 'Utility cabinet', layer: 'floor', snap: true, w: 18, d: 12, h: 84, cab: true, cat: 'Cabinets', modes: ['bath'] },
+  base:     { name: 'Base cabinet', layer: 'floor', snap: true, w: 24, d: 24, h: 34.5, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
+  sinkbase: { name: 'Sink base', layer: 'floor', snap: true, w: 36, d: 24, h: 34.5, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
+  drawer:   { name: 'Drawer base', layer: 'floor', snap: true, w: 18, d: 24, h: 34.5, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
+  pantry:   { name: 'Tall pantry', layer: 'floor', snap: true, w: 24, d: 24, h: 84, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
+  fridge:   { name: 'Refrigerator', layer: 'floor', snap: true, w: 36, d: 30, cat: 'Accessories', modes: ['kitchen'] },
+  range:    { name: 'Range', layer: 'floor', snap: true, w: 30, d: 26, cat: 'Accessories', modes: ['kitchen'] },
+  dw:       { name: 'Dishwasher', layer: 'floor', snap: true, w: 24, d: 24, cat: 'Accessories', modes: ['kitchen'] },
+  island:   { name: 'Island', layer: 'floor', snap: false, w: 60, d: 36, h: 34.5, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
+  endpanel: { name: 'Fridge end panel', layer: 'floor', snap: true, w: 1, d: 27, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
+  upper:    { name: 'Upper cabinet', layer: 'hung', snap: true, w: 30, d: 12, h: 30, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
+  hood:     { name: 'Range hood', layer: 'hung', snap: true, w: 30, d: 20, cat: 'Accessories', modes: ['kitchen'] },
+  microwave:{ name: 'Space-saver microwave', layer: 'hung', snap: true, w: 30, d: 16, cat: 'Accessories', modes: ['kitchen'] },
+  valance:  { name: 'Valance', layer: 'hung', snap: true, w: 36, d: 4, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
+  mirror:   { name: 'Mirror', layer: 'hung', snap: true, w: 24, d: 1.5, cat: 'Accessories', modes: ['bath'] },
+  medcab:   { name: 'Medicine cabinet', layer: 'hung', snap: true, w: 16, d: 4, cat: 'Accessories', modes: ['bath'] },
+  grab:     { name: 'Grab bar', layer: 'hung', snap: true, w: 24, d: 3, cat: 'Accessories', modes: ['bath'] },
+  door:     { name: 'Door', layer: 'inwall', snap: true, w: 30, d: T, cat: 'Walls', modes: ['bath', 'kitchen'] },
+  window:   { name: 'Window', layer: 'inwall', snap: true, w: 36, d: T, cat: 'Walls', modes: ['bath', 'kitchen'] },
+  kneewall: { name: 'Knee wall', layer: 'floor', snap: false, w: 48, d: 4.5, h: 36, cat: 'Walls', modes: ['bath', 'kitchen'] },
+  partition:{ name: 'Inside wall', layer: 'floor', snap: false, w: 48, d: 4.5, cat: 'Walls', modes: ['bath', 'kitchen'] },
+  vlight:   { name: 'Vanity light', layer: 'hung', snap: true, w: 24, d: 2, cat: 'Electrical', modes: ['bath'] },
+  outlet:   { name: 'Outlet', layer: 'hung', snap: true, w: 4, d: 4, cat: 'Electrical', modes: ['bath', 'kitchen'] },
+  gfci:     { name: 'GFCI outlet', layer: 'hung', snap: true, w: 5, d: 4, cat: 'Electrical', modes: ['bath', 'kitchen'] },
+  switch:   { name: 'Switch', layer: 'hung', snap: true, w: 4, d: 4, cat: 'Electrical', modes: ['bath', 'kitchen'] },
+  fan:      { name: 'Exhaust fan', layer: 'ceiling', snap: false, w: 10, d: 10, cat: 'Electrical', modes: ['bath', 'kitchen'] },
+  can:      { name: 'Can light', layer: 'ceiling', snap: false, w: 6, d: 6, cat: 'Electrical', modes: ['bath', 'kitchen'] },
+  wet:      { name: 'Shower light (wet rated)', layer: 'ceiling', snap: false, w: 6, d: 6, cat: 'Electrical', modes: ['bath'] },
+  pendant:  { name: 'Pendant', layer: 'ceiling', snap: false, w: 8, d: 8, cat: 'Electrical', modes: ['kitchen'] },
+  soffit:   { name: 'Soffit', layer: 'ceiling', snap: true, w: 48, d: 24, cat: 'Walls', modes: ['bath', 'kitchen'] },
 };
-export const GROUPS = ['Bath', 'Kitchen', 'Openings', 'Electrical'];
+export const CATS: Cat[] = ['Walls', 'Plumbing', 'Electrical', 'Cabinets', 'Accessories'];
+/** Menu heading for a category in a given kind of room. */
+export const catLabel = (c: Cat, mode: Mode) => c === 'Walls' ? 'Walls & openings' : c === 'Accessories' ? (mode === 'kitchen' ? 'Appliances' : 'Accessories') : c;
+export const kindsFor = (c: Cat, mode: Mode) => Object.entries(KINDS).filter(([, k]) => k.cat === c && k.modes.includes(mode));
 export const isCab = (kind: string) => !!KINDS[kind]?.cab;
 
 export const hasDesign = (d?: Design | null): d is Design => !!d && (d.pts?.length >= 3 || (d.items?.length ?? 0) > 0);

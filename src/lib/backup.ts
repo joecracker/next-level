@@ -54,7 +54,7 @@ export async function restoreBackup<T = unknown>(): Promise<T | null> {
   return loadFromDrive<T>(cfg());
 }
 
-// ---- One Drive folder per job (the job file, the Field Report PDF, and later the estimate) -----
+// ---- One Drive folder per job (the job file, the Field Report PDF, the design picture and cabinet takeoff, and later the estimate) -----
 // Separate from the whole-device backup above, so the two never touch each other.
 const JOBS_FOLDER_NAME = 'JQC Jobs'; // JQC Jobs > year > job folder (the older 'Next Level Jobs' folder is ignored)
 function jobsCfg() {
@@ -79,11 +79,13 @@ export async function saveJobFolder(
   job: { id: string; name: string; customer: string; jobDesc: string; date?: string },
   envelope: unknown,
   pdf?: Blob,
+  extras: Array<{ name: string; mime: string; data: string | Blob }> = [],
 ): Promise<void> {
   const title = folderTitle(job.customer, job.name, job.jobDesc);
   const folderId = await ensureJobFolder(jobsCfg(), job.id, title, title.slice(0, 40), jobYear(job.date));
   await saveFileInFolder(CLIENT_ID, folderId, 'job.json', 'application/json', JSON.stringify(envelope));
   if (pdf) await saveFileInFolder(CLIENT_ID, folderId, 'Field Report.pdf', 'application/pdf', pdf);
+  for (const x of extras) await saveFileInFolder(CLIENT_ID, folderId, x.name, x.mime, x.data);
 }
 
 export async function listJobBackups(): Promise<DriveJobEntry[]> {

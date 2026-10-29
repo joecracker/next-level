@@ -403,8 +403,15 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             const P = it.p || {}; const setP = (q: Record<string, any>) => upd(it.id, { p: { ...P, ...q } });
             const side: Array<[any, string]> = [['wall', 'Wall'], ['knee', 'Knee wall + glass'], ['glass', 'Glass'], ['open', 'Open']];
             if (it.kind === 'shower') return (<>
-              {P.unit !== 'sterling' && <Chips label="Wall finish" value={P.walls || 'tile'} opts={[['tile', 'Tile'], ['wetwall', 'Wet wall panels (Wilson Art)']]} onPick={v => setP({ walls: v })} />}
-              {P.walls === 'wetwall' && <div style={{ fontSize: '13px', color: 'var(--muted)' }}>Wet wall panels sit on a Kohler shower base. Pick one from Add, Plumbing.</div>}
+              {P.unit !== 'sterling' && <>
+                <Chips label="Floor / base" value={P.unit === 'base' ? 'base' : 'tile'} opts={[['tile', 'Tiled floor'], ['base', 'Kohler base']]} onPick={v => v === 'base' ? setP({ unit: 'base', tile: false, curb: true, ...(P.drain === 'endL' || P.drain === 'endR' ? { drain: 'center' } : {}) }) : setP({ unit: undefined, tile: P.walls !== 'wetwall', walls: 'tile' })} />
+                {P.unit === 'base' && <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <Chips label="Base width" value={it.w} opts={[[36, '36"'], [48, '48"'], [60, '60"']]} onPick={v => upd(it.id, { w: v, ...(it.wall !== null ? { t: it.t + (v - it.w) / 2 } : {}) })} />
+                  <Chips label="Base depth" value={it.d} opts={[[36, 'Standard 36"'], [42, '42"']]} onPick={v => upd(it.id, { d: v })} />
+                </div>}
+                <Chips label="Wall finish" value={P.walls || 'tile'} opts={[['tile', 'Tile'], ['wetwall', 'Wet wall panels (Wilson Art)']]} onPick={v => v === 'wetwall' ? setP({ walls: 'wetwall', unit: 'base', tile: false, curb: true }) : setP({ walls: 'tile' })} />
+                {P.walls === 'wetwall' && <div style={{ fontSize: '13px', color: 'var(--muted)' }}>Wet wall panels sit on a Kohler base, so this shower now uses one.</div>}
+              </>}
               {!P.unit && <Sec title="Walls & way in" open>
               <Chips label="Left side" value={P.left} opts={side} onPick={v => setP({ left: v })} />
               <Chips label="Right side" value={P.right} opts={side} onPick={v => setP({ right: v })} />

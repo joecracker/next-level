@@ -5,7 +5,7 @@ import {
 } from './lib/photoStore';
 import { openPhotoBooth } from './lib/photoBooth';
 import { hasDesign } from './design/model';
-import { designPng, takeoffCsv } from './design/exports';
+import { designPng, takeoffCsv, takeoffCsvAll } from './design/exports';
 
 declare global {
   interface Window {
@@ -32,6 +32,7 @@ export function initNextLevel() {
     timestamp: string;
     note?: string; // Capture screen: notes written on this picture
   }
+  interface DesignPage { id: string; name: string; design: any }
   interface Project {
     id: string;
     name: string;
@@ -50,7 +51,9 @@ export function initNextLevel() {
     polished?: string[];   // Capture screen: Polish result waiting for "Use this" / "Keep mine"
     polishedFrom?: string; // the Job notes text that list was made from
     polishUndo?: string;   // Job notes as they were before "Use this"
-    design?: any;          // Design Studio drawing (room, items) - owned by the Design Studio screen
+    design?: any;          // old single drawing; moved into pages the first time the job is opened
+    pages?: DesignPage[];  // Design Studio: the job's drawings, one per room or version (Master bath, Kitchen, Before, After...)
+    curPage?: string;      // the page that was open last
   }
 
   let projects: Project[] = [];
@@ -112,13 +115,28 @@ export function initNextLevel() {
     return { id: uid(), name: name||'New Project', customer: '', category: cat||'Kitchen', scope: 'Full Build', photos: [] };
   }
 
+  // Design pages: a job holds a list of drawings. A job drawn before pages existed gets its one drawing as the first page.
+  function pagesOf(p: Project): DesignPage[] {
+    if (!p.pages) {
+      p.pages = [];
+      if (p.design && hasDesign(p.design)) p.pages.push({ id: uid(), name: p.design.mode === 'kitchen' ? 'Kitchen' : 'Bathroom', design: p.design });
+      delete p.design;
+    }
+    return p.pages;
+  }
+  function curPageOf(p: Project): DesignPage | null { const ps = pagesOf(p); return ps.find(x => x.id === p.curPage) || ps[0] || null; }
+  function pageName(p: Project, want: string, skipId?: string): string {
+    const base = (want || '').trim() || 'Page'; const taken = new Set(pagesOf(p).filter(x => x.id !== skipId).map(x => x.name.toLowerCase()));
+    let n = base, i = 2; while (taken.has(n.toLowerCase())) n = `${base} ${i++}`; return n;
+  }
+
   // A job that was started but never filled in (tapping "Start a new job" saves a blank one straight away).
   // These pile up on top of the list, so the job lists skip them. Nothing is deleted.
   function isBlankJob(p: Project): boolean {
     if (p.name !== 'New Project') return false;
     if (p.customer || p.phone || p.email || p.address || p.jobDesc || p.jobNotes) return false;
     if ((p.photos || []).length || (p.scratch || []).length || (p as any).polished) return false;
-    if (p.design && (p.design.items?.length || p.design.pts?.length)) return false;
+    if (pagesOf(p).some(pg => hasDesign(pg.design))) return false;
     return true;
   }
   // What every job list shows: blanks hidden, most recently used on top.
@@ -280,14 +298,18 @@ export function initNextLevel() {
     notifyCapture(); // lets an open job list refresh itself
   }
 
-  // The Design Studio's two outputs for a job: the plan picture and the cabinet takeoff (CSV, not PDF, so it can be edited or fed to other software).
+  // The Design Studio's outputs for a job: for every page a plan picture and a cabinet takeoff (CSV, not PDF, so it can be edited or fed to other software), plus one combined takeoff when there is more than one page.
   async function designFiles(p: Project): Promise<Array<{ name: string; mime: string; data: string | Blob }>> {
     const out: Array<{ name: string; mime: string; data: string | Blob }> = [];
-    if (!hasDesign(p.design)) return out;
-    const png = await designPng(p.design, [p.customer, p.name].filter(Boolean).join(' - ')).catch(() => null);
-    if (png) out.push({ name: 'Design Plan.png', mime: 'image/png', data: png });
-    const csv = takeoffCsv(p.design, p);
-    if (csv) out.push({ name: 'Cabinet Takeoff.csv', mime: 'text/csv', data: csv });
+    const pgs = pagesOf(p).filter(pg => hasDesign(pg.design));
+    for (const pg of pgs) {
+      const safe = pg.name.replace(/[\\/:*?"<>|]+/g, '').trim() || 'Page';
+      const png = await designPng(pg.design, [p.customer, p.name, pg.name].filter(Boolean).join(' - ')).catch(() => null);
+      if (png) out.push({ name: `${safe} - Plan.png`, mime: 'image/png', data: png });
+      const csv = takeoffCsv(pg.design, p);
+      if (csv) out.push({ name: `${safe} - Takeoff.csv`, mime: 'text/csv', data: csv });
+    }
+    if (pgs.length > 1) { const all = takeoffCsvAll(pgs, p); if (all) out.push({ name: 'All Pages - Takeoff.csv', mime: 'text/csv', data: all }); }
     return out;
   }
 
@@ -534,18 +556,33 @@ export function initNextLevel() {
       save(); notifyCapture();
       return idx >= 0 ? 'replaced' : 'added';
     },
-    // Design Studio: the drawing lives on the job as project.design.
-    getDesign(): any { return getProject()?.design ?? null; },
+    // Design Studio: a job holds pages (drawings). get/setDesign work on the page that is open.
+    getPages(): { pages: Array<{ id: string; name: string; has: boolean }>; cur: string | null } {
+      const p = getProject(); if (!p) return { pages: [], cur: null };
+      const cur = curPageOf(p); return { pages: pagesOf(p).map(x => ({ id: x.id, name: x.name, has: hasDesign(x.design) })), cur: cur?.id ?? null };
+    },
+    getDesign(): any { const p = getProject(); return p ? curPageOf(p)?.design ?? null : null; },
     setDesign(d: any): void {
       const p = getProject(); if (!p) return;
-      p.design = d; p.lastUsed = Date.now(); save();
+      let pg = curPageOf(p);
+      if (!pg) { pg = { id: uid(), name: d?.mode === 'kitchen' ? 'Kitchen' : 'Bathroom', design: d }; p.pages!.push(pg); } else pg.design = d;
+      p.curPage = pg.id; p.lastUsed = Date.now(); save();
     },
+    addPage(name: string, design: any): string {
+      const p = getProject(); if (!p) return ''; pagesOf(p);
+      const pg: DesignPage = { id: uid(), name: pageName(p, name), design }; p.pages!.push(pg); p.curPage = pg.id; p.lastUsed = Date.now(); save(); return pg.id;
+    },
+    openPage(id: string): void { const p = getProject(); if (!p || !pagesOf(p).some(x => x.id === id)) return; p.curPage = id; save(); },
+    renamePage(id: string, name: string): void { const p = getProject(); const pg = p && pagesOf(p).find(x => x.id === id); if (!p || !pg) return; pg.name = pageName(p, name, id); save(); },
+    deletePage(id: string): void { const p = getProject(); if (!p) return; p.pages = pagesOf(p).filter(x => x.id !== id); if (p.curPage === id) p.curPage = p.pages[0]?.id; save(); },
     async designPicture(): Promise<Blob | null> {
-      const p = getProject(); return p && hasDesign(p.design) ? designPng(p.design, [p.customer, p.name].filter(Boolean).join(' - ')) : null;
+      const p = getProject(); const pg = p && curPageOf(p); return p && pg && hasDesign(pg.design) ? designPng(pg.design, [p.customer, p.name, pg.name].filter(Boolean).join(' - ')) : null;
     },
-    designTakeoff(): { csv: string; filename: string } | null {
-      const p = getProject(); const csv = p && hasDesign(p.design) ? takeoffCsv(p.design, p) : null;
-      return csv ? { csv, filename: 'Cabinet Takeoff.csv' } : null;
+    designTakeoff(all?: boolean): { csv: string; filename: string } | null {
+      const p = getProject(); if (!p) return null;
+      if (all) { const csv = takeoffCsvAll(pagesOf(p).filter(pg => hasDesign(pg.design)), p); return csv ? { csv, filename: 'All Pages - Takeoff.csv' } : null; }
+      const pg = curPageOf(p); const csv = pg && hasDesign(pg.design) ? takeoffCsv(pg.design, p) : null;
+      return csv ? { csv, filename: `${pg!.name} - Takeoff.csv` } : null;
     },
     pickJobFile(): void { document.getElementById('job-file-input')?.click(); },
   };

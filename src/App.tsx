@@ -29,10 +29,15 @@ declare global {
       markUpPhoto: (id: string) => void;
       onCapture: (cb: () => void) => () => void;
       sendJob: () => void;
+      getPages: () => { pages: Array<{ id: string; name: string; has: boolean }>; cur: string | null };
       getDesign: () => any;
       setDesign: (d: any) => void;
+      addPage: (name: string, design: any) => string;
+      openPage: (id: string) => void;
+      renamePage: (id: string, name: string) => void;
+      deletePage: (id: string) => void;
       designPicture: () => Promise<Blob | null>;
-      designTakeoff: () => { csv: string; filename: string } | null;
+      designTakeoff: (all?: boolean) => { csv: string; filename: string } | null;
       pickJobFile: () => void;
   buildJobFile: (withPhotos?: boolean) => Promise<File | null>;
       driveState: () => { configured: boolean; connected: boolean };

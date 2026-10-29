@@ -120,6 +120,9 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const [cabGroup, setCabGroup] = useState('Base cabinets');
   const [cabFam, setCabFam] = useState('');
   const [tab, setTab] = useState<'edit' | 'check' | 'list'>('edit');
+  const [pageMenu, setPageMenu] = useState(false);
+  const [pageModal, setPageModal] = useState<null | { mode: 'new' | 'rename'; name: string }>(null);
+  const [delArmed, setDelArmed] = useState(false);
   const [, bump] = useState(0);
   const justAdded = useRef<string | null>(null); // a new item's first drag is part of placing it, not a separate undo step
   const hist = useRef<Design[]>([]); const fut = useRef<Design[]>([]);
@@ -303,6 +306,20 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   };
   const start = (mode: 'bath' | 'kitchen') => { const t = template(mode); hist.current = []; fut.current = []; designRef.current = t; setDesignState(t); persist(t); setSel(null); setView(null); };
 
+  // ----- pages: one job, many drawings (Master bath, Kitchen, Before, After...) -----
+  const pagesInfo = NL?.getPages?.() || { pages: [], cur: null };
+  const curPageName = pagesInfo.pages.find(x => x.id === pagesInfo.cur)?.name || '';
+  const loadPage = () => { const x = NL?.getDesign(); const nd = hasDesign(x) ? (x as Design) : null; hist.current = []; fut.current = []; designRef.current = nd; setDesignState(nd); setSel(null); setView(null); setPageMenu(false); setDelArmed(false); bump(n => n + 1); };
+  const goPage = (id: string) => { if (id === pagesInfo.cur) { setPageMenu(m => !m); setDelArmed(false); return; } NL?.openPage(id); loadPage(); };
+  const makePage = (how: 'bath' | 'kitchen' | 'copy') => {
+    if (!pageModal || !NL) return; const cur = designRef.current;
+    const dflt = how === 'copy' ? `${curPageName || 'Page'} copy` : how === 'kitchen' ? 'Kitchen' : 'Bathroom';
+    const nd: Design = how === 'copy' && cur ? JSON.parse(JSON.stringify(cur)) : template(how === 'kitchen' ? 'kitchen' : 'bath');
+    NL.addPage(pageModal.name.trim() || dflt, nd); setPageModal(null); loadPage();
+  };
+  const renameNow = () => { if (!pageModal || !pagesInfo.cur) return; NL?.renamePage(pagesInfo.cur, pageModal.name); setPageModal(null); bump(n => n + 1); };
+  const deleteNow = () => { if (!pagesInfo.cur) return; if (!delArmed) { setDelArmed(true); setTimeout(() => setDelArmed(false), 3500); return; } NL?.deletePage(pagesInfo.cur); loadPage(); };
+
   // ----- saving out: picture, takeoff, Drive -----
   const deliver = async (file: File) => {
     const nav = navigator as any;
@@ -310,9 +327,11 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
     const url = URL.createObjectURL(file); const a = document.createElement('a'); a.href = url; a.download = file.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(() => URL.revokeObjectURL(url), 4000);
     say(`${file.name} downloaded`);
   };
-  const base = (jobName || 'Job').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'Job';
+  const slug = (t: string) => (t || '').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-');
+  const base = [slug(jobName || 'Job') || 'Job', slug(curPageName)].filter(Boolean).join('-');
   const savePicture = async () => { setSaveOpen(false); const b = await NL?.designPicture(); if (!b) { say('Draw something first'); return; } await deliver(new File([b], `${base}-Design-Plan.png`, { type: 'image/png' })); };
   const saveTakeoff = async () => { setSaveOpen(false); const t = NL?.designTakeoff(); if (!t) { say('No cabinets in the drawing yet'); return; } await deliver(new File([t.csv], `${base}-Cabinet-Takeoff.csv`, { type: 'text/csv' })); };
+  const saveTakeoffAll = async () => { setSaveOpen(false); const t = NL?.designTakeoff(true); if (!t) { say('No cabinets in any page yet'); return; } await deliver(new File([t.csv], `${slug(jobName || 'Job') || 'Job'}-All-Pages-Takeoff.csv`, { type: 'text/csv' })); };
   const saveDrive = async () => {
     setSaveOpen(false); const st = NL?.driveState(); if (!st?.configured) { say('Google Drive is not set up in this copy of the app'); return; }
     try { if (!st.connected) await NL?.driveConnect(); say('Saving to the job folder…'); await NL?.saveJobToDrive(); say('Saved to the job folder in Google Drive'); } catch (err: any) { say(err?.message ? `Drive: ${err.message}` : 'Could not save to Drive'); }
@@ -526,12 +545,44 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
               <div style={{ position: 'absolute', right: 0, top: '50px', zIndex: 50, background: '#1d2425', border: '1px solid rgba(238,241,238,0.25)', borderRadius: '12px', padding: '6px', minWidth: '230px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <button style={{ ...btn, textAlign: 'left' }} onClick={savePicture}>Plan picture (PNG)</button>
                 <button style={{ ...btn, textAlign: 'left', opacity: rows.length ? 1 : 0.5 }} onClick={saveTakeoff}>Cabinet takeoff (CSV)</button>
+                {pagesInfo.pages.length > 1 && <button style={{ ...btn, textAlign: 'left' }} onClick={saveTakeoffAll}>Cabinet takeoff, all pages (CSV)</button>}
                 <button style={{ ...btn, textAlign: 'left' }} onClick={saveDrive}>Save to the job folder in Drive</button>
               </div>)}
           </div>
         </>}
         <button onClick={onCapture} style={btn}>Capture</button>
       </div>
+
+      {/* page tabs */}
+      {(d || pagesInfo.pages.length > 0) && (
+        <div style={{ position: 'relative', borderBottom: '1px solid rgba(238,241,238,0.12)' }}>
+          <div style={{ display: 'flex', gap: '6px', padding: '6px 10px', overflowX: 'auto' }}>
+            {pagesInfo.pages.map(pg => <button key={pg.id} style={{ ...(pg.id === pagesInfo.cur ? btnOn : btn), minHeight: '38px', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => goPage(pg.id)}>{pg.name}{pg.id === pagesInfo.cur ? ' ▾' : ''}</button>)}
+            <button style={{ ...btn, minHeight: '38px', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => { setPageMenu(false); setPageModal({ mode: 'new', name: '' }); }}>+ Page</button>
+          </div>
+          {pageMenu && (
+            <div style={{ position: 'absolute', left: 10, top: '48px', zIndex: 60, background: '#1d2425', border: '1px solid rgba(238,241,238,0.25)', borderRadius: '12px', padding: '6px', minWidth: '210px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <button style={{ ...btn, textAlign: 'left' }} onClick={() => { setPageMenu(false); setPageModal({ mode: 'rename', name: curPageName }); }}>Rename this page</button>
+              <button style={{ ...btn, textAlign: 'left' }} onClick={() => { setPageMenu(false); setPageModal({ mode: 'new', name: `${curPageName} copy` }); }}>Make a copy (before / after)</button>
+              <button style={{ ...btn, textAlign: 'left', ...(delArmed ? { background: '#b91c1c', border: 'none' } : {}) }} onClick={deleteNow}>{delArmed ? 'Tap again to delete this page' : 'Delete this page'}</button>
+            </div>)}
+        </div>)}
+      {pageModal && (
+        <div onClick={() => setPageModal(null)} style={{ position: 'fixed', inset: 0, zIndex: 2100, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '420px', background: '#1d2425', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ fontSize: '18px', fontWeight: 800 }}>{pageModal.mode === 'rename' ? 'Rename this page' : 'New page'}</div>
+            <div><div style={lbl}>Page name</div><input autoFocus value={pageModal.name} onChange={e => setPageModal({ ...pageModal, name: e.target.value })} placeholder="Master bath, Kitchen, Before, After…" style={input} onKeyDown={e => { if (e.key === 'Enter' && pageModal.mode === 'rename') renameNow(); }} /></div>
+            {pageModal.mode === 'rename' ? (
+              <div style={{ display: 'flex', gap: '8px' }}><button style={btnOn} onClick={renameNow}>Save name</button><button style={btn} onClick={() => setPageModal(null)}>Cancel</button></div>
+            ) : (<>
+              <div style={{ color: 'var(--muted)', fontSize: '13px' }}>Start the page as:</div>
+              <button style={{ ...btnOn, minHeight: '52px' }} onClick={() => makePage('bath')}>Bathroom · 5' × 8'</button>
+              <button style={{ ...btn, minHeight: '52px' }} onClick={() => makePage('kitchen')}>Kitchen · 12' × 12'</button>
+              {d && <button style={{ ...btn, minHeight: '52px' }} onClick={() => makePage('copy')}>A copy of “{curPageName || 'this page'}”</button>}
+              <button style={btn} onClick={() => setPageModal(null)}>Cancel</button>
+            </>)}
+          </div>
+        </div>)}
 
       <JobPanel>
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: wide ? 'row' : 'column' }}>

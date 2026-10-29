@@ -123,3 +123,13 @@ export function takeoffCsv(d: Design, job?: { name?: string; customer?: string }
   lines.push('', [`Job: ${[job?.customer, job?.name].filter(Boolean).join(' - ')}`].map(q).join(','));
   return '﻿' + lines.join('\r\n') + '\r\n';
 }
+
+/** One takeoff for every page of the job, with a Page column. */
+export function takeoffCsvAll(pages: Array<{ name: string; design: Design }>, job?: { name?: string; customer?: string }): string | null {
+  const q = (v: string | number) => { const s = String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const lines = [['Page', 'Qty', 'Code', 'Description', 'Width (in)', 'Depth (in)', 'Height (in)', 'Notes'].join(',')]; let n = 0;
+  for (const pg of pages) for (const r of takeoffRows(pg.design)) { n++; lines.push([pg.name, r.qty, r.code, r.desc, r.w, r.dp, r.h, r.notes].map(q).join(',')); }
+  if (!n) return null;
+  lines.push('', [`Job: ${[job?.customer, job?.name].filter(Boolean).join(' - ')}`].map(q).join(','));
+  return '\ufeff' + lines.join('\r\n') + '\r\n';
+}

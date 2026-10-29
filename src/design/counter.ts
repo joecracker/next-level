@@ -25,43 +25,70 @@ export function hasTop(it: DItem): boolean {
   return it.kind !== 'blank';
 }
 
-export interface Top { poly: Pt[]; area: number; splash: Pt[] | null; splashLen: number; ids: string[] }
+/** Overhang past each side of a cabinet's top, inches. Front = the doors, Back = the side opposite (a seating side on an island). */
+export interface Ov { f: number; b: number; l: number; r: number }
+export function ovOf(it: DItem): Ov {
+  const wall = it.wall !== null;
+  const g = (k: string, dflt: number) => { const v = it.p?.[k]; return typeof v === 'number' && v >= 0 ? v : dflt; };
+  return { f: g('ovF', OVERHANG), b: wall ? 0 : g('ovB', OVERHANG), l: g('ovL', wall ? 0 : OVERHANG), r: g('ovR', wall ? 0 : OVERHANG) };
+}
 
-export function tops(d: Design): Top[] {
-  const out: Top[] = [];
+interface Slab { poly: Pt[]; area: number; id: string }
+/** One rectangle per top-carrying item. Sides that touch a neighbour's top get no overhang, so neighbours read as one slab. */
+function slabs(d: Design): Slab[] {
+  const out: Slab[] = []; const items = d.items.filter(hasTop);
+  for (const q of items) {
+    const o = ovOf(q); const f = frame(q, d.pts); let lc = false, rc = false;
+    for (const n of items) {
+      if (n.id === q.id) continue;
+      if (q.wall !== null) {
+        if (n.wall !== q.wall) continue;
+        const gr = (n.t - n.w / 2) - (q.t + q.w / 2), gl = (q.t - q.w / 2) - (n.t + n.w / 2);
+        if (Math.abs(gr) <= 0.75) rc = true; if (Math.abs(gl) <= 0.75) lc = true;
+      } else {
+        if (n.wall !== null || Math.abs((((n.rot - q.rot) % 360) + 540) % 360 - 180) > 0.6) continue;
+        const g = frame(n, d.pts); const dx = (g.cx - f.cx) * f.ux + (g.cy - f.cy) * f.uy, dy = (g.cx - f.cx) * f.nx + (g.cy - f.cy) * f.ny;
+        if (Math.abs(dy) >= (q.d + n.d) / 2 - 1) continue;
+        const gap = Math.abs(dx) - (q.w + n.w) / 2; if (Math.abs(gap) > 0.75) continue;
+        if (dx > 0) rc = true; else lc = true;
+      }
+    }
+    const L = lc ? 0 : o.l, R = rc ? 0 : o.r;
+    let poly: Pt[]; let w = q.w + L + R, dd = q.d + o.f + o.b;
+    if (q.wall !== null && q.wall < d.pts.length) {
+      const sg = seg(d.pts, q.wall); const P = (t: number, y: number): Pt => ({ x: sg.ax + sg.ux * t + sg.nx * y, y: sg.ay + sg.uy * t + sg.ny * y });
+      const t0 = q.t - q.w / 2 - L, t1 = q.t + q.w / 2 + R; poly = [P(t0, 0), P(t1, 0), P(t1, q.d + o.f), P(t0, q.d + o.f)]; dd = q.d + o.f;
+    } else {
+      const a = -q.w / 2 - L, b = q.w / 2 + R, c = -q.d / 2 - o.b, e = q.d / 2 + o.f;
+      poly = ([[a, c], [b, c], [b, e], [a, e]] as Array<[number, number]>).map(([x, y]) => ({ x: f.cx + f.ux * x + f.nx * y, y: f.cy + f.uy * x + f.ny * y }));
+    }
+    out.push({ poly, area: w * dd, id: q.id });
+  }
+  return out;
+}
+
+/** Backsplash strips: one per continuous run of tops along a wall. */
+function splashRuns(d: Design): Array<{ poly: Pt[]; len: number }> {
+  const out: Array<{ poly: Pt[]; len: number }> = [];
   d.pts.forEach((_, wi) => {
-    const L = seg(d.pts, wi);
-    const row = d.items.filter(q => q.wall === wi && hasTop(q)).sort((a, b) => a.t - b.t);
+    const L = seg(d.pts, wi); const row = d.items.filter(q => q.wall === wi && hasTop(q)).sort((a, b) => a.t - b.t);
     let run: DItem[] = [];
-    const flush = () => {
-      if (!run.length) return;
-      const t0 = run[0].t - run[0].w / 2, t1 = run[run.length - 1].t + run[run.length - 1].w / 2;
-      const P = (t: number, y: number): Pt => ({ x: L.ax + L.ux * t + L.nx * y, y: L.ay + L.uy * t + L.ny * y });
-      const poly: Pt[] = [P(t0, 0), P(t1, 0)]; let area = 0;
-      for (let i = run.length - 1; i >= 0; i--) { const q = run[i]; const y = q.d + OVERHANG; poly.push(P(q.t + q.w / 2, y), P(q.t - q.w / 2, y)); area += q.w * y; }
-      out.push({ poly, area, splash: [P(t0, 0), P(t1, 0), P(t1, 1), P(t0, 1)], splashLen: t1 - t0, ids: run.map(q => q.id) });
-      run = [];
-    };
+    const P = (t: number, y: number): Pt => ({ x: L.ax + L.ux * t + L.nx * y, y: L.ay + L.uy * t + L.ny * y });
+    const flush = () => { if (!run.length) return; const t0 = run[0].t - run[0].w / 2 - ovOf(run[0]).l, t1 = run[run.length - 1].t + run[run.length - 1].w / 2 + ovOf(run[run.length - 1]).r; out.push({ poly: [P(t0, 0), P(t1, 0), P(t1, 1), P(t0, 1)], len: t1 - t0 }); run = []; };
     for (const q of row) { const last = run[run.length - 1]; if (last && q.t - q.w / 2 - (last.t + last.w / 2) > 0.75) flush(); run.push(q); }
     flush();
   });
-  for (const q of d.items) {
-    if (q.wall !== null || !hasTop(q)) continue;
-    const f = frame(q, d.pts); const hw = q.w / 2 + OVERHANG, hd = q.d / 2 + OVERHANG;
-    const poly = ([[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]] as Array<[number, number]>).map(([a, b]) => ({ x: f.cx + f.ux * a + f.nx * b, y: f.cy + f.uy * a + f.ny * b }));
-    out.push({ poly, area: (q.w + 2 * OVERHANG) * (q.d + 2 * OVERHANG), splash: null, splashLen: 0, ids: [q.id] });
-  }
   return out;
 }
 
 /** The slabs and backsplash as drawing markup (drawn under the wall-hung things, over the cabinets). */
 export function countertopSvg(d: Design, S: number): string {
-  const ts = tops(d); if (!ts.length) return '';
-  const c = counterOf(d); const m = matOf(c.mat); const o: string[] = [];
+  const sl = slabs(d); const c = counterOf(d); const m = matOf(c.mat); const o: string[] = [];
   const path = (p: Pt[]) => p.map(q => `${Math.round(q.x * 100) / 100},${Math.round(q.y * 100) / 100}`).join(' ');
-  for (const t of ts) {
-    o.push(`<polygon points="${path(t.poly)}" fill="${m.fill}" fill-opacity="0.38" stroke="${m.edge}" stroke-width="${1.4 / S}" stroke-linejoin="round"/>`);
-    if (t.splash && c.splash !== 'none') o.push(`<polygon points="${path(t.splash)}" fill="${c.splash === 'tile' ? '#6f9fb4' : m.edge}" stroke="none"/>`);
+  if (sl.length) {
+    // two passes inside one translucent group: outlines first, then fills, so neighbours merge into one slab with a clean outer edge
+    o.push(`<g opacity="0.4">` + sl.map(t => `<polygon points="${path(t.poly)}" fill="${m.edge}" stroke="${m.edge}" stroke-width="${2.8 / S}" stroke-linejoin="round"/>`).join('') + sl.map(t => `<polygon points="${path(t.poly)}" fill="${m.fill}" stroke="${m.fill}" stroke-width="${0.8 / S}" stroke-linejoin="round"/>`).join('') + `</g>`);
+    if (c.splash !== 'none') for (const r of splashRuns(d)) o.push(`<polygon points="${path(r.poly)}" fill="${c.splash === 'tile' ? '#6f9fb4' : m.edge}" stroke="none"/>`);
   }
   // tile up behind a freestanding range hood
   for (const q of d.items) if (q.kind === 'chimney' && q.p?.tileUp !== false && q.wall !== null && q.wall < d.pts.length) {
@@ -96,8 +123,8 @@ function sinksSvg(d: Design, S: number): string {
 
 /** What to order: slab area (rough, from the drawn tops) and backsplash length. */
 export function counterSummary(d: Design): { area: number; splashLen: number; mat: string; splash: string } | null {
-  const ts = tops(d); if (!ts.length) return null; const c = counterOf(d);
-  return { area: ts.reduce((a, t) => a + t.area, 0) / 144, splashLen: ts.reduce((a, t) => a + t.splashLen, 0) / 12, mat: matOf(c.mat).name, splash: c.splash };
+  const sl = slabs(d); if (!sl.length) return null; const c = counterOf(d);
+  return { area: sl.reduce((a, t) => a + t.area, 0) / 144, splashLen: splashRuns(d).reduce((a, r) => a + r.len, 0) / 12, mat: matOf(c.mat).name, splash: c.splash };
 }
 
 /** Fixtures worth listing next to the counters: sinks, disposals, pot fillers, and tile behind a freestanding hood. */

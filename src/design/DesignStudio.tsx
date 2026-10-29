@@ -5,7 +5,7 @@ import JobPanel from './JobPanel';
 import { runChecks } from './checks';
 import { MAKERS, catalogFor, readyCatalogs, familiesFor, groupsFor, kindForEntry, matches, type CabEntry } from './catalog';
 import { designBody, designBounds, itemShape, takeoffRows } from './exports';
-import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf, sinkOf } from './counter';
+import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf, sinkOf, ovOf } from './counter';
 import {
   CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, polyPatch, polyWorld, toPolyLocal, seg, snapTo, template,
   type Cat, type DItem, type Design, type Pt,
@@ -588,6 +588,17 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           })()}
           {TOP_KINDS.has(it.kind) && KINDS[it.kind].layer === 'floor' && (<Sec title="Countertop" open>
             <Chips label="Countertop on this" value={hasTop(it) ? 'on' : 'off'} opts={[['on', 'On'], ['off', 'Off']]} onPick={v => upd(it.id, { p: { ...(it.p || {}), top: v === 'on' } })} />
+            {hasTop(it) && (() => { const o = ovOf(it); const free = it.wall === null; const set = (k: string, v: number) => upd(it.id, { p: { ...(it.p || {}), [k]: Math.max(0, v) } });
+              return (<>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <Num label="Front overhang" value={o.f} onCommit={v => set('ovF', v)} />
+                  {free && <Num label="Back overhang" value={o.b} onCommit={v => set('ovB', v)} />}
+                  <Num label="Left end" value={o.l} onCommit={v => set('ovL', v)} />
+                  <Num label="Right end" value={o.r} onCommit={v => set('ovR', v)} />
+                </div>
+                {free && <Chips label="Seating side (back) overhang" value={[1.5, 6, 12, 15].includes(o.b) ? o.b : 0} opts={[[1.5, '1 1/2"'], [6, '6"'], [12, '12"'], [15, '15"']]} onPick={v => set('ovB', v)} />}
+                <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.45 }}>The back is the side opposite the doors. Ends that touch a neighbouring top join it, so only the outer ends of a run overhang.</div>
+              </>); })()}
             <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.45 }}>{it.kind === 'blank' ? 'A blank space is just an open spot: set its width and depth above, slide it along the wall, and turn the top on for a freestanding counter.' : 'Cabinets that touch share one continuous top. The material and backsplash are set for the whole room (tap empty floor).'}</div>
           </Sec>)}
           <Sec title="Notes"><Text label="Notes" value={it.notes || ''} onCommit={v => upd(it.id, { notes: v })} /></Sec>

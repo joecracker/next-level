@@ -3,6 +3,7 @@
 // the studio, from Capture's Save-to-Drive, or anywhere else with the studio closed.
 import { KINDS, T, corners, fmtIn, frame, isCab, seg, type DItem, type Design } from './model';
 import { fixtureShape } from './shapes';
+import { countertopSvg, counterSummary } from './counter';
 
 const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const INK = '#14191A';
@@ -25,6 +26,11 @@ export function itemShape(it: DItem, S: number, sel: boolean, fs: number): strin
   } else if (it.kind === 'window') {
     body = `<rect x="${-hw}" y="${-hd}" width="${it.w}" height="${it.d}" fill="#ffffff" stroke="${stroke}" stroke-width="${strokeW}"/>` +
       `<line x1="${-hw}" y1="0" x2="${hw}" y2="0" stroke="${stroke}" stroke-width="${sw}"/>`;
+  } else if (it.kind === 'blank') { // open space: just an outline, so a freestanding top looks open
+    body = `<rect x="${-hw}" y="${-hd}" width="${it.w}" height="${it.d}" fill="none" stroke="${stroke}" stroke-width="${strokeW}" stroke-dasharray="${6 / S} ${4 / S}"/>`;
+  } else if (it.kind === 'ucl') { // light strip under an upper: a box for the reach, a bright line at its front edge
+    body = `<rect x="${-hw}" y="${-hd}" width="${it.w}" height="${it.d}" fill="none" stroke="${sel ? stroke : '#c9b24a'}" stroke-width="${strokeW}" stroke-dasharray="${3 / S} ${3 / S}"/>` +
+      `<line x1="${-hw + 1}" y1="${hd - 1.5}" x2="${hw - 1}" y2="${hd - 1.5}" stroke="#e3b400" stroke-width="${3.2 / S}" stroke-linecap="round"/>`;
   } else {
     const fill = k.layer === 'ceiling' ? 'none' : k.cab ? (k.layer === 'hung' ? '#f3e7cf' : '#e9d8b8') : k.layer === 'hung' ? '#eef0ee' : '#dbe7e1';
     const dash = k.layer === 'ceiling' || k.layer === 'hung' ? ` stroke-dasharray="${5 / S} ${3 / S}"` : '';
@@ -52,12 +58,15 @@ export function designBody(d: Design, S: number, selId?: string | null, title?: 
   }
   const order: string[] = ['inwall', 'floor', 'hung', 'ceiling'];
   const items = (d.items || []).slice().sort((a, b) => order.indexOf(KINDS[a.kind].layer) - order.indexOf(KINDS[b.kind].layer));
+  let topsDone = false;
   for (const it of items) {
+    if (!topsDone && order.indexOf(KINDS[it.kind].layer) >= 2) { out.push(countertopSvg(d, S)); topsDone = true; }
     const f = frame(it, pts);
     const fl = flags?.[it.id];
     const ring = fl ? `<rect x="${-it.w / 2 - 1.5}" y="${-it.d / 2 - 1.5}" width="${it.w + 3}" height="${it.d + 3}" fill="none" stroke="${fl === 'fix' ? '#d9482b' : '#d9a441'}" stroke-width="${3 / S}" stroke-dasharray="${6 / S} ${4 / S}"/>` : '';
     out.push(`<g transform="translate(${f.cx} ${f.cy}) rotate(${f.rot})">${itemShape(it, S, it.id === selId, fs)}${ring}</g>`);
   }
+  if (!topsDone) out.push(countertopSvg(d, S));
   if (pts.length >= 3) { // wall lengths, outside the wall
     pts.forEach((p, i) => {
       const s = seg(pts, i); if (s.L < 1) return;
@@ -117,11 +126,18 @@ export function takeoffRows(d: Design): Array<{ qty: number; code: string; desc:
 }
 
 /** Cabinet takeoff as CSV text (opens in Excel, LibreOffice, or anything else). Sizes in inches. */
+function counterLines(d: Design, pre: Array<string | number> = []): Array<Array<string | number>> {
+  const c = counterSummary(d); if (!c) return [];
+  const rows: Array<Array<string | number>> = [[...pre, 1, '', `Countertop - ${c.mat}`, '', '', '', `about ${Math.round(c.area * 10) / 10} sq ft (drawn tops with 1 1/2" front overhang)`]];
+  if (c.splash !== 'none') rows.push([...pre, 1, '', c.splash === 'tile' ? 'Backsplash - tile to the uppers' : `Backsplash - 4" ${c.mat}`, '', '', '', `about ${Math.round(c.splashLen * 10) / 10} linear ft along the wall runs`]);
+  return rows;
+}
 export function takeoffCsv(d: Design, job?: { name?: string; customer?: string }): string | null {
-  const rows = takeoffRows(d); if (!rows.length) return null;
+  const rows = takeoffRows(d); const extra = counterLines(d); if (!rows.length && !extra.length) return null;
   const q = (v: string | number) => { const s = String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const lines = [['Qty', 'Code', 'Description', 'Width (in)', 'Depth (in)', 'Height (in)', 'Notes'].join(',')];
   rows.forEach(r => lines.push([r.qty, r.code, r.desc, r.w, r.dp, r.h, r.notes].map(q).join(',')));
+  extra.forEach(r => lines.push(r.map(q).join(',')));
   lines.push('', [`Job: ${[job?.customer, job?.name].filter(Boolean).join(' - ')}`].map(q).join(','));
   return '﻿' + lines.join('\r\n') + '\r\n';
 }
@@ -131,6 +147,7 @@ export function takeoffCsvAll(pages: Array<{ name: string; design: Design }>, jo
   const q = (v: string | number) => { const s = String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const lines = [['Page', 'Qty', 'Code', 'Description', 'Width (in)', 'Depth (in)', 'Height (in)', 'Notes'].join(',')]; let n = 0;
   for (const pg of pages) for (const r of takeoffRows(pg.design)) { n++; lines.push([pg.name, r.qty, r.code, r.desc, r.w, r.dp, r.h, r.notes].map(q).join(',')); }
+  for (const pg of pages) for (const r of counterLines(pg.design, [pg.name])) { n++; lines.push(r.map(q).join(',')); }
   if (!n) return null;
   lines.push('', [`Job: ${[job?.customer, job?.name].filter(Boolean).join(' - ')}`].map(q).join(','));
   return '\ufeff' + lines.join('\r\n') + '\r\n';

@@ -24,6 +24,7 @@ export interface Design {
   items: DItem[];
   ceiling?: number;    // ceiling height, inches
   accepted?: Record<string, boolean>; // robot checks Tim chose to keep as they are
+  counter?: { mat?: string; splash?: 'stone' | 'tile' | 'none' }; // countertop material and backsplash for the whole drawing
 }
 
 export type Layer = 'floor' | 'hung' | 'inwall' | 'ceiling';
@@ -48,6 +49,7 @@ export const KINDS: Record<string, Kind> = {
   base:     { name: 'Base cabinet', layer: 'floor', snap: true, w: 24, d: 24, h: 34.5, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
   sinkbase: { name: 'Sink base', layer: 'floor', snap: true, w: 36, d: 24, h: 34.5, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
   drawer:   { name: 'Drawer base', layer: 'floor', snap: true, w: 18, d: 24, h: 34.5, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
+  blank:    { name: 'Blank space (open, with optional top)', layer: 'floor', snap: true, w: 36, d: 24, h: 34.5, cat: 'Cabinets', modes: ['kitchen', 'bath'] },
   pantry:   { name: 'Tall pantry', layer: 'floor', snap: true, w: 24, d: 24, h: 84, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
   fridge:   { name: 'Refrigerator', layer: 'floor', snap: true, w: 36, d: 30, cat: 'Accessories', modes: ['kitchen'] },
   range:    { name: 'Range', layer: 'floor', snap: true, w: 30, d: 26, cat: 'Accessories', modes: ['kitchen'] },
@@ -58,6 +60,7 @@ export const KINDS: Record<string, Kind> = {
   hood:     { name: 'Range hood', layer: 'hung', snap: true, w: 30, d: 20, cat: 'Accessories', modes: ['kitchen'] },
   microwave:{ name: 'Space-saver microwave', layer: 'hung', snap: true, w: 30, d: 16, cat: 'Accessories', modes: ['kitchen'] },
   valance:  { name: 'Valance', layer: 'hung', snap: true, w: 36, d: 4, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
+  ucl:      { name: 'Under-cabinet light', layer: 'hung', snap: true, w: 24, d: 10, cat: 'Electrical', modes: ['kitchen'] },
   mirror:   { name: 'Mirror', layer: 'hung', snap: true, w: 24, d: 1.5, cat: 'Accessories', modes: ['bath'] },
   medcab:   { name: 'Medicine cabinet', layer: 'hung', snap: true, w: 16, d: 4, cat: 'Accessories', modes: ['bath'] },
   grab:     { name: 'Grab bar', layer: 'hung', snap: true, w: 24, d: 3, cat: 'Accessories', modes: ['bath'] },

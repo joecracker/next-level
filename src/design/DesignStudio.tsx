@@ -5,6 +5,7 @@ import JobPanel from './JobPanel';
 import { runChecks } from './checks';
 import { MAKERS, catalogFor, readyCatalogs, familiesFor, groupsFor, kindForEntry, matches, type CabEntry } from './catalog';
 import { designBody, designBounds, itemShape, takeoffRows } from './exports';
+import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf } from './counter';
 import {
   CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, polyPatch, polyWorld, toPolyLocal, seg, snapTo, template,
   type Cat, type DItem, type Design, type Pt,
@@ -557,6 +558,10 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             if (it.kind === 'switch') return <Chips label="Gangs" value={P.gang || 1} opts={[[1, '1'], [2, '2'], [3, '3']]} onPick={v => setP({ gang: v })} />;
             return null;
           })()}
+          {TOP_KINDS.has(it.kind) && KINDS[it.kind].layer === 'floor' && (<Sec title="Countertop" open>
+            <Chips label="Countertop on this" value={hasTop(it) ? 'on' : 'off'} opts={[['on', 'On'], ['off', 'Off']]} onPick={v => upd(it.id, { p: { ...(it.p || {}), top: v === 'on' } })} />
+            <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.45 }}>{it.kind === 'blank' ? 'A blank space is just an open spot: set its width and depth above, slide it along the wall, and turn the top on for a freestanding counter.' : 'Cabinets that touch share one continuous top. The material and backsplash are set for the whole room (tap empty floor).'}</div>
+          </Sec>)}
           <Sec title="Notes"><Text label="Notes" value={it.notes || ''} onCommit={v => upd(it.id, { notes: v })} /></Sec>
         </>);
       })() : sel?.type === 'wall' ? (() => {
@@ -575,6 +580,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
       </>) : (<>
         <div style={{ fontWeight: 800, fontSize: '18px' }}>{d.mode === 'bath' ? 'Bathroom' : 'Kitchen'}</div>
         <Num label="Ceiling height" value={d.ceiling || 96} onCommit={c => commit({ ...d, ceiling: Math.max(48, c) })} />
+        <Chips label="Countertop material" value={counterOf(d).mat} opts={MATS.map(m => [m.id, m.name] as [string, string])} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), mat: v } })} />
+        <Chips label="Backsplash" value={counterOf(d).splash} opts={SPLASHES} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), splash: v as 'stone' | 'tile' | 'none' } })} />
         <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>Tap anything to change it. Drag a wall to stretch the room, or drag a corner for odd shapes. Use Add to place things.</div>
         <div style={lbl}>Cabinets so far</div>
         {rows.length === 0 ? <div style={{ color: 'var(--muted)', fontSize: '14px' }}>None yet.</div> : rows.map((r, i) => (
@@ -696,6 +703,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         const famRows = cabMaker === 'Custom' ? [] : catalogFor(cabMaker, lineId).filter(e => e.group === cabGroup && e.family === famNow).sort((a, b) => (a.h ?? 0) - (b.h ?? 0) || a.w - b.w);
         const catalogPane = (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <button style={{ ...btn, minHeight: '64px', textAlign: 'left', display: 'flex', gap: '10px', alignItems: 'center', padding: '8px' }} onClick={() => addItem({ key: 'blank', kind: 'blank', name: 'Blank space', w: KINDS.blank.w, d: KINDS.blank.d })}>
+              <Thumb e={{ kind: 'blank', w: 36, d: 24 }} /><span>Blank space<div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>an open spot you can size, slide, and put a countertop on</div></span></button>
             <div><div style={lbl}>Maker</div><div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {MAKERS.map(m => <button key={m.id} style={cabMaker === m.id ? btnOn : { ...btn, opacity: m.ready ? 1 : 0.55 }} onClick={() => { setCabMaker(m.id); setCabFam(''); const ln = m.lines ? m.lines.find(l => l.ready)?.id || m.lines[0].id : ''; setCabLine(ln || 'Select'); const g = groupsFor(m.id, ln); if (g.length && !g.includes(cabGroup)) setCabGroup(g[0]); }}>{m.id}</button>)}
               <button style={cabMaker === 'Custom' ? btnOn : btn} onClick={() => setCabMaker('Custom')}>Custom size</button>

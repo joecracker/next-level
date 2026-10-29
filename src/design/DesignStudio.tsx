@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as RPE } from 'react';
 import JobPanel from './JobPanel';
 import { runChecks } from './checks';
-import { designBody, designBounds, takeoffRows } from './exports';
+import { designBody, designBounds, itemShape, takeoffRows } from './exports';
 import {
   CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, seg, snapTo, template,
   type Cat, type DItem, type Design, type Pt,
@@ -45,6 +45,18 @@ function Text({ label, value, onCommit, placeholder }: { label: string; value: s
 }
 
 // ---------- editing the room ----------
+function Thumb({ e, size = 56 }: { e: { kind: string; w: number; d: number; p?: Record<string, any>; extra?: Partial<DItem> }; size?: number }) {
+  const it = mkItem(e.kind, { w: e.w, d: e.d, p: { ...(mkItem(e.kind).p || {}), ...(e.p || {}) }, ...(e.extra || {}) });
+  const S = size / Math.max(e.w, e.d, 24) * 0.8; const m = Math.max(e.w, e.d, 24) * (e.kind === 'door' ? 1.9 : 1.35); const cy = it.kind === 'door' ? e.w * 0.4 : 0;
+  return <svg width={size} height={size} viewBox={`${-m / 2} ${-m / 2 + cy} ${m} ${m}`} style={{ background: '#fff', borderRadius: '8px', flexShrink: 0 }} dangerouslySetInnerHTML={{ __html: itemShape(it, S, false, 10 / S) }} />;
+}
+function Sec({ title, open, children }: { title: string; open?: boolean; children: any }) {
+  const [o, setO] = useState(!!open);
+  return (<div style={{ borderTop: '1px solid rgba(238,241,238,0.12)', paddingTop: '8px' }}>
+    <button onClick={() => setO(!o)} style={{ ...btn, width: '100%', textAlign: 'left', minHeight: '40px', background: 'transparent', border: 'none', padding: '0 2px', display: 'flex', justifyContent: 'space-between' }}><span style={{ ...lbl, marginBottom: 0 }}>{title}</span><span>{o ? '▾' : '▸'}</span></button>
+    {o && <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>{children}</div>}
+  </div>);
+}
 function Chips({ label, value, opts, onPick }: { label: string; value: any; opts: Array<[any, string]>; onPick: (v: any) => void }) {
   return (<div><div style={lbl}>{label}</div><div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
     {opts.map(([v, t]) => <button key={String(v)} style={value === v ? btnOn : btn} onClick={() => onPick(v)}>{t}</button>)}</div></div>);
@@ -101,6 +113,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const [saveOpen, setSaveOpen] = useState(false);
   const [msg, setMsg] = useState('');
   const [armed, setArmed] = useState(false);
+  const [search, setSearch] = useState('');
   const [tab, setTab] = useState<'edit' | 'check' | 'list'>('edit');
   const [, bump] = useState(0);
   const hist = useRef<Design[]>([]); const fut = useRef<Design[]>([]);
@@ -254,10 +267,18 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const delItem = (id: string) => { const cur = designRef.current; if (!cur) return; commit({ ...cur, items: cur.items.filter(q => q.id !== id) }); setSel(null); };
   const dupItem = (it: DItem) => { if (!d) return; const c: DItem = { ...it, id: mkItem(it.kind).id, ...(it.wall !== null ? { t: it.t + it.w } : { x: it.x + 12, y: it.y + 12 }) }; commit(normalize({ ...d, items: [...d.items, c] })); setSel({ type: 'item', id: c.id }); };
   const addItem = (e: AddEntry) => {
-    if (!d) return; const b = designBounds(d); const kind = e.kind; const k = KINDS[kind];
+    if (!d) return;
+    try { const r = JSON.parse(localStorage.getItem('nl.design.recent') || '[]').filter((x: string) => x !== e.key); r.unshift(e.key); localStorage.setItem('nl.design.recent', JSON.stringify(r.slice(0, 6))); } catch { /* ignore */ }
+    if (e.applyTo === 'shower') {
+      const target = (selItem && selItem.kind === 'shower' ? selItem : null) || d.items.filter(q => q.kind === 'shower').slice(-1)[0];
+      if (!target) { say('Add a shower first, then pick its door'); return; }
+      commit(patchItem(d, target.id, { p: { ...(target.p || {}), ...(e.p || {}) } })); setSel({ type: 'item', id: target.id }); setAddOpen(false); return;
+    }
+    const b = designBounds(d); const kind = e.kind; const k = KINDS[kind];
     const over: Partial<DItem> = k.layer === 'inwall' || k.layer === 'hung' || (k.layer === 'floor' && k.snap) ? { wall: 0, t: Math.max(e.w / 2, Math.min(seg(d.pts, 0).L - e.w / 2, seg(d.pts, 0).L / 2)) } : { x: Math.round((b.minX + b.maxX) / 2), y: Math.round((b.minY + b.maxY) / 2) };
-    const base0 = mkItem(kind); const it = mkItem(kind, { w: e.w, d: e.d, p: base0.p ? { ...base0.p, ...(e.p || {}) } : undefined, ...over, ...(kind === 'window' && d.mode === 'kitchen' ? { sill: 42 } : kind === 'window' ? { sill: 36 } : {}), ...(kind === 'door' ? { hinge: 'left', swing: 'in' } : {}) });
-    commit(normalize({ ...d, items: [...d.items, it] })); setSel({ type: 'item', id: it.id }); setAddOpen(false);
+    const base0 = mkItem(kind);
+    const it = mkItem(kind, { w: e.w, d: e.d, p: base0.p ? { ...base0.p, ...(e.p || {}) } : undefined, ...over, ...(e.extra || {}) });
+    commit(normalize({ ...d, items: [...d.items, it] })); setSel({ type: 'item', id: it.id }); setTab('edit'); setAddOpen(false);
   };
   const nudgeBy = (it: DItem, dir: number, axis: 'x' | 'y' | 't') => {
     if (!d) return;
@@ -325,10 +346,12 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         const it = selItem; const k = KINDS[it.kind]; const g = gaps(it, d);
         return (<>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ flex: 1, fontWeight: 800, fontSize: '18px' }}>{k.name}</div>
+            <Thumb e={{ kind: it.kind, w: it.w, d: it.d, p: it.p, extra: { hinge: it.hinge, swing: it.swing } }} size={48} />
+            <div style={{ flex: 1, fontWeight: 800, fontSize: '18px' }}>{k.name}{it.kind === 'door' ? ` · ${({ swing: 'swinging', double: 'double', pocket: 'pocket', barn: 'barn', bifold: 'bi-fold', opening: 'opening' } as Record<string, string>)[it.p?.type || 'swing']}` : ''}</div>
             <button style={btn} onClick={() => dupItem(it)}>Copy</button>
             <button style={{ ...btn, color: '#fca5a5' }} onClick={() => delItem(it.id)}>Delete</button>
           </div>
+          <Sec title="Size & position" open>
           <Text label={isCab(it.kind) ? 'Name on the order' : 'Label on the drawing'} value={it.label || ''} placeholder={k.name} onCommit={v => upd(it.id, { label: v })} />
           {isCab(it.kind) && <Text label="Catalog code" value={it.code || ''} placeholder="e.g. B24" onCommit={v => upd(it.id, { code: v.trim() })} />}
           <div style={{ display: 'grid', gridTemplateColumns: isCab(it.kind) ? '1fr 1fr 1fr' : '1fr 1fr', gap: '8px' }}>
@@ -357,31 +380,56 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
                 <button style={btn} onClick={() => nudgeBy(it, -1, 'y')}>▲</button><button style={btn} onClick={() => nudgeBy(it, 1, 'y')}>▼</button></>)}
             </div>
           </div>
-          {it.wall === null && <button style={btn} onClick={() => upd(it.id, { rot: ((it.rot || 0) + 90) % 360 })}>Rotate 90°</button>}
-          {it.kind === 'door' && (<div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            <button style={btn} onClick={() => upd(it.id, { hinge: it.hinge === 'right' ? 'left' : 'right' })}>Hinge: {it.hinge === 'right' ? 'right' : 'left'}</button>
-            <button style={btn} onClick={() => upd(it.id, { swing: it.swing === 'out' ? 'in' : 'out' })}>Swings {it.swing === 'out' ? 'out' : 'in'}</button></div>)}
-          {it.kind === 'window' && <Num label="Sill height" value={it.sill ?? 36} onCommit={s => upd(it.id, { sill: s })} />}
+          {it.wall === null && (<div>
+            <div style={lbl}>Angle (any direction)</div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button style={btn} onClick={() => upd(it.id, { rot: ((it.rot || 0) - 15 + 360) % 360 })}>−15°</button>
+              <div style={{ ...btn, display: 'flex', alignItems: 'center', minWidth: '64px', justifyContent: 'center' }}>{Math.round(it.rot || 0)}°</div>
+              <button style={btn} onClick={() => upd(it.id, { rot: ((it.rot || 0) + 15) % 360 })}>+15°</button>
+              <button style={btn} onClick={() => upd(it.id, { rot: ((it.rot || 0) + 90) % 360 })}>+90°</button>
+              <button style={btn} onClick={() => upd(it.id, { rot: 0 })}>Straight</button>
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px' }}>You can also drag it on the drawing; the numbers here follow along.</div>
+          </div>)}
+          </Sec>
+          {it.kind === 'door' && (<Sec title="Door" open>
+            <Chips label="Kind of door" value={it.p?.type || 'swing'} opts={[['swing', 'Swinging'], ['double', 'Double'], ['pocket', 'Pocket'], ['barn', 'Barn'], ['bifold', 'Bi-fold'], ['opening', 'Opening']]} onPick={v => upd(it.id, { p: { ...(it.p || {}), type: v } })} />
+            {(it.p?.type || 'swing') !== 'opening' && <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {['swing', 'pocket', 'barn', undefined].includes(it.p?.type) && <button style={btn} onClick={() => upd(it.id, { hinge: it.hinge === 'right' ? 'left' : 'right' })}>{['pocket', 'barn'].includes(it.p?.type) ? 'Slides to the ' : 'Hinge: '}{it.hinge === 'right' ? 'right' : 'left'}</button>}
+              {!['pocket', 'barn'].includes(it.p?.type) && <button style={btn} onClick={() => upd(it.id, { swing: it.swing === 'out' ? 'in' : 'out' })}>{it.p?.type === 'bifold' ? 'Folds ' : 'Swings '}{it.swing === 'out' ? 'out' : 'in'}</button>}
+            </div>}
+          </Sec>)}
+          {it.kind === 'window' && <Sec title="Window" open><Num label="Sill height" value={it.sill ?? 36} onCommit={s => upd(it.id, { sill: s })} /></Sec>}
           {(() => {
             const P = it.p || {}; const setP = (q: Record<string, any>) => upd(it.id, { p: { ...P, ...q } });
             const side: Array<[any, string]> = [['wall', 'Wall'], ['knee', 'Knee wall + glass'], ['glass', 'Glass'], ['open', 'Open']];
             if (it.kind === 'shower') return (<>
+              <Sec title="Walls & way in" open>
               <Chips label="Left side" value={P.left} opts={side} onPick={v => setP({ left: v })} />
               <Chips label="Right side" value={P.right} opts={side} onPick={v => setP({ right: v })} />
               <Chips label="Front" value={P.front} opts={side} onPick={v => setP({ front: v })} />
               <Chips label="Way in" value={P.entry} opts={[['front', 'Front'], ['left', 'Left end'], ['right', 'Right end'], ['cornerL', 'Corner L'], ['cornerR', 'Corner R']]} onPick={v => setP({ entry: v })} />
+              </Sec>
+              <Sec title="Shower door" open>
               <Chips label="Door" value={P.door ? P.doorType : 'none'} opts={[['swing', 'Swing'], ['slider', 'Slider'], ['none', 'No door']]} onPick={v => v === 'none' ? setP({ door: false }) : setP({ door: true, doorType: v })} />
               {P.door && P.entry === 'front' && <Chips label="Door position" value={P.doorPos} opts={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} onPick={v => setP({ doorPos: v })} />}
               <Num label="Door / opening width" value={P.doorW || 30} onCommit={v => setP({ doorW: Math.max(18, v) })} />
               <Chips label="Threshold" value={P.curb ? 'curb' : 'flat'} opts={[['curb', 'Curb'], ['flat', 'Curbless']]} onPick={v => setP({ curb: v === 'curb' })} />
+              </Sec>
+              <Sec title="Drain & valve">
               <Chips label="Drain" value={P.drain} opts={[['endL', 'Left end'], ['endR', 'Right end'], ['center', 'Center'], ['linear', 'Linear back'], ['trL', 'Trench left'], ['trR', 'Trench right']]} onPick={v => setP({ drain: v })} />
               <Chips label="Valve wall" value={P.valve} opts={[['left', 'Left'], ['back', 'Back'], ['right', 'Right']]} onPick={v => setP({ valve: v })} />
               <Chips label="Valve" value={P.valveType} opts={[['standard', 'Standard'], ['slide', 'With slide bar']]} onPick={v => setP({ valveType: v })} />
+              </Sec>
+              <Sec title="Bench, niche & shelves">
               <Chips label="Bench" value={P.bench || 'none'} opts={[['none', 'None'], ['auto', 'Far from valve'], ['left', 'Left'], ['right', 'Right'], ['cornerL', 'Corner L'], ['cornerR', 'Corner R']]} onPick={v => setP({ bench: v })} />
               {P.bench && P.bench !== 'none' && <Num label="Bench depth" value={P.benchW || 15} onCommit={v => setP({ benchW: Math.max(10, v) })} />}
               <Chips label="Niche" value={P.niche || 'none'} opts={[['none', 'None'], ['back', 'Back'], ['left', 'Left'], ['right', 'Right']]} onPick={v => setP({ niche: v })} />
               <Chips label="Corner shelves" value={P.shelves || 'none'} opts={[['none', 'None'], ['bl', 'Back-left'], ['br', 'Back-right'], ['both', 'Both']]} onPick={v => setP({ shelves: v })} />
+              </Sec>
+              <Sec title="Tile">
               <Chips label="Tile lines" value={P.tile ? P.tileSize : 'off'} opts={[['off', 'Off'], ['2', '2"'], ['12', '12×12'], ['12x24', '12×24'], ['24', '24×24']]} onPick={v => v === 'off' ? setP({ tile: false }) : setP({ tile: true, tileSize: v })} />
+              </Sec>
             </>);
             if (it.kind === 'tub') return <Chips label="Drain end" value={P.drain} opts={[['left', 'Left'], ['right', 'Right']]} onPick={v => setP({ drain: v })} />;
             if (it.kind === 'toilet') return <Chips label="Bowl" value={P.bowl} opts={[['elong', 'Elongated'], ['round', 'Round']]} onPick={v => setP({ bowl: v })} />;
@@ -390,7 +438,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             if (it.kind === 'switch') return <Chips label="Gangs" value={P.gang || 1} opts={[[1, '1'], [2, '2'], [3, '3']]} onPick={v => setP({ gang: v })} />;
             return null;
           })()}
-          <Text label="Notes" value={it.notes || ''} onCommit={v => upd(it.id, { notes: v })} />
+          <Sec title="Notes"><Text label="Notes" value={it.notes || ''} onCommit={v => upd(it.id, { notes: v })} /></Sec>
         </>);
       })() : sel?.type === 'wall' ? (() => {
         const s = seg(d.pts, sel.i);
@@ -434,7 +482,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         {d && <>
           <button style={{ ...btn, opacity: hist.current.length ? 1 : 0.4 }} onClick={undo} disabled={!hist.current.length}>Undo</button>
           <button style={{ ...btn, opacity: fut.current.length ? 1 : 0.4 }} onClick={redo} disabled={!fut.current.length}>Redo</button>
-          <button style={btnOn} onClick={() => setAddOpen(true)}>+ Add</button>
+          <button style={btnOn} onClick={() => { setSearch(''); setAddOpen(true); }}>+ Add</button>
           <div style={{ position: 'relative' }}>
             <button style={btn} onClick={() => setSaveOpen(o => !o)}>Save ▾</button>
             {saveOpen && (
@@ -475,19 +523,38 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         </div>
       </JobPanel>
 
-      {addOpen && d && (
-        <div onClick={() => setAddOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '640px', maxHeight: '78vh', overflowY: 'auto', background: '#1d2425', borderRadius: '16px 16px 0 0', padding: '14px' }}>
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
-              {CATS.filter(c => addList(c, d.mode).length).map(c => <button key={c} style={addGroup === c ? btnOn : btn} onClick={() => setAddGroup(c)}>{catLabel(c, d.mode)}</button>)}
-              <button style={{ ...btn, marginLeft: 'auto' }} onClick={() => setAddOpen(false)}>Close</button>
+      {addOpen && d && (() => {
+        const all = CATS.flatMap(c => addList(c, d.mode));
+        const q = search.trim().toLowerCase();
+        let recent: string[] = []; try { recent = JSON.parse(localStorage.getItem('nl.design.recent') || '[]'); } catch { /* ignore */ }
+        const list = q ? all.filter(e => (e.name + ' ' + (e.sub || '')).toLowerCase().includes(q)) : addList(addGroup, d.mode);
+        const secs: Array<[string, AddEntry[]]> = []; list.forEach(e => { const n = q ? 'Results' : e.section || ''; const f = secs.find(x => x[0] === n); if (f) f[1].push(e); else secs.push([n, [e]]); });
+        const rec = q ? [] : recent.map(k => all.find(e => e.key === k)).filter(Boolean) as AddEntry[];
+        if (rec.length) secs.unshift(['Recently used', rec]);
+        return (
+        <div onClick={() => setAddOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '860px', height: 'min(82vh, 640px)', background: '#1d2425', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', gap: '8px', padding: '12px', borderBottom: '1px solid rgba(238,241,238,0.12)' }}>
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search: pocket door, GFCI, vanity…" style={{ ...input, flex: 1 }} />
+              <button style={btn} onClick={() => setAddOpen(false)}>Close</button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px' }}>
-              {addList(addGroup, d.mode).map(e => (
-                <button key={e.key} style={{ ...btn, minHeight: '56px', textAlign: 'left' }} onClick={() => addItem(e)}>{e.name}<div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>{e.sub || `${fmtIn(e.w)} × ${fmtIn(e.d)}`}</div></button>))}
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: wide ? 'row' : 'column' }}>
+              <div style={{ display: 'flex', flexDirection: wide ? 'column' : 'row', gap: '6px', padding: '10px', overflow: 'auto', flexShrink: 0, ...(wide ? { width: '170px', borderRight: '1px solid rgba(238,241,238,0.12)' } : { borderBottom: '1px solid rgba(238,241,238,0.12)' }) }}>
+                {CATS.filter(c => addList(c, d.mode).length).map(c => <button key={c} style={{ ...(addGroup === c && !q ? btnOn : btn), textAlign: 'left', whiteSpace: 'nowrap' }} onClick={() => { setSearch(''); setAddGroup(c); }}>{catLabel(c, d.mode)}</button>)}
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+                {secs.length === 0 && <div style={{ color: 'var(--muted)' }}>Nothing matches that.</div>}
+                {secs.map(([name, es]) => (<div key={name} style={{ marginBottom: '14px' }}>
+                  {name && <div style={lbl}>{name}</div>}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '8px' }}>
+                    {es.map(e => (<button key={name + e.key} style={{ ...btn, minHeight: '72px', textAlign: 'left', display: 'flex', gap: '10px', alignItems: 'center', padding: '8px' }} onClick={() => addItem(e)}>
+                      <Thumb e={e} /><span>{e.name}<div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>{e.sub || `${fmtIn(e.w)} × ${fmtIn(e.d)}`}</div></span></button>))}
+                  </div></div>))}
+              </div>
             </div>
           </div>
-        </div>)}
+        </div>);
+      })()}
     </div>
   );
 }

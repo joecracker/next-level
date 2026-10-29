@@ -65,7 +65,7 @@ export function runChecks(d: Design): Check[] {
       if (p.niche === 'right' && p.right !== 'wall') add('shniche', it, 'fix', 'Niche is on an open side', 'A niche needs a solid wall.');
       if (!items.some(o => o.kind === 'wet' || o.kind === 'fan') && false) void 0;
     }
-    if (it.kind === 'door' && it.wall !== null) {
+    if (it.kind === 'door' && it.wall !== null && ['swing', 'double'].includes(it.p?.type || 'swing')) {
       const c = swingBox(it, d);
       if (c) for (const o of items) {
         if (o.id === it.id || KINDS[o.kind].layer !== 'floor' || o.kind === 'shower') continue;

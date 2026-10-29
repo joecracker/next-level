@@ -27,7 +27,7 @@ export interface Design {
 }
 
 export type Layer = 'floor' | 'hung' | 'inwall' | 'ceiling';
-export type Cat = 'Walls' | 'Plumbing' | 'Electrical' | 'Cabinets' | 'Accessories';
+export type Cat = 'Walls' | 'Doors' | 'Plumbing' | 'Electrical' | 'Cabinets' | 'Accessories';
 export type Mode = 'bath' | 'kitchen';
 export interface Kind { name: string; layer: Layer; snap: boolean; w: number; d: number; h?: number; cab?: boolean; cat: Cat; modes: Mode[]; inWall?: boolean; props?: Record<string, any> }
 export const T = 4.5; // wall thickness
@@ -58,8 +58,8 @@ export const KINDS: Record<string, Kind> = {
   mirror:   { name: 'Mirror', layer: 'hung', snap: true, w: 24, d: 1.5, cat: 'Accessories', modes: ['bath'] },
   medcab:   { name: 'Medicine cabinet', layer: 'hung', snap: true, w: 16, d: 4, cat: 'Accessories', modes: ['bath'] },
   grab:     { name: 'Grab bar', layer: 'hung', snap: true, w: 24, d: 3, cat: 'Accessories', modes: ['bath'] },
-  door:     { name: 'Door', layer: 'inwall', snap: true, w: 30, d: T, cat: 'Walls', modes: ['bath', 'kitchen'] },
-  window:   { name: 'Window', layer: 'inwall', snap: true, w: 36, d: T, cat: 'Walls', modes: ['bath', 'kitchen'] },
+  door:     { name: 'Door', layer: 'inwall', snap: true, w: 30, d: T, props: { type: 'swing' }, cat: 'Doors', modes: ['bath', 'kitchen'] },
+  window:   { name: 'Window', layer: 'inwall', snap: true, w: 36, d: T, cat: 'Doors', modes: ['bath', 'kitchen'] },
   kneewall: { name: 'Knee wall', layer: 'floor', snap: false, w: 48, d: 4.5, h: 36, cat: 'Walls', modes: ['bath', 'kitchen'] },
   partition:{ name: 'Inside wall', layer: 'floor', snap: false, w: 48, d: 4.5, cat: 'Walls', modes: ['bath', 'kitchen'] },
   vlight:   { name: 'Vanity light', layer: 'hung', snap: true, w: 24, d: 2, cat: 'Electrical', modes: ['bath'] },
@@ -72,9 +72,9 @@ export const KINDS: Record<string, Kind> = {
   pendant:  { name: 'Pendant', layer: 'ceiling', snap: false, w: 8, d: 8, cat: 'Electrical', modes: ['kitchen'] },
   soffit:   { name: 'Soffit', layer: 'ceiling', snap: true, w: 48, d: 24, props: { drop: 12 }, cat: 'Walls', modes: ['bath', 'kitchen'] },
 };
-export const CATS: Cat[] = ['Walls', 'Plumbing', 'Electrical', 'Cabinets', 'Accessories'];
+export const CATS: Cat[] = ['Walls', 'Doors', 'Plumbing', 'Electrical', 'Cabinets', 'Accessories'];
 /** Menu heading for a category in a given kind of room. */
-export const catLabel = (c: Cat, mode: Mode) => c === 'Walls' ? 'Walls & openings' : c === 'Accessories' ? (mode === 'kitchen' ? 'Appliances' : 'Accessories') : c;
+export const catLabel = (c: Cat, mode: Mode) => c === 'Walls' ? 'Walls' : c === 'Doors' ? 'Doors & windows' : c === 'Accessories' ? (mode === 'kitchen' ? 'Appliances' : 'Accessories') : c;
 export const kindsFor = (c: Cat, mode: Mode) => Object.entries(KINDS).filter(([, k]) => k.cat === c && k.modes.includes(mode));
 export const isCab = (kind: string) => !!KINDS[kind]?.cab;
 
@@ -252,21 +252,39 @@ export function benchSide(p: Record<string, any>): string {
 }
 
 /** Everything the Add menu offers for a category in a room type, presets included. */
-export interface AddEntry { key: string; kind: string; name: string; sub?: string; w: number; d: number; p?: Record<string, any> }
+export interface AddEntry { key: string; kind: string; name: string; sub?: string; w: number; d: number; p?: Record<string, any>; section?: string; applyTo?: 'shower'; extra?: Partial<DItem> }
 export function addList(c: Cat, mode: Mode): AddEntry[] {
   const out: AddEntry[] = [];
+  if (c === 'Doors') {
+    const W = mode === 'kitchen' ? 34 : 30;
+    const dd = (key: string, name: string, type: string, w: number, sub: string, extra: Partial<DItem> = {}) => out.push({ key, kind: 'door', name, sub, w, d: T, p: { type }, section: 'Doors', extra: { hinge: 'left', swing: 'in', ...extra } });
+    dd('d-swing', 'Swinging door', 'swing', W, 'one door on hinges');
+    dd('d-double', 'Double doors', 'double', 60, 'two doors meet in the middle');
+    dd('d-pocket', 'Pocket door', 'pocket', 30, 'slides into the wall');
+    dd('d-barn', 'Barn door', 'barn', 36, 'slides on a track, room side');
+    dd('d-bifold', 'Bi-fold door', 'bifold', 48, 'folds in the middle');
+    dd('d-open', 'Plain opening', 'opening', 36, 'no door at all');
+    out.push({ key: 'window', kind: 'window', name: 'Window', w: 36, d: T, section: 'Windows', extra: { sill: mode === 'kitchen' ? 42 : 36 } });
+    if (mode === 'bath') {
+      const sd = (key: string, name: string, sub: string, p: Record<string, any>) => out.push({ key, kind: 'shower', name, sub: sub + ' (on the selected shower)', w: 30, d: 30, p, section: 'Shower doors', applyTo: 'shower' });
+      sd('sd-pivot', 'Pivot glass door', 'swings open', { door: true, doorType: 'swing' });
+      sd('sd-slide', 'Sliding glass door', 'slides on a track', { door: true, doorType: 'slider' });
+      sd('sd-open', 'Open, no door', 'walk-in', { door: false });
+    }
+    return out;
+  }
   if (c === 'Plumbing' && mode === 'bath') {
     out.push(
-      { key: 'sh-swap', kind: 'shower', name: 'Shower: tub swap', sub: '5\' × 2\'-8", glass, curb', w: 60, d: 32 },
-      { key: 'sh-bench', kind: 'shower', name: 'Shower: tub swap with bench', sub: 'bench at the far end', w: 60, d: 32, p: { bench: 'auto', valveType: 'slide' } },
-      { key: 'sh-walkin', kind: 'shower', name: 'Shower: walk-in', sub: '5\' × 3\', knee wall', w: 60, d: 36, p: { front: 'knee', drain: 'center' } },
-      { key: 'sh-corner', kind: 'shower', name: 'Shower: corner 36 × 36', sub: 'way in at the corner', w: 36, d: 36, p: { entry: 'cornerL', drain: 'center', valve: 'back' } },
-      { key: 'sh-free', kind: 'shower', name: 'Shower: free-draw floor', sub: 'draw your own walls around it', w: 48, d: 36, p: { free: true, left: 'open', right: 'open', front: 'open', door: false, curb: false, drain: 'center', valve: 'back' } },
+      { key: 'sh-swap', kind: 'shower', name: 'Shower: tub swap', sub: '5\' × 2\'-8", glass, curb', w: 60, d: 32, section: 'Showers' },
+      { key: 'sh-bench', kind: 'shower', name: 'Shower: tub swap with bench', sub: 'bench at the far end', w: 60, d: 32, p: { bench: 'auto', valveType: 'slide' }, section: 'Showers' },
+      { key: 'sh-walkin', kind: 'shower', name: 'Shower: walk-in', sub: '5\' × 3\', knee wall', w: 60, d: 36, p: { front: 'knee', drain: 'center' }, section: 'Showers' },
+      { key: 'sh-corner', kind: 'shower', name: 'Shower: corner 36 × 36', sub: 'way in at the corner', w: 36, d: 36, p: { entry: 'cornerL', drain: 'center', valve: 'back' }, section: 'Showers' },
+      { key: 'sh-free', kind: 'shower', name: 'Shower: free-draw floor', sub: '2" tile, shape it yourself', w: 48, d: 36, p: { free: true, left: 'open', right: 'open', front: 'open', door: false, curb: false, drain: 'center', valve: 'back', tileSize: '2' }, section: 'Showers' },
     );
   }
   for (const [key, k] of Object.entries(KINDS)) {
     if (k.cat !== c || !k.modes.includes(mode) || key === 'shower') continue;
-    out.push({ key, kind: key, name: k.name, w: k.w, d: k.d });
+    out.push({ key, kind: key, name: k.name, w: k.w, d: k.d, section: c === 'Plumbing' ? 'Fixtures' : undefined });
   }
   return out;
 }

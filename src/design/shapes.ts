@@ -126,11 +126,47 @@ function pedestal(it: DItem, S: number, fs: number, stroke: string, sw: number):
   return ell(w / 2, d / 2, w / 2, d / 2, `fill="#fff" stroke="${stroke}" stroke-width="${sw}"`) + ell(w / 2, d * 0.5, w * 0.3, d * 0.28, `fill="none" stroke="${INK}" stroke-width="${1 / S}"`) + circ(w / 2, 3.5, 0.9, `fill="${INK}"`) + (w * S > 44 ? txt('PEDESTAL', w / 2, d + fs * 0.9, fs * 0.75, '#555') : '');
 }
 
+
+/** Doors, drawn centred on the wall line: +y is the room side. type: swing | double | pocket | barn | bifold | opening */
+function doorShape(it: DItem, S: number, stroke: string, strokeW: number): string {
+  const w = it.w, hw = w / 2, hd = it.d / 2; const sw = 1.5 / S; const type = it.p?.type || 'swing';
+  const sgn = it.swing === 'out' ? -1 : 1; const y0 = sgn * (T / 2);
+  const right = it.hinge === 'right';
+  const dash = `stroke-dasharray="${4 / S} ${3 / S}"`;
+  let o = rect(-hw, -hd, w, it.d, `fill="#ffffff"`);
+  const jamb = line(-hw, -hd, -hw, hd, `stroke="${stroke}" stroke-width="${strokeW}"`) + line(hw, -hd, hw, hd, `stroke="${stroke}" stroke-width="${strokeW}"`);
+  const arc = (hx: number, ox: number, r: number, sweepFlag: number) => `<path d="M ${f(ox)} ${f(y0)} A ${f(r)} ${f(r)} 0 0 ${sweepFlag} ${f(hx)} ${f(y0 + sgn * r)}" fill="none" stroke="${stroke}" stroke-width="${sw}" ${dash}/>`;
+  if (type === 'opening') {
+    o += jamb + line(-hw, 0, hw, 0, `stroke="#999" stroke-width="${sw}" ${dash}`);
+  } else if (type === 'double') {
+    const r = w / 2;
+    o += line(-hw, y0, -hw, y0 + sgn * r, `stroke="${stroke}" stroke-width="${strokeW}"`) + line(hw, y0, hw, y0 + sgn * r, `stroke="${stroke}" stroke-width="${strokeW}"`);
+    o += arc(-hw, 0, r, sgn > 0 ? 0 : 1) + arc(hw, 0, r, sgn > 0 ? 1 : 0) + jamb;
+  } else if (type === 'pocket') {
+    const x1 = right ? hw : -hw, x2 = right ? hw - w * 0.9 : -hw + w * 0.9;
+    o += rect(Math.min(x1, x2), -hd + 0.5, Math.abs(x2 - x1), it.d - 1, `fill="none" stroke="${stroke}" stroke-width="${sw}" ${dash}`) + jamb;
+    o += line(x1, 0, x2, 0, `stroke="${stroke}" stroke-width="${strokeW}"`) + txt('POCKET', 0, sgn * (hd + fsOf(S) * 0.9), fsOf(S) * 0.8, '#555');
+  } else if (type === 'barn') {
+    const px = right ? -hw : hw - w; // panel sits on the room side, rides past the opening
+    const py = sgn * (hd + 1);
+    o += jamb + rect(px - (right ? w * 0.05 : 0) , sgn > 0 ? py : py - 2, w, 2, `fill="#b08a55" stroke="${stroke}" stroke-width="${sw}"`) + line(-hw - 4, sgn * (hd + 4), hw + w + 4, sgn * (hd + 4), `stroke="#777" stroke-width="${sw}" ${dash}`) + txt('BARN', 0, sgn * (hd + 10), fsOf(S) * 0.8, '#555');
+  } else if (type === 'bifold') {
+    const q = w / 4;
+    o += jamb + `<polyline points="${-hw},${f(y0)} ${f(-hw + q * 0.7)},${f(y0 + sgn * q)} ${f(0)},${f(y0)} ${f(q * 0.7)},${f(y0 + sgn * q)} ${hw},${f(y0)}" fill="none" stroke="${stroke}" stroke-width="${strokeW}"/>`;
+  } else { // swing
+    const hx = right ? hw : -hw, ox = right ? -hw : hw;
+    o += line(hx, y0, hx, y0 + sgn * w, `stroke="${stroke}" stroke-width="${strokeW}"`) + arc(hx, ox, w, (sgn > 0) === right ? 1 : 0) + jamb;
+  }
+  return o;
+}
+const fsOf = (S: number) => 12 / S;
+
 /** Returns the drawing for kinds that have their own look, or null for plain boxes. */
 export function fixtureShape(it: DItem, S: number, fs: number, stroke: string, sw: number, label: string): string | null {
   const w = it.w, d = it.d;
   const body = (() => {
     switch (it.kind) {
+      case 'door': return doorShape(it, S, stroke, sw);
       case 'shower': return shower(it, S, fs, stroke, sw);
       case 'tub': return tub(it, S, fs, stroke, sw);
       case 'toilet': return toilet(it, S, fs, stroke, sw);
@@ -149,5 +185,6 @@ export function fixtureShape(it: DItem, S: number, fs: number, stroke: string, s
     }
   })();
   if (body === null) return null;
+  if (it.kind === 'door') return body;
   return `<g transform="translate(${-w / 2} ${-d / 2})">${body}</g>`;
 }

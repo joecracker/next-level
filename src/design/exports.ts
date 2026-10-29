@@ -7,7 +7,7 @@ import { fixtureShape } from './shapes';
 const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const INK = '#14191A';
 
-function itemShape(it: DItem, S: number, sel: boolean, fs: number): string {
+export function itemShape(it: DItem, S: number, sel: boolean, fs: number): string {
   const k = KINDS[it.kind]; const hw = it.w / 2, hd = it.d / 2; const sw = 1.5 / S;
   const stroke = sel ? '#E8731A' : INK; const strokeW = sel ? 3 / S : sw;
   const lab0 = isCab(it.kind) && it.code ? it.code : it.label || k.name;

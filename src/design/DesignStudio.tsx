@@ -422,6 +422,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
               <div style={{ ...btn, display: 'flex', alignItems: 'center', minWidth: '64px', justifyContent: 'center' }}>{Math.round(it.rot || 0)}°</div>
               <button style={btn} onClick={() => upd(it.id, { rot: ((it.rot || 0) + 15) % 360 })}>+15°</button>
               <button style={btn} onClick={() => upd(it.id, { rot: ((it.rot || 0) + 90) % 360 })}>+90°</button>
+              <button style={btn} onClick={() => upd(it.id, { rot: ((it.rot || 0) + 180) % 360 })}>Turn around 180°</button>
               <button style={btn} onClick={() => upd(it.id, { rot: 0 })}>Straight</button>
             </div>
             <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px' }}>You can also drag it on the drawing; the numbers here follow along.</div>

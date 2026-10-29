@@ -133,6 +133,7 @@ function vanity(it: DItem, S: number, fs: number, stroke: string, sw: number, la
     o += ell(cx, d * 0.5, Math.min(w / (n * 2) - 1.5, 9), Math.min(d * 0.28, 6), `fill="#fff" stroke="${INK}" stroke-width="${1 / S}"`);
     o += circ(cx, 3.2, 0.9, `fill="${INK}"`);
   }
+  o += line(1, d - 1.8 / S, w - 1, d - 1.8 / S, `stroke="${INK}" stroke-width="${3.4 / S}" stroke-linecap="round"`); // the doors face the room
   if (label && w * S > label.length * 6.4 + 4) o += txt(label, w / 2, d - fs * 0.9, fs * 0.85);
   return o;
 }

@@ -45,6 +45,31 @@ function Text({ label, value, onCommit, placeholder }: { label: string; value: s
   );
 }
 
+// ---------- where a newly added item lands: the first open spot, instead of stacking on top of the last one ----------
+function openSpot(d: Design, kind: string, w: number, dp: number): Partial<DItem> {
+  const k = KINDS[kind]; const layer = k.layer;
+  const onWall = layer === 'inwall' || layer === 'hung' || (layer === 'floor' && k.snap);
+  if (onWall) {
+    for (let i = 0; i < d.pts.length; i++) {
+      const L = seg(d.pts, i).L; if (L < w) continue;
+      const busy = d.items.filter(q => q.wall === i && KINDS[q.kind].layer === layer).map(q => [q.t - q.w / 2, q.t + q.w / 2]);
+      const lo = w / 2, hi = L - w / 2; const mid = L / 2;
+      const cands: number[] = [mid]; for (let t = lo; t <= hi + 0.01; t += 3) cands.push(t);
+      const free = cands.filter(t => busy.every(([a, b]) => t + w / 2 <= a + 0.01 || t - w / 2 >= b - 0.01));
+      if (free.length) { free.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid)); return { wall: i, t: Math.round(Math.max(lo, Math.min(hi, free[0])) * 4) / 4 }; }
+    }
+    const L0 = seg(d.pts, 0).L; return { wall: 0, t: Math.max(w / 2, Math.min(L0 - w / 2, L0 / 2)) };
+  }
+  const b = designBounds(d); const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+  const others = d.items.filter(q => q.wall === null && KINDS[q.kind].layer === layer);
+  const hit = (x: number, y: number) => others.some(q => Math.abs(q.x - x) < (q.w + w) / 2 && Math.abs(q.y - y) < (q.d + dp) / 2);
+  const cands: Array<[number, number]> = [];
+  for (let x = b.minX + w / 2; x <= b.maxX - w / 2 + 0.01; x += 6) for (let y = b.minY + dp / 2; y <= b.maxY - dp / 2 + 0.01; y += 6) cands.push([x, y]);
+  cands.sort((a, c) => Math.hypot(a[0] - cx, a[1] - cy) - Math.hypot(c[0] - cx, c[1] - cy));
+  const f = cands.find(([x, y]) => !hit(x, y));
+  return f ? { x: Math.round(f[0]), y: Math.round(f[1]) } : { x: Math.round(cx), y: Math.round(cy) };
+}
+
 // ---------- editing the room ----------
 function Thumb({ e, size = 56 }: { e: { kind: string; w: number; d: number; p?: Record<string, any>; extra?: Partial<DItem> }; size?: number }) {
   const it = mkItem(e.kind, { w: e.w, d: e.d, p: { ...(mkItem(e.kind).p || {}), ...(e.p || {}) }, ...(e.extra || {}) });
@@ -280,7 +305,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const addCab = (e: CabEntry) => {
     if (!d) return;
     const kind = kindForEntry(e); const k = KINDS[kind]; const b = designBounds(d);
-    const over: Partial<DItem> = k.layer === 'hung' ? { wall: 0, t: Math.max(e.w / 2, Math.min(seg(d.pts, 0).L - e.w / 2, seg(d.pts, 0).L / 2)) } : k.snap ? { wall: 0, t: Math.max(e.w / 2, Math.min(seg(d.pts, 0).L - e.w / 2, seg(d.pts, 0).L / 2)) } : { x: Math.round((b.minX + b.maxX) / 2), y: Math.round((b.minY + b.maxY) / 2) };
+    const over: Partial<DItem> = openSpot(d, kind, e.w, e.d);
     const it = mkItem(kind, { w: e.w, d: e.d, ...(e.h ? { h: e.h } : {}), code: e.code, label: `${e.maker}${e.line ? ' ' + e.line : ''} ${e.family}`, p: { maker: e.maker, ...(e.line ? { line: e.line } : {}), family: e.family, ...(e.lr ? { lr: true, hand: 'L' } : {}) }, ...over });
     commit(normalize({ ...d, items: [...d.items, it] })); justAdded.current = it.id; setSel({ type: 'item', id: it.id }); setTab('edit'); setAddOpen(false);
   };
@@ -292,7 +317,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
       commit(patchItem(d, target.id, { p: { ...(target.p || {}), ...(e.p || {}) } })); setSel({ type: 'item', id: target.id }); setAddOpen(false); return;
     }
     const b = designBounds(d); const kind = e.kind; const k = KINDS[kind];
-    const over: Partial<DItem> = k.layer === 'inwall' || k.layer === 'hung' || (k.layer === 'floor' && k.snap) ? { wall: 0, t: Math.max(e.w / 2, Math.min(seg(d.pts, 0).L - e.w / 2, seg(d.pts, 0).L / 2)) } : { x: Math.round((b.minX + b.maxX) / 2), y: Math.round((b.minY + b.maxY) / 2) };
+    const over: Partial<DItem> = openSpot(d, kind, e.w, e.d);
     const base0 = mkItem(kind);
     const it = mkItem(kind, { w: e.w, d: e.d, p: base0.p ? { ...base0.p, ...(e.p || {}) } : undefined, ...over, ...(e.extra || {}) });
     commit(normalize({ ...d, items: [...d.items, it] })); justAdded.current = it.id; setSel({ type: 'item', id: it.id }); setTab('edit'); setAddOpen(false);

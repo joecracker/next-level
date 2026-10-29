@@ -1,6 +1,7 @@
 // Cabinet catalogs by maker. Each entry is one orderable model with its real size from the maker's own sheet.
 import { HC_FAMILIES, HC_ROWS } from './homecrestData';
 import { WB_SELECT_FAMILIES, WB_SELECT_ROWS } from './wellbornSelectData';
+import { WB_PREMIER_FAMILIES, WB_PREMIER_ROWS } from './wellbornPremierData';
 
 export interface CabEntry { maker: string; line: string; group: string; family: string; code: string; w: number; d: number; h: number | null; lr: boolean }
 
@@ -9,8 +10,7 @@ export const MAKERS: Array<{ id: string; note: string; ready: boolean; lines?: L
   { id: 'Homecrest', note: 'from Homecrest\'s Specifications Guide (2019 sheet)', ready: true },
   { id: 'Wellborn', note: 'from Wellborn\'s own specification catalogs', ready: true, lines: [
     { id: 'Select', ready: true, note: 'Select Specification Catalog 2024-2025. Sizes come from the model codes and the catalog headings.' },
-    { id: 'Aspire', ready: false, note: 'Aspire is not loaded yet.' },
-    { id: 'Premier', ready: false, note: 'Premier is not loaded yet.' },
+    { id: 'Premier', ready: true, note: 'Premier Specification Catalog (updated 4/16/26). Sizes come from the model codes and the catalog headings.' },
   ] },
 ];
 
@@ -21,6 +21,7 @@ export function catalogFor(maker: string, line = ''): CabEntry[] {
   let out: CabEntry[] = [];
   if (maker === 'Homecrest') out = HC_ROWS.map(([f, code, w, d, h, lr]) => ({ maker, line: '', group: HC_FAMILIES[f][0], family: HC_FAMILIES[f][1], code, w, d: d ?? 24, h, lr: lr === 'LR' }));
   if (maker === 'Wellborn' && line === 'Select') out = WB_SELECT_ROWS.map(([f, code, w, d, h, lr]) => ({ maker, line, group: WB_SELECT_FAMILIES[f][0], family: WB_SELECT_FAMILIES[f][1], code, w, d: d ?? 24, h, lr: lr === 'LR' }));
+  if (maker === 'Wellborn' && line === 'Premier') out = WB_PREMIER_ROWS.map(([f, code, w, d, h, lr]) => ({ maker, line, group: WB_PREMIER_FAMILIES[f][0], family: WB_PREMIER_FAMILIES[f][1], code, w, d: d ?? 24, h, lr: lr === 'LR' }));
   return (cache[key] = out);
 }
 export function readyCatalogs(): CabEntry[] {

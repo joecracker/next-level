@@ -1,7 +1,7 @@
 // Drawings for the fixtures that have more to them than a labelled box: showers, tubs, toilets, vanities,
 // in-wall outlets and switches, ceiling items. Each is drawn in the item's own box: (0,0) is its back-left
 // corner against the wall, x runs along the wall, y runs out into the room. S = pixels per inch.
-import { T, benchSide, type DItem } from './model';
+import { T, benchSide, polyArea, type DItem } from './model';
 
 const INK = '#14191A', GL = '#3f8fa8', CURB = '#9ea49a', BRASS = '#9a7a2c', TILE = '#b9c0b6';
 const f = (n: number) => Math.round(n * 100) / 100;
@@ -11,7 +11,29 @@ const circ = (cx: number, cy: number, r: number, a: string) => `<circle cx="${f(
 const ell = (cx: number, cy: number, rx: number, ry: number, a: string) => `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" ${a}/>`;
 const txt = (s: string, x: number, y: number, size: number, fill = INK, anchor = 'middle') => `<text x="${f(x)}" y="${f(y + size * 0.35)}" font-size="${f(size)}" text-anchor="${anchor}" fill="${fill}">${s}</text>`;
 
+function polyShower(it: DItem, S: number, fs: number): string {
+  const p = it.p || {}; const poly = p.poly as Array<[number, number]>; const line1 = 1.5 / S;
+  const pts = poly.map(q => `${f(q[0])},${f(q[1])}`).join(' '); const id = 'pf' + String(it.id).replace(/[^a-zA-Z0-9]/g, '');
+  const o: string[] = [`<polygon points="${pts}" fill="#eceee8"/>`];
+  if (p.tile) {
+    const TS = ({ '2': [2, 2], '12': [12, 12], '12x24': [12, 24], '24': [24, 24] } as Record<string, number[]>)[p.tileSize || '12'] || [12, 12];
+    if (TS[0] * S >= 5 && TS[1] * S >= 5) {
+      const g: string[] = [];
+      for (let x = TS[0]; x < it.w - 0.01; x += TS[0]) g.push(line(x, 0, x, it.d, `stroke="${TILE}" stroke-width="${0.8 / S}"`));
+      for (let y = TS[1]; y < it.d - 0.01; y += TS[1]) g.push(line(0, y, it.w, y, `stroke="${TILE}" stroke-width="${0.8 / S}"`));
+      o.push(`<clipPath id="${id}"><polygon points="${pts}"/></clipPath><g clip-path="url(#${id})">${g.join('')}</g>`);
+    }
+  }
+  o.push(`<polygon points="${pts}" fill="none" stroke="${p.curb ? CURB : '#9aa09a'}" stroke-width="${(p.curb ? 4 : 1.5) / S}" stroke-linejoin="round"/>`);
+  o.push(`<polygon points="${pts}" fill="none" stroke="${INK}" stroke-width="${line1}" stroke-linejoin="round"/>`);
+  const cx = poly.reduce((a, q) => a + q[0], 0) / poly.length, cy = poly.reduce((a, q) => a + q[1], 0) / poly.length;
+  o.push(circ(cx, cy - 6, 2.5, `fill="#fff" stroke="${INK}" stroke-width="${line1}"`) + circ(cx, cy - 6, 0.9, `fill="${INK}"`));
+  o.push(txt('SHOWER FLOOR', cx, cy + 2, fs * 0.9, '#333') + txt(`${Math.round(polyArea(poly) / 14.4) / 10} sq ft`, cx, cy + 2 + fs * 1.1, fs * 0.8, '#555'));
+  return o.join('');
+}
+
 function shower(it: DItem, S: number, fs: number, stroke: string, sw: number): string {
+  if (it.p?.poly) return polyShower(it, S, fs);
   const p = it.p || {}; const w = it.w, d = it.d, curb = !!p.curb; const E = 24;
   const dw = Math.min(p.doorW || 30, w, d);
   const o: string[] = [];

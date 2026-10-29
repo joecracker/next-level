@@ -273,6 +273,7 @@ export function addList(c: Cat, mode: Mode): AddEntry[] {
   if (c === 'Plumbing' && mode === 'bath') {
     const sz = (x: number) => Number.isInteger(x) ? String(x) : x === 39.375 ? '39 3/8' : x === 63.25 ? '63 1/4' : String(x);
     out.push({ key: 'sh-tile', kind: 'shower', name: 'Shower', sub: 'tile or wall panels, set any size, add bench, glass, door', w: 60, d: 32, section: 'Showers' });
+    out.push({ key: 'sh-free', kind: 'shower', name: 'Shower, draw your own floor', sub: 'a tiled floor in any shape: drag the corners, tap a + to add one', w: 60, d: 48, section: 'Showers', p: { free: true, tile: true, tileSize: '12', curb: false, drain: 'center', poly: [[0, 0], [60, 0], [60, 48], [0, 48]] } });
     const bases: Array<[number, number]> = [[36, 36], [48, 36], [60, 36], [36, 42], [48, 42], [60, 42]];
     bases.forEach(([w, d]) => out.push({ key: `kb-${w}x${d}`, kind: 'shower', name: `Kohler base ${w} × ${d}`, sub: d === 42 ? '42" deep' : 'standard depth', w, d, section: 'Kohler shower bases (tile or wet wall panels on top)', p: { unit: 'base', tile: false, left: 'wall', right: 'wall', front: 'open', door: false, curb: true, drain: 'center', valve: 'back' } }));
     const su: Array<[number, number, string]> = [[36, 34, 'center drain'], [42, 34, 'curved front'], [48, 34, 'center drain'], [60, 34, 'center drain'], [60, 30, 'end drain'], [60, 32, 'end drain'], [36, 36, ''], [42, 36, ''], [48, 36, ''], [60, 36, ''], [48, 36, 'with seat'], [60, 36, 'with seat'], [39.375, 39.375, 'accessible, roll-in'], [63.25, 39.375, 'accessible, roll-in']];
@@ -288,4 +289,27 @@ export function addList(c: Cat, mode: Mode): AddEntry[] {
     out.push({ key, kind: key, name: k.name, w: k.w, d: k.d, section: c === 'Plumbing' ? 'Fixtures & fittings' : undefined });
   }
   return out;
+}
+
+// ---------- a shower floor drawn corner by corner ----------
+/** The floor corners (p.poly, in the item's own box: 0,0 = back-left) as points on the drawing. */
+export function polyWorld(it: DItem, pts: Pt[]): Pt[] {
+  const f = frame(it, pts); const poly = (it.p?.poly || []) as Array<[number, number]>;
+  return poly.map(([px, py]) => { const lx = px - it.w / 2, ly = py - it.d / 2; return { x: f.cx + f.ux * lx + f.nx * ly, y: f.cy + f.uy * lx + f.ny * ly }; });
+}
+/** A drawing point as a spot in the item's own box. */
+export function toPolyLocal(it: DItem, pts: Pt[], P: Pt): [number, number] {
+  const f = frame(it, pts); const dx = P.x - f.cx, dy = P.y - f.cy;
+  return [dx * f.ux + dy * f.uy + it.w / 2, dx * f.nx + dy * f.ny + it.d / 2];
+}
+/** New corner list -> the changes to the item: the box shrinks or grows to fit, and the item stays put on the drawing. */
+export function polyPatch(it: DItem, pts: Pt[], poly: Array<[number, number]>): Partial<DItem> {
+  const xs = poly.map(q => q[0]), ys = poly.map(q => q[1]);
+  const mx = Math.min(...xs), my = Math.min(...ys), Mx = Math.max(...xs), My = Math.max(...ys);
+  const w = Math.max(6, Mx - mx), d = Math.max(6, My - my);
+  const f = frame(it, pts); const lx = (mx + Mx) / 2 - it.w / 2, ly = (my + My) / 2 - it.d / 2;
+  return { wall: null, rot: Math.round(f.rot * 100) / 100, x: f.cx + f.ux * lx + f.nx * ly, y: f.cy + f.uy * lx + f.ny * ly, w, d, p: { ...(it.p || {}), poly: poly.map(([a, b]) => [a - mx, b - my]) } };
+}
+export function polyArea(poly: Array<[number, number]>): number {
+  let a = 0; for (let i = 0; i < poly.length; i++) { const [x1, y1] = poly[i], [x2, y2] = poly[(i + 1) % poly.length]; a += x1 * y2 - x2 * y1; } return Math.abs(a) / 2;
 }

@@ -1,12 +1,12 @@
 // Design Studio: draw the room, place and size things with live numbers, then save a plan picture and a
 // cabinet takeoff to the job. The drawing is stored on the job (project.design) and travels with it.
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as RPE } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as RPE } from 'react';
 import JobPanel from './JobPanel';
 import { runChecks } from './checks';
 import { MAKERS, catalogFor, readyCatalogs, familiesFor, groupsFor, kindForEntry, matches, type CabEntry } from './catalog';
 import { designBody, designBounds, itemShape, takeoffRows } from './exports';
 import {
-  CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, seg, snapTo, template,
+  CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, polyPatch, polyWorld, toPolyLocal, seg, snapTo, template,
   type Cat, type DItem, type Design, type Pt,
 } from './model';
 
@@ -46,9 +46,9 @@ function Text({ label, value, onCommit, placeholder }: { label: string; value: s
 }
 
 // ---------- where a newly added item lands: the first open spot, instead of stacking on top of the last one ----------
-function openSpot(d: Design, kind: string, w: number, dp: number): Partial<DItem> {
+function openSpot(d: Design, kind: string, w: number, dp: number, loose = false): Partial<DItem> {
   const k = KINDS[kind]; const layer = k.layer;
-  const onWall = layer === 'inwall' || layer === 'hung' || (layer === 'floor' && k.snap);
+  const onWall = !loose && (layer === 'inwall' || layer === 'hung' || (layer === 'floor' && k.snap));
   if (onWall) {
     for (let i = 0; i < d.pts.length; i++) {
       const L = seg(d.pts, i).L; if (L < w) continue;
@@ -73,8 +73,20 @@ function openSpot(d: Design, kind: string, w: number, dp: number): Partial<DItem
 // ---------- editing the room ----------
 function Thumb({ e, size = 56 }: { e: { kind: string; w: number; d: number; p?: Record<string, any>; extra?: Partial<DItem> }; size?: number }) {
   const it = mkItem(e.kind, { w: e.w, d: e.d, p: { ...(mkItem(e.kind).p || {}), ...(e.p || {}) }, ...(e.extra || {}) });
-  const S = size / Math.max(e.w, e.d, 24) * 0.8; const m = Math.max(e.w, e.d, 24) * (e.kind === 'door' ? 1.9 : 1.35); const cy = it.kind === 'door' ? e.w * 0.4 : 0;
-  return <svg width={size} height={size} viewBox={`${-m / 2} ${-m / 2 + cy} ${m} ${m}`} style={{ background: '#fff', borderRadius: '8px', flexShrink: 0 }} dangerouslySetInnerHTML={{ __html: itemShape(it, S, false, 10 / S).replace(/<text[\s\S]*?<\/text>/g, '') }} />;
+  const S0 = size / Math.max(e.w, e.d, 24) * 0.8; const m0 = Math.max(e.w, e.d, 24) * (e.kind === 'door' ? 1.9 : 1.35); const cy0 = it.kind === 'door' ? e.w * 0.4 : 0;
+  // measure what actually got drawn (doors, glass swings and walls reach past the box), then frame exactly that so nothing is cropped
+  const gRef = useRef<SVGGElement>(null);
+  const [fit, setFit] = useState<{ x: number; y: number; m: number; S: number } | null>(null);
+  useLayoutEffect(() => {
+    try {
+      const b = gRef.current?.getBBox(); if (!b || !b.width || !b.height) return;
+      const ext = Math.max(b.width, b.height) * 1.12; const S1 = size / ext * 0.92;
+      const nx = b.x + b.width / 2 - ext / 2, ny = b.y + b.height / 2 - ext / 2;
+      setFit(f => f && Math.abs(f.m - ext) < 0.01 && Math.abs(f.x - nx) < 0.01 && Math.abs(f.y - ny) < 0.01 ? f : { x: nx, y: ny, m: ext, S: S1 });
+    } catch { /* a browser that can't measure keeps the plain framing */ }
+  }, [e.kind, e.w, e.d, size, JSON.stringify(e.p || {})]);
+  const S = fit ? fit.S : S0; const vb = fit ? `${fit.x} ${fit.y} ${fit.m} ${fit.m}` : `${-m0 / 2} ${-m0 / 2 + cy0} ${m0} ${m0}`;
+  return <svg width={size} height={size} viewBox={vb} style={{ background: '#fff', borderRadius: '8px', flexShrink: 0 }}><g ref={gRef} dangerouslySetInnerHTML={{ __html: itemShape(it, S, false, 10 / S).replace(/<text[\s\S]*?<\/text>/g, '') }} /></svg>;
 }
 function Sec({ title, open, children }: { title: string; open?: boolean; children: any }) {
   const [o, setO] = useState(!!open);
@@ -130,6 +142,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const [design, setDesignState] = useState<Design | null>(() => { const d = NL?.getDesign(); return hasDesign(d) ? (d as Design) : null; });
   const designRef = useRef(design); designRef.current = design;
   const [sel, setSel] = useState<Sel>(null);
+  const [vtx, setVtx] = useState<number | null>(null); // the selected corner of a drawn shower floor
   const [view, setView] = useState<View | null>(null);
   const viewRef = useRef(view); viewRef.current = view;
   const [size, setSize] = useState({ w: 800, h: 600 });
@@ -236,7 +249,20 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
       gesture.current = { kind: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, v0: v, D0: toDesign(mid.x, mid.y) };
       return;
     }
-    const P = toDesign(e.clientX, e.clientY); const hit = hitTest(P); const d = designRef.current;
+    const P = toDesign(e.clientX, e.clientY); const d = designRef.current;
+    const pf = sel?.type === 'item' ? d.items.find(q => q.id === sel.id && q.kind === 'shower' && q.p?.poly) : undefined;
+    if (pf) { // corners of a drawn shower floor come first, so they can be grabbed even over a wall corner
+      const px = 1 / viewRef.current.s; const W = polyWorld(pf, d.pts); const poly = pf.p!.poly as Array<[number, number]>;
+      const k = W.findIndex(q => Math.hypot(P.x - q.x, P.y - q.y) < 14 * px);
+      if (k >= 0) { setVtx(k); gesture.current = { kind: 'vertex', id: pf.id, k, start: d, sx: e.clientX, sy: e.clientY, moved: false }; return; }
+      const m = W.findIndex((q, i) => { const r = W[(i + 1) % W.length]; return Math.hypot(P.x - (q.x + r.x) / 2, P.y - (q.y + r.y) / 2) < 12 * px; });
+      if (m >= 0) {
+        const a2 = poly[m], b2 = poly[(m + 1) % poly.length]; const np = poly.slice(); np.splice(m + 1, 0, [(a2[0] + b2[0]) / 2, (a2[1] + b2[1]) / 2]);
+        const base = patchItem(d, pf.id, polyPatch(pf, d.pts, np)); live(base); setVtx(m + 1);
+        gesture.current = { kind: 'vertex', id: pf.id, k: m + 1, start: d, base, sx: e.clientX, sy: e.clientY, moved: true }; return;
+      }
+    }
+    const hit = hitTest(P);
     if (hit?.type === 'item') {
       setSel(hit); const it = d.items.find(q => q.id === hit.id)!; const f = frame(it, d.pts);
       const riders = it.wall !== null && KINDS[it.kind].layer === 'floor'
@@ -263,6 +289,11 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
     if (g.kind === 'pan') { const v = g.v0; setView({ s: v.s, cx: v.cx - (e.clientX - g.sx) / v.s, cy: v.cy - (e.clientY - g.sy) / v.s }); return; }
     if (!g.moved && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 5) return; g.moved = true;
     const P = toDesign(e.clientX, e.clientY); const d0: Design = g.start;
+    if (g.kind === 'vertex') {
+      const b0: Design = g.base || d0; const it0 = b0.items.find(q => q.id === g.id)!; const poly = (it0.p!.poly as Array<[number, number]>).map(q => [q[0], q[1]] as [number, number]);
+      const [lx, ly] = toPolyLocal(it0, b0.pts, P); poly[g.k] = [snapTo(lx, SNAP), snapTo(ly, SNAP)];
+      live(patchItem(b0, it0.id, polyPatch(it0, b0.pts, poly))); return;
+    }
     if (g.kind === 'item') {
       const it0 = d0.items.find(q => q.id === g.id)!; const k = KINDS[it0.kind];
       const C = { x: P.x + g.off.x, y: P.y + g.off.y }; const q = nearestWall(d0.pts, C.x, C.y);
@@ -317,7 +348,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
       commit(patchItem(d, target.id, { p: { ...(target.p || {}), ...(e.p || {}) } })); setSel({ type: 'item', id: target.id }); setAddOpen(false); return;
     }
     const b = designBounds(d); const kind = e.kind; const k = KINDS[kind];
-    const over: Partial<DItem> = openSpot(d, kind, e.w, e.d);
+    const over: Partial<DItem> = openSpot(d, kind, e.w, e.d, !!e.p?.poly);
     const base0 = mkItem(kind);
     const it = mkItem(kind, { w: e.w, d: e.d, p: base0.p ? { ...base0.p, ...(e.p || {}) } : undefined, ...over, ...(e.extra || {}) });
     commit(normalize({ ...d, items: [...d.items, it] })); justAdded.current = it.id; setSel({ type: 'item', id: it.id }); setTab('edit'); setAddOpen(false);
@@ -464,6 +495,12 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           {(() => {
             const P = it.p || {}; const setP = (q: Record<string, any>) => upd(it.id, { p: { ...P, ...q } });
             const side: Array<[any, string]> = [['wall', 'Wall'], ['knee', 'Knee wall + glass'], ['glass', 'Glass'], ['open', 'Open']];
+            if (it.kind === 'shower' && P.poly) return (<>
+              <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>Drag an orange corner to reshape the floor. Tap a + on an edge to add a corner there.</div>
+              <button style={btn} disabled={vtx === null || (P.poly as any[]).length <= 3 || vtx >= (P.poly as any[]).length} onClick={() => { const np = (P.poly as Array<[number, number]>).filter((_, i) => i !== vtx); commit(patchItem(d!, it.id, polyPatch(it, d!.pts, np))); setVtx(null); }}>Remove the selected corner</button>
+              <Chips label="Threshold" value={P.curb ? 'curb' : 'flat'} opts={[['curb', 'Curb'], ['flat', 'Curbless']]} onPick={v => setP({ curb: v === 'curb' })} />
+              <Chips label="Tile lines" value={P.tile ? P.tileSize : 'off'} opts={[['off', 'Off'], ['2', '2"'], ['12', '12×12'], ['12x24', '12×24'], ['24', '24×24']]} onPick={v => v === 'off' ? setP({ tile: false }) : setP({ tile: true, tileSize: v })} />
+            </>);
             if (it.kind === 'shower') return (<>
               {P.unit !== 'sterling' && <>
                 <Chips label="Floor / base" value={P.unit === 'base' ? 'base' : 'tile'} opts={[['tile', 'Tiled floor'], ['base', 'Kohler base']]} onPick={v => v === 'base' ? setP({ unit: 'base', tile: false, curb: true, ...(P.drain === 'endL' || P.drain === 'endR' ? { drain: 'center' } : {}) }) : setP({ unit: undefined, tile: P.walls !== 'wetwall', walls: 'tile' })} />
@@ -618,6 +655,10 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
                 onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} fontFamily="Arial, Helvetica, sans-serif">
                 <g dangerouslySetInnerHTML={{ __html: body }} />
                 {sel?.type === 'wall' && (() => { const s = seg(d.pts, sel.i); return <line x1={s.ax} y1={s.ay} x2={s.bx} y2={s.by} stroke="#E8731A" strokeWidth={4 * px} strokeLinecap="round" />; })()}
+                {selItem?.kind === 'shower' && selItem.p?.poly && (() => { const W = polyWorld(selItem, d.pts); return <g>
+                  {W.map((q, i) => { const r = W[(i + 1) % W.length]; return <g key={'m' + i}><circle cx={(q.x + r.x) / 2} cy={(q.y + r.y) / 2} r={9 * px} fill="#ffffff" stroke="#E8731A" strokeWidth={1.5 * px} /><path d={`M${(q.x + r.x) / 2 - 4 * px} ${(q.y + r.y) / 2} h${8 * px} M${(q.x + r.x) / 2} ${(q.y + r.y) / 2 - 4 * px} v${8 * px}`} stroke="#E8731A" strokeWidth={2 * px} /></g>; })}
+                  {W.map((q, i) => <circle key={'v' + i} cx={q.x} cy={q.y} r={(vtx === i ? 10 : 8) * px} fill={vtx === i ? '#E8731A' : '#ffffff'} stroke="#E8731A" strokeWidth={2.5 * px} />)}
+                </g>; })()}
                 {d.pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={(sel?.type === 'corner' && sel.i === i ? 10 : 7) * px} fill={sel?.type === 'corner' && sel.i === i ? '#E8731A' : '#ffffff'} stroke="#14191A" strokeWidth={2 * px} />)}
               </svg>
             )}

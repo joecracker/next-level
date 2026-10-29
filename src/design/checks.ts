@@ -39,6 +39,7 @@ export function runChecks(d: Design): Check[] {
       if (it.kind === 'vanity' && p.sinks === 2 && it.w < 48) add('v2', it, 'fix', 'Two sinks need a wider vanity', `Needs at least 4'-0", this is ${fmtIn(it.w)}.`);
     }
     if (it.kind === 'shower') {
+      if (p.walls === 'wetwall' && p.unit !== 'base') add('wetbase', it, 'fix', 'Wet wall panels need a Kohler base', 'Swap this for a Kohler shower base from Add, Plumbing.');
       if (it.w < 30 || it.d < 30) add('shsize', it, 'fix', 'Shower is too small', `Inside must be at least 30" x 30" (this is ${fmtIn(it.w)} x ${fmtIn(it.d)}).`);
       else if (it.w < 32 || it.d < 32) add('shsize', it, 'tight', 'Shower is the bare minimum', 'Inside 32" x 32" is more comfortable.');
       const side = (s: string) => p[s];

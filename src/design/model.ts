@@ -35,7 +35,10 @@ const SHOWER = { left: 'wall', right: 'wall', front: 'glass', entry: 'front', do
 
 export const KINDS: Record<string, Kind> = {
   shower:   { name: 'Shower', layer: 'floor', snap: true, w: 60, d: 32, props: SHOWER, cat: 'Plumbing', modes: ['bath'] },
-  tub:      { name: 'Tub', layer: 'floor', snap: true, w: 60, d: 30, props: { drain: 'left' }, cat: 'Plumbing', modes: ['bath'] },
+  tub:      { name: 'Tub', layer: 'floor', snap: true, w: 60, d: 30, props: { drain: 'left', door: false, doorH: 58, niche: 'none', shelves: 'none' }, cat: 'Plumbing', modes: ['bath'] },
+  ftub:     { name: 'Freestanding tub', layer: 'floor', snap: false, w: 60, d: 30, cat: 'Plumbing', modes: ['bath'] },
+  tubfiller:{ name: 'Tub filler', layer: 'hung', snap: true, w: 6, d: 3, cat: 'Plumbing', modes: ['bath'] },
+  rainhead: { name: 'Rain head', layer: 'ceiling', snap: false, w: 8, d: 8, props: { size: 8 }, cat: 'Plumbing', modes: ['bath'] },
   toilet:   { name: 'Toilet', layer: 'floor', snap: true, w: 20, d: 29, props: { bowl: 'elong' }, cat: 'Plumbing', modes: ['bath'] },
   vanity:   { name: 'Vanity', layer: 'floor', snap: true, w: 36, d: 21, props: { sinks: 1 }, h: 34.5, cab: true, cat: 'Cabinets', modes: ['bath'] },
   linen:    { name: 'Linen tower', layer: 'floor', snap: true, w: 18, d: 21, h: 84, cab: true, cat: 'Cabinets', modes: ['bath'] },
@@ -60,8 +63,8 @@ export const KINDS: Record<string, Kind> = {
   grab:     { name: 'Grab bar', layer: 'hung', snap: true, w: 24, d: 3, cat: 'Accessories', modes: ['bath'] },
   door:     { name: 'Door', layer: 'inwall', snap: true, w: 30, d: T, props: { type: 'swing' }, cat: 'Doors', modes: ['bath', 'kitchen'] },
   window:   { name: 'Window', layer: 'inwall', snap: true, w: 36, d: T, cat: 'Doors', modes: ['bath', 'kitchen'] },
-  kneewall: { name: 'Knee wall', layer: 'floor', snap: false, w: 48, d: 4.5, h: 36, cat: 'Walls', modes: ['bath', 'kitchen'] },
-  partition:{ name: 'Inside wall', layer: 'floor', snap: false, w: 48, d: 4.5, cat: 'Walls', modes: ['bath', 'kitchen'] },
+  kneewall: { name: 'Knee wall', layer: 'floor', snap: false, w: 48, d: 4.5, h: 36, props: { height: 36 }, cat: 'Walls', modes: ['bath', 'kitchen'] },
+  partition:{ name: 'Inside wall (to the ceiling)', layer: 'floor', snap: false, w: 48, d: 4.5, cat: 'Walls', modes: ['bath', 'kitchen'] },
   vlight:   { name: 'Vanity light', layer: 'hung', snap: true, w: 24, d: 2, cat: 'Electrical', modes: ['bath'] },
   outlet:   { name: 'Outlet', layer: 'hung', snap: true, w: 4, d: T, inWall: true, cat: 'Electrical', modes: ['bath', 'kitchen'] },
   gfci:     { name: 'GFCI outlet', layer: 'hung', snap: true, w: 5, d: T, inWall: true, cat: 'Electrical', modes: ['bath', 'kitchen'] },
@@ -265,26 +268,24 @@ export function addList(c: Cat, mode: Mode): AddEntry[] {
     dd('d-bifold', 'Bi-fold door', 'bifold', 48, 'folds in the middle');
     dd('d-open', 'Plain opening', 'opening', 36, 'no door at all');
     out.push({ key: 'window', kind: 'window', name: 'Window', w: 36, d: T, section: 'Windows', extra: { sill: mode === 'kitchen' ? 42 : 36 } });
-    if (mode === 'bath') {
-      const sd = (key: string, name: string, sub: string, p: Record<string, any>) => out.push({ key, kind: 'shower', name, sub: sub + ' (on the selected shower)', w: 30, d: 30, p, section: 'Shower doors', applyTo: 'shower' });
-      sd('sd-pivot', 'Pivot glass door', 'swings open', { door: true, doorType: 'swing' });
-      sd('sd-slide', 'Sliding glass door', 'slides on a track', { door: true, doorType: 'slider' });
-      sd('sd-open', 'Open, no door', 'walk-in', { door: false });
-    }
     return out;
   }
   if (c === 'Plumbing' && mode === 'bath') {
-    out.push(
-      { key: 'sh-swap', kind: 'shower', name: 'Shower: tub swap', sub: '5\' × 2\'-8", glass, curb', w: 60, d: 32, section: 'Showers' },
-      { key: 'sh-bench', kind: 'shower', name: 'Shower: tub swap with bench', sub: 'bench at the far end', w: 60, d: 32, p: { bench: 'auto', valveType: 'slide' }, section: 'Showers' },
-      { key: 'sh-walkin', kind: 'shower', name: 'Shower: walk-in', sub: '5\' × 3\', knee wall', w: 60, d: 36, p: { front: 'knee', drain: 'center' }, section: 'Showers' },
-      { key: 'sh-corner', kind: 'shower', name: 'Shower: corner 36 × 36', sub: 'way in at the corner', w: 36, d: 36, p: { entry: 'cornerL', drain: 'center', valve: 'back' }, section: 'Showers' },
-      { key: 'sh-free', kind: 'shower', name: 'Shower: free-draw floor', sub: '2" tile, shape it yourself', w: 48, d: 36, p: { free: true, left: 'open', right: 'open', front: 'open', door: false, curb: false, drain: 'center', valve: 'back', tileSize: '2' }, section: 'Showers' },
-    );
+    const sz = (x: number) => Number.isInteger(x) ? String(x) : x === 39.375 ? '39 3/8' : x === 63.25 ? '63 1/4' : String(x);
+    out.push({ key: 'sh-tile', kind: 'shower', name: 'Shower', sub: 'tile or wall panels, set any size, add bench, glass, door', w: 60, d: 32, section: 'Showers' });
+    const bases: Array<[number, number]> = [[36, 36], [48, 36], [60, 36], [36, 42], [48, 42], [60, 42]];
+    bases.forEach(([w, d]) => out.push({ key: `kb-${w}x${d}`, kind: 'shower', name: `Kohler base ${w} × ${d}`, sub: d === 42 ? '42" deep' : 'standard depth', w, d, section: 'Kohler shower bases (tile or wet wall panels on top)', p: { unit: 'base', tile: false, left: 'wall', right: 'wall', front: 'open', door: false, curb: true, drain: 'center', valve: 'back' } }));
+    const su: Array<[number, number, string]> = [[36, 34, 'center drain'], [42, 34, 'curved front'], [48, 34, 'center drain'], [60, 34, 'center drain'], [60, 30, 'end drain'], [60, 32, 'end drain'], [36, 36, ''], [42, 36, ''], [48, 36, ''], [60, 36, ''], [48, 36, 'with seat'], [60, 36, 'with seat'], [39.375, 39.375, 'accessible, roll-in'], [63.25, 39.375, 'accessible, roll-in']];
+    su.forEach(([w, d, n]) => out.push({ key: `su-${w}x${d}${n}`, kind: 'shower', name: `Sterling ${sz(w)} × ${sz(d)}`, sub: n || 'shower unit', w, d, section: 'Sterling by Kohler shower units', p: { unit: 'sterling', tile: false, left: 'wall', right: 'wall', front: 'open', door: false, curb: true, drain: n.includes('end') ? 'endR' : 'center', valve: 'back', ...(n.includes('seat') ? { bench: 'left', benchW: 15 } : {}) } }));
+    out.push({ key: 'tub-alcove', kind: 'tub', name: 'Tub', sub: 'alcove, set any size', w: 60, d: 30, section: 'Tubs' });
+    out.push({ key: 'tub-free60', kind: 'ftub', name: 'Freestanding tub, small', sub: '60" long', w: 60, d: 30, section: 'Tubs' });
+    out.push({ key: 'tub-free70', kind: 'ftub', name: 'Freestanding tub, large', sub: '70" long', w: 70, d: 32, section: 'Tubs' });
+    const tu: Array<[number, number, string]> = [[60, 29, 'Performa'], [60, 30, 'Accord, Ensemble, Traverse'], [60, 32, 'Accord, Ensemble, Traverse'], [60, 36, 'Ensemble Tile'], [60, 42, 'Ensemble Tile']];
+    tu.forEach(([w, d, n]) => out.push({ key: `tu-${w}x${d}`, kind: 'tub', name: `Sterling ${w} × ${d}`, sub: n, w, d, section: 'Sterling by Kohler tub units', p: { unit: 'sterling' } }));
   }
   for (const [key, k] of Object.entries(KINDS)) {
-    if (k.cat !== c || !k.modes.includes(mode) || key === 'shower') continue;
-    out.push({ key, kind: key, name: k.name, w: k.w, d: k.d, section: c === 'Plumbing' ? 'Fixtures' : undefined });
+    if (k.cat !== c || !k.modes.includes(mode) || key === 'shower' || key === 'tub' || key === 'ftub') continue;
+    out.push({ key, kind: key, name: k.name, w: k.w, d: k.d, section: c === 'Plumbing' ? 'Fixtures & fittings' : undefined });
   }
   return out;
 }

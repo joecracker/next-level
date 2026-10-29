@@ -48,7 +48,7 @@ function Text({ label, value, onCommit, placeholder }: { label: string; value: s
 function Thumb({ e, size = 56 }: { e: { kind: string; w: number; d: number; p?: Record<string, any>; extra?: Partial<DItem> }; size?: number }) {
   const it = mkItem(e.kind, { w: e.w, d: e.d, p: { ...(mkItem(e.kind).p || {}), ...(e.p || {}) }, ...(e.extra || {}) });
   const S = size / Math.max(e.w, e.d, 24) * 0.8; const m = Math.max(e.w, e.d, 24) * (e.kind === 'door' ? 1.9 : 1.35); const cy = it.kind === 'door' ? e.w * 0.4 : 0;
-  return <svg width={size} height={size} viewBox={`${-m / 2} ${-m / 2 + cy} ${m} ${m}`} style={{ background: '#fff', borderRadius: '8px', flexShrink: 0 }} dangerouslySetInnerHTML={{ __html: itemShape(it, S, false, 10 / S) }} />;
+  return <svg width={size} height={size} viewBox={`${-m / 2} ${-m / 2 + cy} ${m} ${m}`} style={{ background: '#fff', borderRadius: '8px', flexShrink: 0 }} dangerouslySetInnerHTML={{ __html: itemShape(it, S, false, 10 / S).replace(/<text[\s\S]*?<\/text>/g, '') }} />;
 }
 function Sec({ title, open, children }: { title: string; open?: boolean; children: any }) {
   const [o, setO] = useState(!!open);
@@ -268,7 +268,6 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const dupItem = (it: DItem) => { if (!d) return; const c: DItem = { ...it, id: mkItem(it.kind).id, ...(it.wall !== null ? { t: it.t + it.w } : { x: it.x + 12, y: it.y + 12 }) }; commit(normalize({ ...d, items: [...d.items, c] })); setSel({ type: 'item', id: c.id }); };
   const addItem = (e: AddEntry) => {
     if (!d) return;
-    try { const r = JSON.parse(localStorage.getItem('nl.design.recent') || '[]').filter((x: string) => x !== e.key); r.unshift(e.key); localStorage.setItem('nl.design.recent', JSON.stringify(r.slice(0, 6))); } catch { /* ignore */ }
     if (e.applyTo === 'shower') {
       const target = (selItem && selItem.kind === 'shower' ? selItem : null) || d.items.filter(q => q.kind === 'shower').slice(-1)[0];
       if (!target) { say('Add a shower first, then pick its door'); return; }
@@ -404,14 +403,16 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             const P = it.p || {}; const setP = (q: Record<string, any>) => upd(it.id, { p: { ...P, ...q } });
             const side: Array<[any, string]> = [['wall', 'Wall'], ['knee', 'Knee wall + glass'], ['glass', 'Glass'], ['open', 'Open']];
             if (it.kind === 'shower') return (<>
-              <Sec title="Walls & way in" open>
+              {P.unit !== 'sterling' && <Chips label="Wall finish" value={P.walls || 'tile'} opts={[['tile', 'Tile'], ['wetwall', 'Wet wall panels (Wilson Art)']]} onPick={v => setP({ walls: v })} />}
+              {P.walls === 'wetwall' && <div style={{ fontSize: '13px', color: 'var(--muted)' }}>Wet wall panels sit on a Kohler shower base. Pick one from Add, Plumbing.</div>}
+              {!P.unit && <Sec title="Walls & way in" open>
               <Chips label="Left side" value={P.left} opts={side} onPick={v => setP({ left: v })} />
               <Chips label="Right side" value={P.right} opts={side} onPick={v => setP({ right: v })} />
               <Chips label="Front" value={P.front} opts={side} onPick={v => setP({ front: v })} />
               <Chips label="Way in" value={P.entry} opts={[['front', 'Front'], ['left', 'Left end'], ['right', 'Right end'], ['cornerL', 'Corner L'], ['cornerR', 'Corner R']]} onPick={v => setP({ entry: v })} />
-              </Sec>
+              </Sec>}
               <Sec title="Shower door" open>
-              <Chips label="Door" value={P.door ? P.doorType : 'none'} opts={[['swing', 'Swing'], ['slider', 'Slider'], ['none', 'No door']]} onPick={v => v === 'none' ? setP({ door: false }) : setP({ door: true, doorType: v })} />
+              <Chips label="Door" value={P.door ? P.doorType : 'none'} opts={[['swing', 'Swing'], ['slider', 'Slider'], ['none', 'No door']]} onPick={v => v === 'none' ? setP({ door: false, ...(P.unit ? { front: 'open' } : {}) }) : setP({ door: true, doorType: v, ...(P.unit ? { front: 'glass' } : {}) })} />
               {P.door && P.entry === 'front' && <Chips label="Door position" value={P.doorPos} opts={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} onPick={v => setP({ doorPos: v })} />}
               <Num label="Door / opening width" value={P.doorW || 30} onCommit={v => setP({ doorW: Math.max(18, v) })} />
               <Chips label="Threshold" value={P.curb ? 'curb' : 'flat'} opts={[['curb', 'Curb'], ['flat', 'Curbless']]} onPick={v => setP({ curb: v === 'curb' })} />
@@ -421,17 +422,29 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
               <Chips label="Valve wall" value={P.valve} opts={[['left', 'Left'], ['back', 'Back'], ['right', 'Right']]} onPick={v => setP({ valve: v })} />
               <Chips label="Valve" value={P.valveType} opts={[['standard', 'Standard'], ['slide', 'With slide bar']]} onPick={v => setP({ valveType: v })} />
               </Sec>
-              <Sec title="Bench, niche & shelves">
+              {!P.unit && <Sec title="Bench, niche & shelves">
               <Chips label="Bench" value={P.bench || 'none'} opts={[['none', 'None'], ['auto', 'Far from valve'], ['left', 'Left'], ['right', 'Right'], ['cornerL', 'Corner L'], ['cornerR', 'Corner R']]} onPick={v => setP({ bench: v })} />
               {P.bench && P.bench !== 'none' && <Num label="Bench depth" value={P.benchW || 15} onCommit={v => setP({ benchW: Math.max(10, v) })} />}
               <Chips label="Niche" value={P.niche || 'none'} opts={[['none', 'None'], ['back', 'Back'], ['left', 'Left'], ['right', 'Right']]} onPick={v => setP({ niche: v })} />
               <Chips label="Corner shelves" value={P.shelves || 'none'} opts={[['none', 'None'], ['bl', 'Back-left'], ['br', 'Back-right'], ['both', 'Both']]} onPick={v => setP({ shelves: v })} />
-              </Sec>
-              <Sec title="Tile">
+              </Sec>}
+              {!P.unit && P.walls !== 'wetwall' && <Sec title="Tile">
               <Chips label="Tile lines" value={P.tile ? P.tileSize : 'off'} opts={[['off', 'Off'], ['2', '2"'], ['12', '12×12'], ['12x24', '12×24'], ['24', '24×24']]} onPick={v => v === 'off' ? setP({ tile: false }) : setP({ tile: true, tileSize: v })} />
-              </Sec>
+              </Sec>}
             </>);
-            if (it.kind === 'tub') return <Chips label="Drain end" value={P.drain} opts={[['left', 'Left'], ['right', 'Right']]} onPick={v => setP({ drain: v })} />;
+            if (it.kind === 'tub') return (<>
+              <Chips label="Drain end" value={P.drain} opts={[['left', 'Left'], ['right', 'Right']]} onPick={v => setP({ drain: v })} />
+              <Chips label="Glass door" value={P.door ? 'slider' : 'none'} opts={[['none', 'None'], ['slider', 'Sliding glass']]} onPick={v => setP({ door: v === 'slider' })} />
+              {P.door && <Chips label="Door height" value={P.doorH || 58} opts={[[55, '55"'], [58, '58"'], [62, '62"'], [67, '67"']]} onPick={v => setP({ doorH: v })} />}
+              <Chips label="Niche" value={P.niche || 'none'} opts={[['none', 'None'], ['back', 'Back'], ['left', 'Left'], ['right', 'Right']]} onPick={v => setP({ niche: v })} />
+              <Chips label="Corner shelves" value={P.shelves || 'none'} opts={[['none', 'None'], ['bl', 'Back-left'], ['br', 'Back-right'], ['both', 'Both']]} onPick={v => setP({ shelves: v })} />
+              <div style={{ fontSize: '13px', color: 'var(--muted)' }}>Grab bars, a tub filler and a rain head are under Add, Plumbing and Accessories.</div>
+            </>);
+            if (it.kind === 'kneewall') return (<>
+              <Chips label="Height" value={[36, 42].includes(P.height ?? 36) ? (P.height ?? 36) : 0} opts={[[36, '36"'], [42, '42"'], [0, 'Other']]} onPick={v => v && setP({ height: v })} />
+              <Num label="Height (type it)" value={P.height ?? 36} onCommit={v => setP({ height: Math.max(6, v) })} />
+            </>);
+            if (it.kind === 'partition') return <div style={{ fontSize: '14px', color: 'var(--muted)' }}>Inside walls always run to the ceiling.</div>;
             if (it.kind === 'toilet') return <Chips label="Bowl" value={P.bowl} opts={[['elong', 'Elongated'], ['round', 'Round']]} onPick={v => setP({ bowl: v })} />;
             if (it.kind === 'vanity') return <Chips label="Sinks" value={P.sinks} opts={[[1, 'One'], [2, 'Two']]} onPick={v => setP({ sinks: v })} />;
             if (it.kind === 'soffit') return <Num label="Drop below ceiling" value={P.drop ?? 12} onCommit={v => setP({ drop: Math.max(1, v) })} />;
@@ -526,11 +539,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
       {addOpen && d && (() => {
         const all = CATS.flatMap(c => addList(c, d.mode));
         const q = search.trim().toLowerCase();
-        let recent: string[] = []; try { recent = JSON.parse(localStorage.getItem('nl.design.recent') || '[]'); } catch { /* ignore */ }
         const list = q ? all.filter(e => (e.name + ' ' + (e.sub || '')).toLowerCase().includes(q)) : addList(addGroup, d.mode);
         const secs: Array<[string, AddEntry[]]> = []; list.forEach(e => { const n = q ? 'Results' : e.section || ''; const f = secs.find(x => x[0] === n); if (f) f[1].push(e); else secs.push([n, [e]]); });
-        const rec = q ? [] : recent.map(k => all.find(e => e.key === k)).filter(Boolean) as AddEntry[];
-        if (rec.length) secs.unshift(['Recently used', rec]);
         return (
         <div onClick={() => setAddOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '860px', height: 'min(82vh, 640px)', background: '#1d2425', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

@@ -92,17 +92,32 @@ function shower(it: DItem, S: number, fs: number, stroke: string, sw: number): s
   else o.push(rect(4, 2.5, w - 8, 3, dstyle));
   if (p.valve === 'back') o.push(rect(w / 2 - 3, 0, 6, 3, `fill="${INK}"`)); else if (p.valve === 'left') o.push(rect(0, d / 2 - 3, 3, 6, `fill="${INK}"`)); else o.push(rect(w - 3, d / 2 - 3, 3, 6, `fill="${INK}"`));
   if (p.valveType === 'slide') { if (p.valve === 'back') o.push(circ(w / 2 + 7.5, 2.3, 1.5, `fill="${GL}"`)); else if (p.valve === 'left') o.push(circ(2.3, d / 2 + 7.5, 1.5, `fill="${GL}"`)); else o.push(circ(w - 2.3, d / 2 + 7.5, 1.5, `fill="${GL}"`)); }
-  o.push(txt(`SHOWER ${Math.round(w)} × ${Math.round(d)}`, w / 2, d * 0.62, fs, '#333'));
+  o.push(txt(`${p.unit === 'sterling' ? 'STERLING' : p.unit === 'base' ? 'KOHLER BASE' : 'SHOWER'} ${Math.round(w * 10) / 10} × ${Math.round(d * 10) / 10}`, w / 2, d * 0.62, fs * (p.unit ? 0.85 : 1), '#333'));
   void stroke; void sw;
   return o.join('');
 }
 
 function tub(it: DItem, S: number, fs: number, stroke: string, sw: number): string {
-  const w = it.w, d = it.d; const left = (it.p?.drain || 'left') === 'left';
-  return rect(0, 0, w, d, `fill="#f7f9f9" stroke="${stroke}" stroke-width="${sw}"`) +
+  const w = it.w, d = it.d, p = it.p || {}; const left = (p.drain || 'left') === 'left';
+  const line1 = 1.5 / S;
+  let o = rect(0, 0, w, d, `fill="#f7f9f9" stroke="${stroke}" stroke-width="${sw}"`) +
     rect(3, 3, w - 6, d - 6, `rx="${Math.min(10, d / 3)}" fill="#ffffff" stroke="${INK}" stroke-width="${1 / S}"`) +
-    circ(left ? 8 : w - 8, d / 2, 1.8, `fill="#fff" stroke="${INK}" stroke-width="${1 / S}"`) +
-    circ(left ? 8 : w - 8, 6, 1, `fill="${INK}"`) + txt('TUB', w / 2, d / 2, fs, '#333');
+    circ(left ? 8 : w - 8, d / 2, 1.8, `fill="#fff" stroke="${INK}" stroke-width="${1 / S}"`);
+  const nStyle = `fill="#f6efe0" stroke="${BRASS}" stroke-width="${line1}"`;
+  if (p.niche === 'back') o += rect(w / 2 - 6, 0, 12, 4, nStyle);
+  if (p.niche === 'left') o += rect(0, d / 2 - 6, 4, 12, nStyle);
+  if (p.niche === 'right') o += rect(w - 4, d / 2 - 6, 4, 12, nStyle);
+  const SHF = 8;
+  if (p.shelves === 'bl' || p.shelves === 'both') o += `<path d="M0 0 H${SHF} A${SHF} ${SHF} 0 0 1 0 ${SHF} Z" fill="#fff" stroke="${INK}" stroke-width="${line1}"/>`;
+  if (p.shelves === 'br' || p.shelves === 'both') o += `<path d="M${w} 0 H${w - SHF} A${SHF} ${SHF} 0 0 0 ${w} ${SHF} Z" fill="#fff" stroke="${INK}" stroke-width="${line1}"/>`;
+  if (p.door) { o += line(w * 0.05, d, w * 0.55, d - 1.2, `stroke="${GL}" stroke-width="${2 / S}"`) + line(w * 0.45, d + 1.2, w * 0.95, d, `stroke="${GL}" stroke-width="${2 / S}"`); }
+  return o + txt(p.unit === 'sterling' ? `STERLING ${w} × ${d}` : 'TUB', w / 2, d / 2, fs * 0.9, '#333');
+}
+function ftub(it: DItem, S: number, fs: number, stroke: string, sw: number): string {
+  const w = it.w, d = it.d;
+  return rect(0, 0, w, d, `rx="${d / 2}" fill="#ffffff" stroke="${stroke}" stroke-width="${sw}"`) +
+    rect(3, 3, w - 6, d - 6, `rx="${(d - 6) / 2}" fill="#f4f7f7" stroke="${INK}" stroke-width="${1 / S}"`) +
+    circ(w * 0.18, d / 2, 1.8, `fill="#fff" stroke="${INK}" stroke-width="${1 / S}"`) + txt(`FREESTANDING ${w}"`, w / 2, d / 2, fs * 0.8, '#333');
 }
 function toilet(it: DItem, S: number, fs: number, stroke: string, sw: number): string {
   const w = it.w, d = it.d; const round = it.p?.bowl === 'round';
@@ -167,7 +182,10 @@ export function fixtureShape(it: DItem, S: number, fs: number, stroke: string, s
   const body = (() => {
     switch (it.kind) {
       case 'door': return doorShape(it, S, stroke, sw);
+      case 'kneewall': return rect(0, 0, w, d, `fill="#a4a99f" stroke="${stroke}" stroke-width="${sw}"`) + (w * S > 40 ? txt(`KNEE ${Math.round(it.p?.height ?? 36)}"`, w / 2, d / 2, Math.min(fs * 0.7, d), '#222') : '');
+      case 'partition': return rect(0, 0, w, d, `fill="${INK}" stroke="${stroke}" stroke-width="${sw}"`);
       case 'shower': return shower(it, S, fs, stroke, sw);
+      case 'ftub': return ftub(it, S, fs, stroke, sw);
       case 'tub': return tub(it, S, fs, stroke, sw);
       case 'toilet': return toilet(it, S, fs, stroke, sw);
       case 'vanity': return vanity(it, S, fs, stroke, sw, label);

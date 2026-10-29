@@ -2,6 +2,8 @@
 // "blank space" can carry one (a switch on each), and neighbours along a wall are drawn as ONE continuous slab.
 import { KINDS, frame, seg, type Design, type DItem, type Pt } from './model';
 
+const INK = '#14191A';
+
 export const OVERHANG = 1.5;           // inches past the cabinet fronts
 export const SPLASH_H = 4;             // inches, the standard stone backsplash
 export const TOP_KINDS = new Set(['base', 'sinkbase', 'drawer', 'island', 'dw', 'blank']);
@@ -61,6 +63,34 @@ export function countertopSvg(d: Design, S: number): string {
     o.push(`<polygon points="${path(t.poly)}" fill="${m.fill}" fill-opacity="0.38" stroke="${m.edge}" stroke-width="${1.4 / S}" stroke-linejoin="round"/>`);
     if (t.splash && c.splash !== 'none') o.push(`<polygon points="${path(t.splash)}" fill="${c.splash === 'tile' ? '#6f9fb4' : m.edge}" stroke="none"/>`);
   }
+  // tile up behind a freestanding range hood
+  for (const q of d.items) if (q.kind === 'chimney' && q.p?.tileUp !== false && q.wall !== null && q.wall < d.pts.length) {
+    const L = seg(d.pts, q.wall); const P = (t: number, y: number) => ({ x: L.ax + L.ux * t + L.nx * y, y: L.ay + L.uy * t + L.ny * y });
+    o.push(`<polygon points="${path([P(q.t - q.w / 2, 0), P(q.t + q.w / 2, 0), P(q.t + q.w / 2, 1), P(q.t - q.w / 2, 1)])}" fill="#6f9fb4" stroke="none"/>`);
+  }
+  o.push(sinksSvg(d, S));
+  return o.join('');
+}
+
+export const sinkOf = (it: DItem): string => (it.p?.sink as string) || '5050';
+export const SINK_NAMES: Record<string, string> = { single: 'Single bowl', '5050': '50/50 double bowl', farm: 'Farmhouse sink' };
+
+/** Sink bowls (and disposal rings) drawn on the tops of sink bases. */
+function sinksSvg(d: Design, S: number): string {
+  const o: string[] = []; const line = 1.2 / S;
+  for (const q of d.items) {
+    if (q.kind !== 'sinkbase' || !hasTop(q)) continue; const sk = sinkOf(q); if (sk === 'none') continue;
+    const f = frame(q, d.pts); const hw = q.w / 2, hd = q.d / 2; const iw = Math.max(12, q.w - 3);
+    const y0 = -hd + 3.5; const bd = sk === 'farm' ? Math.max(12, q.d - 4.5) : Math.min(Math.max(10, q.d - 6), 18);
+    const bowl = (cx: number, w: number, extra = '') => `<rect x="${cx - w / 2}" y="${y0}" width="${w}" height="${bd}" rx="${Math.min(3, w / 4)}" fill="#f7f7f4" stroke="${INK}" stroke-width="${line}"${extra}/><circle cx="${cx}" cy="${y0 + bd * 0.55}" r="0.9" fill="${INK}"/>`;
+    let g = '';
+    if (sk === '5050') { const bw = (iw - 1.5) / 2; g += bowl(-(bw + 1.5) / 2, bw) + bowl((bw + 1.5) / 2, bw); }
+    else g += bowl(0, sk === 'farm' ? Math.min(iw, 33) : Math.min(iw, 30));
+    if (sk === 'farm') g += `<line x1="${-Math.min(iw, 33) / 2}" y1="${y0 + bd}" x2="${Math.min(iw, 33) / 2}" y2="${y0 + bd}" stroke="${INK}" stroke-width="${3 / S}"/>`;
+    g += `<circle cx="0" cy="${-hd + 1.7}" r="1.1" fill="#fff" stroke="${INK}" stroke-width="${line}"/>`; // faucet
+    if (q.p?.disposal) { const dx = sk === '5050' ? ((iw - 1.5) / 2 + 1.5) / 2 : 0; g += `<circle cx="${dx}" cy="${y0 + bd * 0.55}" r="2.6" fill="none" stroke="${INK}" stroke-width="${line}" stroke-dasharray="${2 / S} ${1.5 / S}"/>`; }
+    void hw; o.push(`<g transform="translate(${f.cx} ${f.cy}) rotate(${f.rot})">${g}</g>`);
+  }
   return o.join('');
 }
 
@@ -68,4 +98,20 @@ export function countertopSvg(d: Design, S: number): string {
 export function counterSummary(d: Design): { area: number; splashLen: number; mat: string; splash: string } | null {
   const ts = tops(d); if (!ts.length) return null; const c = counterOf(d);
   return { area: ts.reduce((a, t) => a + t.area, 0) / 144, splashLen: ts.reduce((a, t) => a + t.splashLen, 0) / 12, mat: matOf(c.mat).name, splash: c.splash };
+}
+
+/** Fixtures worth listing next to the counters: sinks, disposals, pot fillers, and tile behind a freestanding hood. */
+export function fixtureLines(d: Design): Array<{ desc: string; qty: number; note: string }> {
+  const out: Array<{ desc: string; qty: number; note: string }> = [];
+  const sinks: Record<string, number> = {}; let disp = 0;
+  for (const q of d.items) if (q.kind === 'sinkbase') { const k = sinkOf(q); if (k !== 'none') sinks[k] = (sinks[k] || 0) + 1; if (q.p?.disposal) disp++; }
+  for (const [k, n] of Object.entries(sinks)) out.push({ desc: `Kitchen sink - ${SINK_NAMES[k] || k}`, qty: n, note: '' });
+  if (disp) out.push({ desc: 'Garbage disposal', qty: disp, note: '' });
+  const pf = d.items.filter(q => q.kind === 'potfiller').length; if (pf) out.push({ desc: 'Pot filler', qty: pf, note: '' });
+  const ceil = d.ceiling || 96; const soffit = d.items.find(q => q.kind === 'soffit');
+  for (const q of d.items) if (q.kind === 'chimney' && q.p?.tileUp !== false) {
+    const top = q.p?.tileTo === 'soffit' ? ceil - (soffit?.p?.drop ?? 12) : ceil; const h = Math.max(0, top - 36);
+    out.push({ desc: `Tile behind range hood, up to the ${q.p?.tileTo === 'soffit' ? 'soffit' : 'ceiling'}`, qty: 1, note: `about ${Math.round(q.w * h / 14.4) / 10} sq ft (${q.w}" wide x ${Math.round(h)}" tall)` });
+  }
+  return out;
 }

@@ -5,7 +5,7 @@ import JobPanel from './JobPanel';
 import { runChecks } from './checks';
 import { MAKERS, catalogFor, readyCatalogs, familiesFor, groupsFor, kindForEntry, matches, type CabEntry } from './catalog';
 import { designBody, designBounds, itemShape, takeoffRows } from './exports';
-import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf } from './counter';
+import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf, sinkOf } from './counter';
 import {
   CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, polyPatch, polyWorld, toPolyLocal, seg, snapTo, template,
   type Cat, type DItem, type Design, type Pt,
@@ -343,6 +343,12 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   };
   const addItem = (e: AddEntry) => {
     if (!d) return;
+    if (e.applyTo === 'sinkbase') { // a sink or disposal goes on the selected sink base, else the last one, else a new sink base
+      const target = (selItem && selItem.kind === 'sinkbase' ? selItem : null) || d.items.filter(q => q.kind === 'sinkbase').slice(-1)[0];
+      if (target) { commit(patchItem(d, target.id, { p: { ...(target.p || {}), ...(e.p || {}) } })); setSel({ type: 'item', id: target.id }); setAddOpen(false); return; }
+      const nb = mkItem('sinkbase', { w: e.w, d: e.d, p: { ...(e.p || {}) }, ...openSpot(d, 'sinkbase', e.w, e.d) });
+      commit(normalize({ ...d, items: [...d.items, nb] })); justAdded.current = nb.id; setSel({ type: 'item', id: nb.id }); setTab('edit'); setAddOpen(false); return;
+    }
     if (e.applyTo === 'shower') {
       const target = (selItem && selItem.kind === 'shower' ? selItem : null) || d.items.filter(q => q.kind === 'shower').slice(-1)[0];
       if (!target) { say('Add a shower first, then pick its door'); return; }
@@ -496,6 +502,28 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           {(() => {
             const P = it.p || {}; const setP = (q: Record<string, any>) => upd(it.id, { p: { ...P, ...q } });
             const side: Array<[any, string]> = [['wall', 'Wall'], ['knee', 'Knee wall + glass'], ['glass', 'Glass'], ['open', 'Open']];
+            if (it.kind === 'sinkbase') return (<>
+              <Chips label="Sink" value={sinkOf(it)} opts={[['single', 'Single bowl'], ['5050', '50/50'], ['farm', 'Farmhouse'], ['none', 'No sink']]} onPick={v => setP({ sink: v })} />
+              <Chips label="Garbage disposal" value={P.disposal ? 'on' : 'off'} opts={[['on', 'Yes'], ['off', 'No']]} onPick={v => setP({ disposal: v === 'on' })} />
+              {sinkOf(it) === 'farm' && it.w < 36 && <div style={{ fontSize: '13px', color: 'var(--muted)' }}>A farmhouse sink needs a 36" sink base.</div>}
+              {!hasTop(it) && sinkOf(it) !== 'none' && <div style={{ fontSize: '13px', color: 'var(--muted)' }}>The sink shows when this base has a countertop on.</div>}
+            </>);
+            if (it.kind === 'fridge') return (<>
+              <Chips label="Width" value={it.w} opts={[[30, '30"'], [33, '33"'], [36, '36"'], [42, '42"']]} onPick={v => upd(it.id, { w: v })} />
+              <Chips label="Depth" value={it.d} opts={[[30, 'Standard 30"'], [25, 'Counter depth 25"']]} onPick={v => upd(it.id, { d: v })} />
+              <div style={{ fontSize: '13px', color: 'var(--muted)' }}>Any other size: type it in Width or Depth above.</div>
+            </>);
+            if (it.kind === 'range') return (<>
+              <Chips label="Width" value={it.w} opts={[[30, '30"'], [36, '36"']]} onPick={v => upd(it.id, { w: v })} />
+              <div style={{ fontSize: '13px', color: 'var(--muted)' }}>Any other size: type it in Width above. Add a 240V range outlet under Electrical.</div>
+            </>);
+            if (it.kind === 'hood' || it.kind === 'chimney') return (<>
+              <Chips label="Width" value={it.w} opts={[[30, '30"'], [36, '36"']]} onPick={v => upd(it.id, { w: v })} />
+              {it.kind === 'chimney' && <>
+                <Chips label="Tile behind it" value={P.tileUp === false ? 'off' : 'on'} opts={[['on', 'Tile up'], ['off', 'None']]} onPick={v => setP({ tileUp: v === 'on' })} />
+                {P.tileUp !== false && <Chips label="Tile goes up to" value={P.tileTo || 'ceiling'} opts={[['ceiling', 'The ceiling'], ['soffit', 'The soffit']]} onPick={v => setP({ tileTo: v })} />}
+              </>}
+            </>);
             if (it.kind === 'shower' && P.poly) return (<>
               <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>Drag an orange corner to reshape the floor. Tap a + on an edge to add a corner there.</div>
               <button style={btn} disabled={vtx === null || (P.poly as any[]).length <= 3 || vtx >= (P.poly as any[]).length} onClick={() => { const np = (P.poly as Array<[number, number]>).filter((_, i) => i !== vtx); commit(patchItem(d!, it.id, polyPatch(it, d!.pts, np))); setVtx(null); }}>Remove the selected corner</button>

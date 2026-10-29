@@ -58,7 +58,15 @@ export const KINDS: Record<string, Kind> = {
   endpanel: { name: 'Fridge end panel', layer: 'floor', snap: true, w: 1, d: 27, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
   upper:    { name: 'Upper cabinet', layer: 'hung', snap: true, w: 30, d: 12, h: 30, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
   hood:     { name: 'Range hood', layer: 'hung', snap: true, w: 30, d: 20, cat: 'Accessories', modes: ['kitchen'] },
-  microwave:{ name: 'Space-saver microwave', layer: 'hung', snap: true, w: 30, d: 16, cat: 'Accessories', modes: ['kitchen'] },
+  microwave:{ name: 'Microwave over the range', layer: 'hung', snap: true, w: 30, d: 16, cat: 'Accessories', modes: ['kitchen'] },
+  chimney:  { name: 'Freestanding range hood', layer: 'hung', snap: true, w: 30, d: 20, props: { tileUp: true, tileTo: 'ceiling' }, cat: 'Accessories', modes: ['kitchen'] },
+  potfiller:{ name: 'Pot filler', layer: 'hung', snap: true, w: 6, d: 3, cat: 'Plumbing', modes: ['kitchen'] },
+  dedout:   { name: 'Dedicated outlet (fridge, microwave, disposal, dishwasher)', layer: 'hung', snap: true, w: 4, d: T, inWall: true, cat: 'Electrical', modes: ['kitchen'] },
+  out240:   { name: '240V range outlet', layer: 'hung', snap: true, w: 5, d: T, inWall: true, cat: 'Electrical', modes: ['kitchen'] },
+  gfci20:   { name: '20-amp counter GFCI', layer: 'hung', snap: true, w: 5, d: T, inWall: true, cat: 'Electrical', modes: ['kitchen'] },
+  dswitch:  { name: 'Disposal switch', layer: 'hung', snap: true, w: 4, d: T, inWall: true, cat: 'Electrical', modes: ['kitchen'] },
+  islout:   { name: 'Island outlet', layer: 'ceiling', snap: false, w: 5, d: 5, cat: 'Electrical', modes: ['kitchen'] },
+  cfan:     { name: 'Ceiling fan', layer: 'ceiling', snap: false, w: 44, d: 44, cat: 'Electrical', modes: ['kitchen'] },
   valance:  { name: 'Valance', layer: 'hung', snap: true, w: 36, d: 4, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
   ucl:      { name: 'Under-cabinet light', layer: 'hung', snap: true, w: 24, d: 10, cat: 'Electrical', modes: ['kitchen'] },
   mirror:   { name: 'Mirror', layer: 'hung', snap: true, w: 24, d: 1.5, cat: 'Accessories', modes: ['bath'] },
@@ -258,7 +266,7 @@ export function benchSide(p: Record<string, any>): string {
 }
 
 /** Everything the Add menu offers for a category in a room type, presets included. */
-export interface AddEntry { key: string; kind: string; name: string; sub?: string; w: number; d: number; p?: Record<string, any>; section?: string; applyTo?: 'shower'; extra?: Partial<DItem> }
+export interface AddEntry { key: string; kind: string; name: string; sub?: string; w: number; d: number; p?: Record<string, any>; section?: string; applyTo?: 'shower' | 'sinkbase'; extra?: Partial<DItem> }
 export function addList(c: Cat, mode: Mode): AddEntry[] {
   const out: AddEntry[] = [];
   if (c === 'Doors') {
@@ -287,8 +295,17 @@ export function addList(c: Cat, mode: Mode): AddEntry[] {
     const tu: Array<[number, number, string]> = [[60, 29, 'Performa'], [60, 30, 'Accord, Ensemble, Traverse'], [60, 32, 'Accord, Ensemble, Traverse'], [60, 36, 'Ensemble Tile'], [60, 42, 'Ensemble Tile']];
     tu.forEach(([w, d, n]) => out.push({ key: `tu-${w}x${d}`, kind: 'tub', name: `Sterling ${w} × ${d}`, sub: n, w, d, section: 'Sterling by Kohler tub units', p: { unit: 'sterling' } }));
   }
+  if (c === 'Plumbing' && mode === 'kitchen') {
+    const sk = (key: string, name: string, sub: string, sink: string) => out.push({ key, kind: 'sinkbase', name, sub, w: 36, d: 24, section: 'Kitchen sinks (set on the sink base)', applyTo: 'sinkbase', p: { sink } });
+    sk('ks-single', 'Full-size single bowl', 'one big bowl', 'single'); sk('ks-5050', '50/50 double bowl', 'two equal bowls', '5050'); sk('ks-farm', 'Farmhouse (apron front)', 'needs a 36" sink base', 'farm');
+    out.push({ key: 'ks-disp', kind: 'sinkbase', name: 'Garbage disposal', sub: 'on the sink base; add its switch under Electrical', w: 36, d: 24, section: 'Kitchen sinks (set on the sink base)', applyTo: 'sinkbase', p: { disposal: true } });
+  }
+  if (c === 'Accessories' && mode === 'kitchen') {
+    out.push({ key: 'ch30', kind: 'chimney', name: 'Freestanding range hood 30"', sub: 'chimney style; tile behind it to the ceiling', w: 30, d: 20, section: 'Range hoods' });
+    out.push({ key: 'ch36', kind: 'chimney', name: 'Freestanding range hood 36"', sub: 'chimney style; tile behind it to the ceiling', w: 36, d: 20, section: 'Range hoods' });
+  }
   for (const [key, k] of Object.entries(KINDS)) {
-    if (k.cat !== c || !k.modes.includes(mode) || key === 'shower' || key === 'tub' || key === 'ftub') continue;
+    if (k.cat !== c || !k.modes.includes(mode) || key === 'shower' || key === 'tub' || key === 'ftub' || key === 'chimney') continue;
     out.push({ key, kind: key, name: k.name, w: k.w, d: k.d, section: c === 'Plumbing' ? 'Fixtures & fittings' : undefined });
   }
   return out;

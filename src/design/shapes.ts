@@ -199,6 +199,35 @@ function doorShape(it: DItem, S: number, stroke: string, strokeW: number): strin
 }
 const fsOf = (S: number) => 12 / S;
 
+// ---------- kitchen appliances: generic, clean, recognisable (the customer picks the real ones) ----------
+function appliance(it: DItem, S: number, fs: number, stroke: string, sw: number): string | null {
+  const w = it.w, d = it.d; const thin = `stroke="${INK}" stroke-width="${1 / S}"`; const dash = `stroke-dasharray="${5 / S} ${3 / S}"`;
+  const lab = (t: string, size = 0.8) => (w * S > t.length * 5.6 + 6 ? txt(t, w / 2, d / 2, fs * size, '#333') : '');
+  switch (it.kind) {
+    case 'fridge': {
+      const two = w >= 33; let o = rect(0, 0, w, d, `fill="#f1f3f1" stroke="${stroke}" stroke-width="${sw}"`);
+      o += line(1, d - 1, w - 1, d - 1, `stroke="${INK}" stroke-width="${3 / S}" stroke-linecap="round"`);
+      if (two) o += line(w / 2, d - 3, w / 2, d, thin);
+      return o + lab(`FRIDGE ${Math.round(w)}"`, 0.85);
+    }
+    case 'range': {
+      let o = rect(0, 0, w, d, `fill="#e6e8e6" stroke="${stroke}" stroke-width="${sw}"`);
+      const r = Math.min(w / 6, d / 6, 4.5);
+      for (const [fx, fy] of [[0.27, 0.27], [0.73, 0.27], [0.27, 0.68], [0.73, 0.68]]) o += circ(w * fx, d * fy, r, `fill="none" ${thin}`) + circ(w * fx, d * fy, r * 0.4, `fill="${INK}"`);
+      o += line(1, d - 1, w - 1, d - 1, `stroke="${INK}" stroke-width="${3 / S}" stroke-linecap="round"`);
+      return o;
+    }
+    case 'dw': return rect(0, 0, w, d, `fill="#e6e8e6" stroke="${stroke}" stroke-width="${sw}"`) + line(1, d - 1, w - 1, d - 1, `stroke="${INK}" stroke-width="${3 / S}" stroke-linecap="round"`) + lab('DW', 0.9);
+    case 'microwave': return rect(0, 0, w, d, `fill="#eef0ee" fill-opacity="0.5" stroke="${stroke}" stroke-width="${sw}" ${dash}`) + rect(2, 2, w * 0.66, d - 4, `fill="none" ${thin}`) + lab('MICROWAVE', 0.7);
+    case 'hood': return rect(0, 0, w, d, `fill="#eef0ee" fill-opacity="0.5" stroke="${stroke}" stroke-width="${sw}" ${dash}`) + line(0, 0, w, d, thin) + line(w, 0, 0, d, thin);
+    case 'chimney': return rect(0, 0, w, d, `fill="#eef0ee" fill-opacity="0.5" stroke="${stroke}" stroke-width="${sw}" ${dash}`) + rect(w / 2 - Math.min(5, w / 4), 0, Math.min(10, w / 2), Math.min(8, d / 2), `fill="#cfd4cf" ${thin}`) + lab(`HOOD ${Math.round(w)}"`, 0.75);
+    case 'potfiller': return rect(0, 0, w, d, `fill="#fff" stroke="${stroke}" stroke-width="${sw}"`) + circ(w / 2, d + 0.5, 1.6, `fill="#3f8fa8" stroke="${INK}" stroke-width="${1 / S}"`);
+    case 'cfan': { let o = circ(w / 2, d / 2, 3, `fill="#fff" stroke="${stroke}" stroke-width="${sw}"`); for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + 0.5; o += `<ellipse cx="${f(w / 2 + Math.cos(a) * w * 0.3)}" cy="${f(d / 2 + Math.sin(a) * d * 0.3)}" rx="${f(w * 0.22)}" ry="${f(w * 0.06)}" transform="rotate(${f(a * 180 / Math.PI)} ${f(w / 2 + Math.cos(a) * w * 0.3)} ${f(d / 2 + Math.sin(a) * d * 0.3)})" fill="#fff" stroke="${stroke}" stroke-width="${sw}"/>`; } return o; }
+    case 'islout': return rect(0, 0, w, d, `fill="#fff" stroke="${stroke}" stroke-width="${sw}"`) + txt('IO', w / 2, d / 2, fs * 0.7, '#222');
+    default: return null;
+  }
+}
+
 /** Returns the drawing for kinds that have their own look, or null for plain boxes. */
 export function fixtureShape(it: DItem, S: number, fs: number, stroke: string, sw: number, label: string): string | null {
   const w = it.w, d = it.d;
@@ -217,9 +246,10 @@ export function fixtureShape(it: DItem, S: number, fs: number, stroke: string, s
       case 'can': return circ(w / 2, d / 2, w / 2, `fill="#fff" stroke="${stroke}" stroke-width="${sw}"`) + circ(w / 2, d / 2, 0.9, `fill="${INK}"`);
       case 'wet': return circ(w / 2, d / 2, w / 2, `fill="#fff" stroke="${GL}" stroke-width="${sw}"`) + txt('WET', w / 2, d + fs * 0.9, fs * 0.7, '#555');
       case 'pendant': return circ(w / 2, d / 2, w / 2, `fill="#fff" stroke="${stroke}" stroke-width="${sw}"`) + circ(w / 2, d / 2, w * 0.33, `fill="none" stroke="${INK}" stroke-width="${1 / S}"`);
+      case 'fridge': case 'range': case 'dw': case 'microwave': case 'hood': case 'chimney': case 'potfiller': case 'cfan': case 'islout': return appliance(it, S, fs, stroke, sw);
       case 'soffit': return rect(0, 0, w, d, `fill="rgba(160,138,88,0.14)" stroke="${stroke === INK ? '#8a6d2f' : stroke}" stroke-width="${2 / S}" stroke-dasharray="${6 / S} ${4 / S}"`) + txt(`SOFFIT ${Math.round(it.p?.drop ?? 12)}" DROP`, w / 2, d / 2, fs * 0.85, '#5c4614');
-      case 'outlet': case 'gfci': case 'switch': {
-        const g = it.kind === 'gfci' ? 'GFCI' : it.kind === 'switch' ? (it.p?.gang > 1 ? `S${it.p.gang}` : 'S') : 'O';
+      case 'outlet': case 'gfci': case 'switch': case 'dedout': case 'out240': case 'gfci20': case 'dswitch': {
+        const g = it.kind === 'gfci' ? 'GFCI' : it.kind === 'dedout' ? 'D' : it.kind === 'out240' ? '240' : it.kind === 'gfci20' ? 'G20' : it.kind === 'dswitch' ? 'DS' : it.kind === 'switch' ? (it.p?.gang > 1 ? `S${it.p.gang}` : 'S') : 'O';
         return rect(-w / 2 + w / 2, 0, w, d, `fill="#fff" stroke="${stroke}" stroke-width="${sw}"`) + txt(g, w / 2, d + fs * 0.85, fs * 0.8, '#222');
       }
       default: return null;

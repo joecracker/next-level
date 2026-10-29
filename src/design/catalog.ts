@@ -46,6 +46,7 @@ export function kindForEntry(e: CabEntry): string {
     return 'vanity';
   }
   if (/pantry|utility|oven|laundry utility/.test(f) && (e.h ?? 0) > 60) return 'pantry';
+  if (e.group === 'Base cabinets' && /sink/.test(f)) return 'sinkbase';
   return 'base';
 }
 export function matches(e: CabEntry, q: string): boolean {

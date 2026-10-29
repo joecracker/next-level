@@ -3,7 +3,7 @@
 // the studio, from Capture's Save-to-Drive, or anywhere else with the studio closed.
 import { KINDS, T, corners, fmtIn, frame, isCab, seg, type DItem, type Design } from './model';
 import { fixtureShape } from './shapes';
-import { countertopSvg, counterSummary } from './counter';
+import { countertopSvg, counterSummary, fixtureLines } from './counter';
 
 const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const INK = '#14191A';
@@ -127,9 +127,12 @@ export function takeoffRows(d: Design): Array<{ qty: number; code: string; desc:
 
 /** Cabinet takeoff as CSV text (opens in Excel, LibreOffice, or anything else). Sizes in inches. */
 function counterLines(d: Design, pre: Array<string | number> = []): Array<Array<string | number>> {
-  const c = counterSummary(d); if (!c) return [];
-  const rows: Array<Array<string | number>> = [[...pre, 1, '', `Countertop - ${c.mat}`, '', '', '', `about ${Math.round(c.area * 10) / 10} sq ft (drawn tops with 1 1/2" front overhang)`]];
-  if (c.splash !== 'none') rows.push([...pre, 1, '', c.splash === 'tile' ? 'Backsplash - tile to the uppers' : `Backsplash - 4" ${c.mat}`, '', '', '', `about ${Math.round(c.splashLen * 10) / 10} linear ft along the wall runs`]);
+  const c = counterSummary(d); const rows: Array<Array<string | number>> = [];
+  if (c) {
+    rows.push([...pre, 1, '', `Countertop - ${c.mat}`, '', '', '', `about ${Math.round(c.area * 10) / 10} sq ft (drawn tops with 1 1/2" front overhang)`]);
+    if (c.splash !== 'none') rows.push([...pre, 1, '', c.splash === 'tile' ? 'Backsplash - tile to the uppers' : `Backsplash - 4" ${c.mat}`, '', '', '', `about ${Math.round(c.splashLen * 10) / 10} linear ft along the wall runs`]);
+  }
+  for (const x of fixtureLines(d)) rows.push([...pre, x.qty, '', x.desc, '', '', '', x.note]);
   return rows;
 }
 export function takeoffCsv(d: Design, job?: { name?: string; customer?: string }): string | null {

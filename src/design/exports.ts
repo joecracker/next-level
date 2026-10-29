@@ -106,8 +106,9 @@ export function takeoffRows(d: Design): Array<{ qty: number; code: string; desc:
   for (const it of d.items || []) {
     if (!isCab(it.kind)) continue;
     const desc = it.label || KINDS[it.kind].name;
-    const key = [it.code || '', desc, it.w, it.d, it.h ?? ''].join('|');
-    const row = map.get(key) || { qty: 0, code: it.code || '', desc, w: it.w, dp: it.d, h: (it.h ?? '') as number | '', notes: [] };
+    const code = (it.code || '') + (it.p?.lr && it.p?.hand ? ' ' + it.p.hand : '');
+    const key = [code, desc, it.w, it.d, it.h ?? ''].join('|');
+    const row = map.get(key) || { qty: 0, code, desc, w: it.w, dp: it.d, h: (it.h ?? '') as number | '', notes: [] };
     row.qty++; if (it.notes) row.notes.push(it.notes); map.set(key, row);
   }
   return [...map.values()].map(r => ({ ...r, notes: r.notes.join('; ') }));

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as RPE } from 'react';
 import JobPanel from './JobPanel';
 import { runChecks } from './checks';
+import { MAKERS, catalogFor, familiesFor, groupsFor, kindForEntry, matches, type CabEntry } from './catalog';
 import { designBody, designBounds, itemShape, takeoffRows } from './exports';
 import {
   CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, seg, snapTo, template,
@@ -114,6 +115,9 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const [msg, setMsg] = useState('');
   const [armed, setArmed] = useState(false);
   const [search, setSearch] = useState('');
+  const [cabMaker, setCabMaker] = useState('Homecrest');
+  const [cabGroup, setCabGroup] = useState('Base cabinets');
+  const [cabFam, setCabFam] = useState('');
   const [tab, setTab] = useState<'edit' | 'check' | 'list'>('edit');
   const [, bump] = useState(0);
   const justAdded = useRef<string | null>(null); // a new item's first drag is part of placing it, not a separate undo step
@@ -269,6 +273,13 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const upd = (id: string, p: Partial<DItem>) => d && commit(patchItem(d, id, p));
   const delItem = (id: string) => { const cur = designRef.current; if (!cur) return; commit({ ...cur, items: cur.items.filter(q => q.id !== id) }); setSel(null); };
   const dupItem = (it: DItem) => { if (!d) return; const c: DItem = { ...it, id: mkItem(it.kind).id, ...(it.wall !== null ? { t: it.t + it.w } : { x: it.x + 12, y: it.y + 12 }) }; commit(normalize({ ...d, items: [...d.items, c] })); setSel({ type: 'item', id: c.id }); };
+  const addCab = (e: CabEntry) => {
+    if (!d) return;
+    const kind = kindForEntry(e); const k = KINDS[kind]; const b = designBounds(d);
+    const over: Partial<DItem> = k.layer === 'hung' ? { wall: 0, t: Math.max(e.w / 2, Math.min(seg(d.pts, 0).L - e.w / 2, seg(d.pts, 0).L / 2)) } : k.snap ? { wall: 0, t: Math.max(e.w / 2, Math.min(seg(d.pts, 0).L - e.w / 2, seg(d.pts, 0).L / 2)) } : { x: Math.round((b.minX + b.maxX) / 2), y: Math.round((b.minY + b.maxY) / 2) };
+    const it = mkItem(kind, { w: e.w, d: e.d, ...(e.h ? { h: e.h } : {}), code: e.code, label: `${e.maker} ${e.family}`, p: { maker: e.maker, family: e.family, ...(e.lr ? { lr: true, hand: 'L' } : {}) }, ...over });
+    commit(normalize({ ...d, items: [...d.items, it] })); justAdded.current = it.id; setSel({ type: 'item', id: it.id }); setTab('edit'); setAddOpen(false);
+  };
   const addItem = (e: AddEntry) => {
     if (!d) return;
     if (e.applyTo === 'shower') {
@@ -354,6 +365,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             <button style={{ ...btn, color: '#fca5a5' }} onClick={() => delItem(it.id)}>Delete</button>
           </div>
           <Sec title="Size & position" open>
+          {it.p?.maker && <div style={{ fontSize: '14px' }}><b>{it.code}</b> · {it.p.maker} · {it.p.family}</div>}
+          {it.p?.lr && <Chips label="Hinge hand (order as)" value={it.p.hand || 'L'} opts={[['L', 'Left'], ['R', 'Right']]} onPick={v => upd(it.id, { p: { ...(it.p || {}), hand: v } })} />}
           <Text label={isCab(it.kind) ? 'Name on the order' : 'Label on the drawing'} value={it.label || ''} placeholder={k.name} onCommit={v => upd(it.id, { label: v })} />
           {isCab(it.kind) && <Text label="Catalog code" value={it.code || ''} placeholder="e.g. B24" onCommit={v => upd(it.id, { code: v.trim() })} />}
           <div style={{ display: 'grid', gridTemplateColumns: isCab(it.kind) ? '1fr 1fr 1fr' : '1fr 1fr', gap: '8px' }}>
@@ -551,6 +564,38 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         const q = search.trim().toLowerCase();
         const list = q ? all.filter(e => (e.name + ' ' + (e.sub || '')).toLowerCase().includes(q)) : addList(addGroup, d.mode);
         const secs: Array<[string, AddEntry[]]> = []; list.forEach(e => { const n = q ? 'Results' : e.section || ''; const f = secs.find(x => x[0] === n); if (f) f[1].push(e); else secs.push([n, [e]]); });
+        const selStyle: CSSProperties = { ...input, minHeight: '48px', width: '100%' };
+        const catMatches: CabEntry[] = q ? MAKERS.filter(m => m.ready).flatMap(m => catalogFor(m.id)).filter(e => matches(e, q)).slice(0, 80) : [];
+        const cabCard = (e: CabEntry) => (
+          <button key={e.maker + e.code + e.family} style={{ ...btn, minHeight: '64px', textAlign: 'left', padding: '8px 10px' }} onClick={() => addCab(e)}>
+            <b>{e.code}</b>{e.lr ? ' L or R' : ''}<div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>{fmtIn(e.w)} wide × {fmtIn(e.d)} deep{e.h ? ` × ${fmtIn(e.h)} high` : ''}{q ? ` · ${e.family}` : ''}</div></button>);
+        const customCabs = addList('Cabinets', d.mode);
+        const fams = cabMaker === 'Custom' ? [] : familiesFor(cabMaker, cabGroup);
+        const famNow = fams.includes(cabFam) ? cabFam : fams[0] || '';
+        const famRows = cabMaker === 'Custom' ? [] : catalogFor(cabMaker).filter(e => e.group === cabGroup && e.family === famNow).sort((a, b) => (a.h ?? 0) - (b.h ?? 0) || a.w - b.w);
+        const catalogPane = (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div><div style={lbl}>Maker</div><div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {MAKERS.map(m => <button key={m.id} style={cabMaker === m.id ? btnOn : { ...btn, opacity: m.ready ? 1 : 0.55 }} onClick={() => { setCabMaker(m.id); setCabFam(''); const g = groupsFor(m.id); if (g.length && !g.includes(cabGroup)) setCabGroup(g[0]); }}>{m.id}</button>)}
+              <button style={cabMaker === 'Custom' ? btnOn : btn} onClick={() => setCabMaker('Custom')}>Custom size</button>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '4px' }}>{cabMaker === 'Custom' ? 'Plain cabinets you size yourself.' : MAKERS.find(m => m.id === cabMaker)?.note}</div></div>
+            {cabMaker === 'Custom' ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '8px' }}>
+                {customCabs.map(e => (<button key={e.key} style={{ ...btn, minHeight: '56px', textAlign: 'left' }} onClick={() => addItem(e)}>{e.name}<div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>{fmtIn(e.w)} × {fmtIn(e.d)}</div></button>))}
+              </div>
+            ) : !MAKERS.find(m => m.id === cabMaker)?.ready ? (
+              <div style={{ color: 'var(--muted)' }}>The {cabMaker} lines aren't loaded yet.</div>
+            ) : (<>
+              <div style={{ display: 'grid', gridTemplateColumns: wide ? '1fr 1fr' : '1fr', gap: '8px' }}>
+                <div><div style={lbl}>Kind of cabinet</div>
+                  <select style={selStyle} value={cabGroup} onChange={e => { setCabGroup(e.target.value); setCabFam(''); }}>{groupsFor(cabMaker).map(g => <option key={g} value={g}>{g}</option>)}</select></div>
+                <div><div style={lbl}>Style</div>
+                  <select style={selStyle} value={famNow} onChange={e => setCabFam(e.target.value)}>{fams.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '8px' }}>{famRows.map(cabCard)}</div>
+            </>)}
+          </div>);
         return (
         <div onClick={() => setAddOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '860px', height: 'min(82vh, 640px)', background: '#1d2425', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -563,13 +608,16 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
                 {CATS.filter(c => addList(c, d.mode).length).map(c => <button key={c} style={{ ...(addGroup === c && !q ? btnOn : btn), textAlign: 'left', whiteSpace: 'nowrap' }} onClick={() => { setSearch(''); setAddGroup(c); }}>{catLabel(c, d.mode)}</button>)}
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-                {secs.length === 0 && <div style={{ color: 'var(--muted)' }}>Nothing matches that.</div>}
+                {addGroup === 'Cabinets' && !q ? catalogPane : (<>
+                {secs.length === 0 && catMatches.length === 0 && <div style={{ color: 'var(--muted)' }}>Nothing matches that.</div>}
+                {catMatches.length > 0 && <div style={{ marginBottom: '14px' }}><div style={lbl}>Cabinet models</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '8px' }}>{catMatches.map(cabCard)}</div></div>}
                 {secs.map(([name, es]) => (<div key={name} style={{ marginBottom: '14px' }}>
                   {name && <div style={lbl}>{name}</div>}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '8px' }}>
                     {es.map(e => (<button key={name + e.key} style={{ ...btn, minHeight: '72px', textAlign: 'left', display: 'flex', gap: '10px', alignItems: 'center', padding: '8px' }} onClick={() => addItem(e)}>
                       <Thumb e={e} /><span>{e.name}<div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>{e.sub || `${fmtIn(e.w)} × ${fmtIn(e.d)}`}</div></span></button>))}
                   </div></div>))}
+                </>)}
               </div>
             </div>
           </div>

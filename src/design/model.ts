@@ -31,7 +31,7 @@ export type Cat = 'Walls' | 'Doors' | 'Plumbing' | 'Electrical' | 'Cabinets' | '
 export type Mode = 'bath' | 'kitchen';
 export interface Kind { name: string; layer: Layer; snap: boolean; w: number; d: number; h?: number; cab?: boolean; cat: Cat; modes: Mode[]; inWall?: boolean; props?: Record<string, any> }
 export const T = 4.5; // wall thickness
-const SHOWER = { left: 'wall', right: 'wall', front: 'glass', entry: 'front', doorPos: 'left', door: true, doorType: 'swing', doorW: 30, curb: true, drain: 'endL', valve: 'left', valveType: 'standard', tile: true, tileSize: '12', tileDir: 'v', free: false, bench: 'none', benchW: 15, benchTop: 'granite', niche: 'none', nicheH: 24, shelves: 'none' };
+const SHOWER = { left: 'wall', right: 'wall', front: 'glass', entry: 'front', doorPos: 'left', door: true, doorType: 'swing', doorW: 30, curb: true, drain: 'endL', valve: 'left', valveType: 'standard', tile: true, tileSize: '2', tileDir: 'v', free: false, bench: 'none', benchW: 15, benchTop: 'granite', niche: 'none', nicheH: 24, shelves: 'none' };
 
 export const KINDS: Record<string, Kind> = {
   shower:   { name: 'Shower', layer: 'floor', snap: true, w: 60, d: 32, props: SHOWER, cat: 'Plumbing', modes: ['bath'] },
@@ -264,7 +264,7 @@ export function addList(c: Cat, mode: Mode): AddEntry[] {
     dd('d-swing', 'Swinging door', 'swing', W, 'one door on hinges');
     dd('d-double', 'Double doors', 'double', 60, 'two doors meet in the middle');
     dd('d-pocket', 'Pocket door', 'pocket', 30, 'slides into the wall');
-    dd('d-barn', 'Barn door', 'barn', 36, 'slides on a track, room side');
+    dd('d-barn', 'Barn door', 'barn', 36, 'slides on a track, outside the room', { swing: 'out' });
     dd('d-bifold', 'Bi-fold door', 'bifold', 48, 'folds in the middle');
     dd('d-open', 'Plain opening', 'opening', 36, 'no door at all');
     out.push({ key: 'window', kind: 'window', name: 'Window', w: 36, d: T, section: 'Windows', extra: { sill: mode === 'kitchen' ? 42 : 36 } });

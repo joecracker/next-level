@@ -116,6 +116,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<'edit' | 'check' | 'list'>('edit');
   const [, bump] = useState(0);
+  const justAdded = useRef<string | null>(null); // a new item's first drag is part of placing it, not a separate undo step
   const hist = useRef<Design[]>([]); const fut = useRef<Design[]>([]);
   const wrapRef = useRef<HTMLDivElement>(null); const svgRef = useRef<SVGSVGElement>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -126,6 +127,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   // ----- saving to the job, undo / redo -----
   const persist = (d: Design) => { try { NL?.setDesign(d); } catch { /* ignore */ } };
   const commit = (next: Design) => {
+    justAdded.current = null;
     const cur = designRef.current; if (cur) { hist.current.push(cur); if (hist.current.length > 80) hist.current.shift(); }
     fut.current = []; designRef.current = next; setDesignState(next); persist(next); bump(x => x + 1);
   };
@@ -256,7 +258,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
     pointers.current.delete(e.pointerId); const g = gesture.current;
     if (pointers.current.size === 0) gesture.current = null; else if (g?.kind === 'pinch') { gesture.current = null; }
     if (g && g.start && g.moved && designRef.current && designRef.current !== g.start) {
-      hist.current.push(g.start); if (hist.current.length > 80) hist.current.shift(); fut.current = []; persist(designRef.current); bump(x => x + 1);
+      if (g.kind === 'item' && justAdded.current === g.id) justAdded.current = null; else { hist.current.push(g.start); if (hist.current.length > 80) hist.current.shift(); }
+      fut.current = []; persist(designRef.current); bump(x => x + 1);
     }
   };
 
@@ -277,7 +280,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
     const over: Partial<DItem> = k.layer === 'inwall' || k.layer === 'hung' || (k.layer === 'floor' && k.snap) ? { wall: 0, t: Math.max(e.w / 2, Math.min(seg(d.pts, 0).L - e.w / 2, seg(d.pts, 0).L / 2)) } : { x: Math.round((b.minX + b.maxX) / 2), y: Math.round((b.minY + b.maxY) / 2) };
     const base0 = mkItem(kind);
     const it = mkItem(kind, { w: e.w, d: e.d, p: base0.p ? { ...base0.p, ...(e.p || {}) } : undefined, ...over, ...(e.extra || {}) });
-    commit(normalize({ ...d, items: [...d.items, it] })); setSel({ type: 'item', id: it.id }); setTab('edit'); setAddOpen(false);
+    commit(normalize({ ...d, items: [...d.items, it] })); justAdded.current = it.id; setSel({ type: 'item', id: it.id }); setTab('edit'); setAddOpen(false);
   };
   const nudgeBy = (it: DItem, dir: number, axis: 'x' | 'y' | 't') => {
     if (!d) return;
@@ -395,7 +398,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             <Chips label="Kind of door" value={it.p?.type || 'swing'} opts={[['swing', 'Swinging'], ['double', 'Double'], ['pocket', 'Pocket'], ['barn', 'Barn'], ['bifold', 'Bi-fold'], ['opening', 'Opening']]} onPick={v => upd(it.id, { p: { ...(it.p || {}), type: v } })} />
             {(it.p?.type || 'swing') !== 'opening' && <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {['swing', 'pocket', 'barn', undefined].includes(it.p?.type) && <button style={btn} onClick={() => upd(it.id, { hinge: it.hinge === 'right' ? 'left' : 'right' })}>{['pocket', 'barn'].includes(it.p?.type) ? 'Slides to the ' : 'Hinge: '}{it.hinge === 'right' ? 'right' : 'left'}</button>}
-              {!['pocket', 'barn'].includes(it.p?.type) && <button style={btn} onClick={() => upd(it.id, { swing: it.swing === 'out' ? 'in' : 'out' })}>{it.p?.type === 'bifold' ? 'Folds ' : 'Swings '}{it.swing === 'out' ? 'out' : 'in'}</button>}
+              {it.p?.type !== 'pocket' && <button style={btn} onClick={() => upd(it.id, { swing: it.swing === 'out' ? 'in' : 'out' })}>{it.p?.type === 'barn' ? (it.swing === 'out' ? 'Hangs outside the room' : 'Hangs inside the room') : (it.p?.type === 'bifold' ? 'Folds ' : 'Swings ') + (it.swing === 'out' ? 'out' : 'in')}</button>}
             </div>}
           </Sec>)}
           {it.kind === 'window' && <Sec title="Window" open><Num label="Sill height" value={it.sill ?? 36} onCommit={s => upd(it.id, { sill: s })} /></Sec>}

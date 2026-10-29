@@ -122,9 +122,29 @@ function sinksSvg(d: Design, S: number): string {
 }
 
 /** What to order: slab area (rough, from the drawn tops) and backsplash length. */
+/** Area where two convex slabs overlap (e.g. the corner square where two wall runs meet), so it is not counted twice. */
+function overlapArea(a: Pt[], b: Pt[]): number {
+  const cross = (o: Pt, p: Pt, q: Pt) => (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+  const orient = cross(a[0], a[1], a[2]) >= 0 ? 1 : -1; let out = b.slice();
+  for (let i = 0; i < a.length && out.length; i++) {
+    const p = a[i], q = a[(i + 1) % a.length]; const inp = out; out = [];
+    inp.forEach((cur, j) => {
+      const prev = inp[(j + inp.length - 1) % inp.length]; const cin = orient * cross(p, q, cur) >= 0, pin = orient * cross(p, q, prev) >= 0;
+      if (cin !== pin) { const t = cross(p, q, prev) / (cross(p, q, prev) - cross(p, q, cur)); out.push({ x: prev.x + (cur.x - prev.x) * t, y: prev.y + (cur.y - prev.y) * t }); }
+      if (cin) out.push(cur);
+    });
+  }
+  let ar = 0; for (let i = 0; i < out.length; i++) { const u = out[i], v = out[(i + 1) % out.length]; ar += u.x * v.y - v.x * u.y; } return Math.abs(ar) / 2;
+}
+function slabArea(sl: Slab[]): number {
+  let t = sl.reduce((a, x) => a + x.area, 0);
+  for (let i = 0; i < sl.length; i++) for (let j = i + 1; j < sl.length; j++) t -= overlapArea(sl[i].poly, sl[j].poly);
+  return t;
+}
+
 export function counterSummary(d: Design): { area: number; splashLen: number; mat: string; splash: string } | null {
   const sl = slabs(d); if (!sl.length) return null; const c = counterOf(d);
-  return { area: sl.reduce((a, t) => a + t.area, 0) / 144, splashLen: splashRuns(d).reduce((a, r) => a + r.len, 0) / 12, mat: matOf(c.mat).name, splash: c.splash };
+  return { area: slabArea(sl) / 144, splashLen: splashRuns(d).reduce((a, r) => a + r.len, 0) / 12, mat: matOf(c.mat).name, splash: c.splash };
 }
 
 /** Fixtures worth listing next to the counters: sinks, disposals, pot fillers, and tile behind a freestanding hood. */

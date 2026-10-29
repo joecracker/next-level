@@ -96,7 +96,7 @@ export function runChecks(d: Design): Check[] {
     if (!items.some(o => o.kind === 'fan')) out.push({ id: 'nofan:', lvl: 'tight', title: 'No exhaust fan', detail: 'A bathroom needs a vent fan. Add one under Electrical.' });
   } else {
     const dw = items.find(o => o.kind === 'dw'), sk = items.find(o => o.kind === 'sinkbase');
-    for (const r of items.filter(o => o.kind === 'range')) if (!items.some(o => o.kind === 'out240')) { add('no240', r, 'tight', 'No 240V outlet for the range', 'An electric range needs its own 240V outlet. Add one under Electrical (skip it for a gas range).'); break; }
+    for (const r of items.filter(o => o.kind === 'range' && o.p?.fuel === 'electric')) if (!items.some(o => o.kind === 'out240')) { add('no240', r, 'tight', 'No 240V outlet for the range', 'An electric range needs its own 240V outlet. Add one under Electrical.'); break; }
     if (dw && sk) { const a = F(dw), b = F(sk); if (Math.hypot(a.cx - b.cx, a.cy - b.cy) > 48) add('dwsink', dw, 'tight', 'Dishwasher is far from the sink', 'Keep it next to the sink base if you can.'); }
     for (const isl of items.filter(o => o.kind === 'island')) {
       const f = F(isl); const segs = segsOf(d, ['floor'], isl.id);

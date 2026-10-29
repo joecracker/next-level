@@ -515,7 +515,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             </>);
             if (it.kind === 'range') return (<>
               <Chips label="Width" value={it.w} opts={[[30, '30"'], [36, '36"']]} onPick={v => upd(it.id, { w: v })} />
-              <div style={{ fontSize: '13px', color: 'var(--muted)' }}>Any other size: type it in Width above. Add a 240V range outlet under Electrical.</div>
+              <Chips label="Fuel" value={P.fuel === 'electric' ? 'electric' : 'gas'} opts={[['gas', 'Gas'], ['electric', 'Electric (needs 240V)']]} onPick={v => setP({ fuel: v })} />
+              <div style={{ fontSize: '13px', color: 'var(--muted)' }}>Any other size: type it in Width above. Choosing Electric makes the Check tab ask for a 240V range outlet (Add, Electrical).</div>
             </>);
             if (it.kind === 'hood' || it.kind === 'chimney') return (<>
               <Chips label="Width" value={it.w} opts={[[30, '30"'], [36, '36"']]} onPick={v => upd(it.id, { w: v })} />
@@ -597,7 +598,9 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
                   <Num label="Right end" value={o.r} onCommit={v => set('ovR', v)} />
                 </div>
                 {free && <Chips label="Seating side (back) overhang" value={[1.5, 6, 12, 15].includes(o.b) ? o.b : 0} opts={[[1.5, '1 1/2"'], [6, '6"'], [12, '12"'], [15, '15"']]} onPick={v => set('ovB', v)} />}
-                <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.45 }}>The back is the side opposite the doors. Ends that touch a neighbouring top join it, so only the outer ends of a run overhang.</div>
+                <Chips label="Left end overhang" value={[0, 1.5, 6, 12, 15].includes(o.l) ? o.l : -1} opts={[[0, 'None'], [1.5, '1 1/2"'], [6, '6"'], [12, '12"'], [15, '15"']]} onPick={v => set('ovL', v)} />
+                <Chips label="Right end overhang" value={[0, 1.5, 6, 12, 15].includes(o.r) ? o.r : -1} opts={[[0, 'None'], [1.5, '1 1/2"'], [6, '6"'], [12, '12"'], [15, '15"']]} onPick={v => set('ovR', v)} />
+                <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.45 }}>The back is the side opposite the doors; left and right are as you face the doors. Ends that touch a neighbouring top join it, so only the outer ends of a run overhang.</div>
               </>); })()}
             <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.45 }}>{it.kind === 'blank' ? 'A blank space is just an open spot: set its width and depth above, slide it along the wall, and turn the top on for a freestanding counter.' : 'Cabinets that touch share one continuous top. The material and backsplash are set for the whole room (tap empty floor).'}</div>
           </Sec>)}

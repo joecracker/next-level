@@ -546,6 +546,11 @@ export function initNextLevel() {
       try { await dehydrateProjects([incoming]); } catch { /* private mode etc: pictures stay inline and still show */ }
       incoming.lastUsed = Date.now();
       if (idx >= 0) {
+        // Replacing from Drive must never throw pictures away: a picture on this device that the Drive copy does not have
+        // (it was added after the last save, or saved from another device) stays with the job.
+        const inDrive = new Set<string>(incoming.photos.map((ph: any) => ph.id));
+        const onlyHere = (projects[idx].photos || []).filter((ph: any) => !inDrive.has(ph.id));
+        if (onlyHere.length) incoming.photos = [...incoming.photos, ...onlyHere];
         const keep = new Set<string>(incoming.photos.map((ph: any) => ph.id));
         (projects[idx].photos || []).forEach((ph: any) => {
           if (!keep.has(ph.id)) { try { Promise.resolve(deletePhotoBlob(ph.id)).catch(() => { /* ignore */ }); } catch { /* ignore */ } }

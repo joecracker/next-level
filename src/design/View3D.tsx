@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { KINDS, T, frame, seg, type DItem, type Design, type Pt } from './model';
 import { counterSlabs, paintOf } from './counter';
-import { appHex, cabColor, colorPaint } from './finishes';
+import { appHex, cabColor, colorPaint, floorHexOf, shade, wallHexOf } from './finishes';
 import { floorOf, vaultOf } from './finish';
 import { wallHeights } from './walls';
 import { windowOf } from './windows';
@@ -79,7 +79,17 @@ function parts(it: DItem, d: Design): Part[] {
   const P = (o: Partial<Part> & { h: number }): Part => ({ lx: 0, lz: 0, w, dd: dp, y0: 0, color: cab, ...o });
   const top = (h: number, color = tcol): Part => P({ y0: h, h: 1.5, dd: dp + 1.5, lz: 0.75, w: w + 0.5, color });
   switch (it.kind) {
-    case 'toilet': return [P({ lz: dp * 0.15, dd: dp * 0.7, h: 15, color: COL.white }), P({ lz: -dp * 0.35, dd: dp * 0.3, w: w * 0.8, h: 28, color: COL.white })];
+    case 'toilet': { // a tank, a rounded bowl with a seat, and a base joining them; the bowl is rounder or longer by the setting
+      const round = p.bowl === 'round'; const tank = 7.5; const bw = w * 0.78; const bl = round ? 16.5 : 19;
+      const zBowl = dp / 2 - bl / 2; const gap = dp - bl - tank; const W = COL.white;
+      const o: Part[] = [
+        P({ lz: -dp / 2 + tank / 2, w: w * 0.95, dd: tank, h: 28, color: W }),
+        P({ lz: zBowl, w: bw, dd: bl, h: 15, round: true, color: W }),
+        P({ lz: zBowl, w: bw + 1.5, dd: bl + 1.5, y0: 15, h: 1.2, round: true, color: '#fafaf8' }),
+      ];
+      if (gap > 0.5) o.push(P({ lz: -dp / 2 + tank + gap / 2, w: bw * 0.62, dd: gap + 1, h: 14, color: W }));
+      return o;
+    }
     case 'pedestal': return [P({ w: w * 0.35, dd: dp * 0.4, lz: -dp * 0.2, h: 30, color: COL.white }), P({ y0: 30, h: 5, color: COL.white })];
     case 'tub': case 'ftub': {
       const o = [P({ h: 20, color: COL.white }), P({ y0: 20, h: 0.4, w: w - 5, dd: dp - 5, color: '#dfe9ee' })];
@@ -106,11 +116,11 @@ function parts(it: DItem, d: Design): Part[] {
 }
 
 // ---------- the scene ----------
-function tileTexture(tile: string, dir: 'v' | 'h'): { tex: THREE.CanvasTexture; cw: number; ch: number } | null {
+function tileTexture(tile: string, dir: 'v' | 'h', base: string, lineColor: string): { tex: THREE.CanvasTexture; cw: number; ch: number } | null {
   if (tile === 'plain') return null;
   const cell = tile === '24' || tile === '12x24' ? 24 : 12; const N = 256; const sc = N / cell;
   const c = document.createElement('canvas'); c.width = N; c.height = N; const g = c.getContext('2d'); if (!g) return null;
-  g.fillStyle = '#e7e3d9'; g.fillRect(0, 0, N, N); g.strokeStyle = '#aaa595'; g.lineWidth = 3;
+  g.fillStyle = base; g.fillRect(0, 0, N, N); g.strokeStyle = lineColor; g.lineWidth = 3;
   const L = (x1: number, y1: number, x2: number, y2: number) => { g.beginPath(); g.moveTo(x1 * sc, y1 * sc); g.lineTo(x2 * sc, y2 * sc); g.stroke(); };
   if (tile === '12') { L(0, 0, 12, 0); L(0, 0, 0, 12); }
   else if (tile === '24') { L(0, 0, 24, 0); L(0, 0, 0, 24); }
@@ -125,13 +135,14 @@ function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
   const g = new THREE.Group(); const pts = d.pts; const base = d.ceiling || 96;
   const add = (geo: THREE.BufferGeometry, m: THREE.Material, M?: THREE.Matrix4) => { const mesh = new THREE.Mesh(geo, m); if (M) { mesh.matrixAutoUpdate = false; mesh.matrix.copy(M); } g.add(mesh); return mesh; };
   const boxAt = (M: THREE.Matrix4, p: Part) => {
-    const geo = new THREE.BoxGeometry(p.w, p.h, p.dd); const C = M.clone().multiply(new THREE.Matrix4().makeTranslation(p.lx, p.y0 + p.h / 2, p.lz));
-    add(geo, mat(p.color, p.opacity ?? 1), C);
+    const T0 = new THREE.Matrix4().makeTranslation(p.lx, p.y0 + p.h / 2, p.lz);
+    if (p.round) { add(new THREE.CylinderGeometry(0.5, 0.5, 1, 28), mat(p.color, p.opacity ?? 1), M.clone().multiply(T0).multiply(new THREE.Matrix4().makeScale(p.w, p.h, p.dd))); return; }
+    add(new THREE.BoxGeometry(p.w, p.h, p.dd), mat(p.color, p.opacity ?? 1), M.clone().multiply(T0));
   };
 
   // floor
-  const fl = floorOf(d); const tt = tileTexture(fl.tile, fl.dir);
-  const fm = new THREE.MeshStandardMaterial({ color: tt ? '#ffffff' : COL.floor, map: tt ? tt.tex : null, roughness: 0.9, side: THREE.DoubleSide }); mats.push(fm);
+  const fl = floorOf(d); const fhex = floorHexOf(d); const tt = tileTexture(fl.tile, fl.dir, fhex || '#e7e3d9', shade(fhex || '#e7e3d9', 0.78));
+  const fm = new THREE.MeshStandardMaterial({ color: tt ? '#ffffff' : fhex || COL.floor, map: tt ? tt.tex : null, roughness: 0.9, side: THREE.DoubleSide }); mats.push(fm);
   add(surface(pts, 0), fm);
 
   // walls, with door and window openings cut in
@@ -158,7 +169,7 @@ function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
       const hole = new THREE.Path(); hole.moveTo(a, y0); hole.lineTo(b, y0); hole.lineTo(b, y1); hole.lineTo(a, y1); hole.closePath(); sh.holes.push(hole);
     }
     const M = frameM(s.ux, s.uy, -s.nx, -s.ny, s.ax, s.ay); // x along the wall, z out through the wall
-    const wm = mat(COL.wall); wm.transparent = true; const wmesh = add(new THREE.ExtrudeGeometry(sh, { depth: T, bevelEnabled: false }), wm, M);
+    const wm = mat(wallHexOf(d) || COL.wall); wm.transparent = true; const wmesh = add(new THREE.ExtrudeGeometry(sh, { depth: T, bevelEnabled: false }), wm, M);
     const entry = { m: wm, mesh: wmesh, x: [] as THREE.Mesh[], mx: s.ax + s.ux * s.L / 2 - s.nx * T / 2, mz: s.ay + s.uy * s.L / 2 - s.ny * T / 2, ox: -s.nx, oz: -s.ny };
     walls.push(entry);
     for (const q of d.items) if (q.kind === 'window' && q.wall === i) { // glass in each window

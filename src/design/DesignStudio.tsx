@@ -7,7 +7,8 @@ import { MAKERS, catalogFor, readyCatalogs, familiesFor, groupsFor, kindForEntry
 import { designBody, designBounds, itemShape, takeoffRows } from './exports';
 import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf, sinkOf, ovOf, topRun } from './counter';
 import { SIDE_TYPES, sidesOf } from './showerwalls';
-import { APP_FINISHES, CAB_COLORS, CAB_DEFAULT, TOP_COLORS } from './finishes';
+import { APP_FINISHES, CAB_COLORS, CAB_DEFAULT, FLOOR_COLORS, TOP_COLORS, WALL_COLORS } from './finishes';
+import { TRIM_ITEMS, trimSuggest } from './trim';
 import { FLOOR_TILES, floorOf, vaultOf, vaultText } from './finish';
 import { setWallHeight, wallHeights } from './walls';
 import { GLASS, WTYPES } from './model';
@@ -108,6 +109,38 @@ function Chips({ label, value, opts, onPick }: { label: string; value: any; opts
   return (<div><div style={lbl}>{label}</div><div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
     {opts.map(([v, t]) => <button key={String(v)} style={value === v ? btnOn : btn} onClick={() => onPick(v)}>{t}</button>)}</div></div>);
 }
+function Qty({ label, value, onCommit }: { label: string; value: number; onCommit: (v: number) => void }) {
+  const [txt, setTxt] = useState(value ? String(value) : '');
+  useEffect(() => { setTxt(value ? String(value) : ''); }, [value]);
+  const done = () => { const v = parseFloat(txt); if (txt.trim() === '') onCommit(0); else if (!isNaN(v) && v >= 0) onCommit(Math.round(v * 100) / 100); else setTxt(value ? String(value) : ''); };
+  return (<label style={{ display: 'block', minWidth: 0 }}><div style={lbl}>{label}</div>
+    <input value={txt} placeholder="0" inputMode="decimal" onChange={e => setTxt(e.target.value)} onBlur={done} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} style={input} /></label>);
+}
+/** Trim and extras for the cabinets: type what you counted; it goes on the takeoff. */
+function TrimPanel({ d, commit }: { d: Design; commit: (n: Design) => void }) {
+  const acc = d.acc || {}; const q = acc.q || {}; const x = acc.x || []; const sug = trimSuggest(d);
+  const setQ = (k: string, v: number) => commit({ ...d, acc: { ...acc, q: { ...q, [k]: v } } });
+  const setX = (nx: Array<{ label: string; qty: number; unit: string }>) => commit({ ...d, acc: { ...acc, x: nx } });
+  return (
+    <div style={{ padding: '12px 14px 90px', display: 'flex', flexDirection: 'column', gap: '12px', color: 'var(--cream)' }}>
+      <div style={{ fontWeight: 800, fontSize: '18px' }}>Trim and extras</div>
+      <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>Type the feet you counted. Each one goes on the takeoff. Handles are not listed.</div>
+      {TRIM_ITEMS.map(t => (<div key={t.id}>
+        <Qty label={t.label + ' (linear feet)'} value={q[t.id] || 0} onCommit={v => setQ(t.id, v)} />
+        {t.hint && <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px', lineHeight: 1.4 }}>{t.hint}</div>}
+        {sug[t.id] > 0 && (q[t.id] || 0) !== sug[t.id] && <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', fontSize: '13px', color: 'var(--muted)' }}>From the drawing: about {sug[t.id]} ft <button style={{ ...btn, minHeight: '32px' }} onClick={() => setQ(t.id, sug[t.id])}>Use</button></div>}
+      </div>))}
+      <Chips label="Touch-up kit" value={q.touchup ? 'yes' : 'no'} opts={[['no', 'No'], ['yes', 'Yes']]} onPick={v => setQ('touchup', v === 'yes' ? 1 : 0)} />
+      <div style={lbl}>Anything else</div>
+      {x.map((r, i) => (<div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 90px auto', gap: '6px', alignItems: 'end' }}>
+        <Text label="What" value={r.label} onCommit={v => setX(x.map((y, j) => j === i ? { ...y, label: v } : y))} />
+        <Qty label="How many" value={r.qty} onCommit={v => setX(x.map((y, j) => j === i ? { ...y, qty: v } : y))} />
+        <button style={btn} onClick={() => setX(x.filter((_, j) => j !== i))}>Remove</button>
+      </div>))}
+      <button style={btn} onClick={() => setX([...x, { label: '', qty: 1, unit: 'ea' }])}>+ Add a line</button>
+    </div>
+  );
+}
 function Swatches({ label, value, opts, onPick }: { label: string; value: string; opts: Array<{ id: string; name: string; hex: string }>; onPick: (id: string) => void }) {
   return (<div><div style={lbl}>{label}</div><div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
     {opts.map(o => <button key={o.id} style={{ ...(value === o.id ? btnOn : btn), display: 'flex', alignItems: 'center', gap: '7px', padding: '0 10px' }} onClick={() => onPick(o.id)}><span style={{ width: 18, height: 18, borderRadius: 4, background: o.hex, border: '1px solid rgba(255,255,255,0.55)', flexShrink: 0 }} />{o.name}</button>)}</div></div>);
@@ -174,7 +207,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const [cabLine, setCabLine] = useState('Select');
   const [cabGroup, setCabGroup] = useState('Base cabinets');
   const [cabFam, setCabFam] = useState('');
-  const [tab, setTab] = useState<'edit' | 'check' | 'list'>('edit');
+  const [tab, setTab] = useState<'edit' | 'check' | 'list' | 'trim'>('edit');
   const [pageMenu, setPageMenu] = useState(false);
   const [pageModal, setPageModal] = useState<null | { mode: 'new' | 'rename'; name: string }>(null);
   const [delArmed, setDelArmed] = useState(false);
@@ -674,6 +707,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           <Swatches label="Upper cabinets (if different)" value={d.finish?.upper || ''} opts={[{ id: '', name: 'Same as the rest', hex: '#8a8f8c' }, ...CAB_COLORS]} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), upper: v || undefined } })} />
           <Swatches label="Countertop color" value={counterOf(d).color === 'auto' ? '' : counterOf(d).color} opts={[{ id: '', name: 'Standard', hex: '#b7b4ac' }, ...TOP_COLORS]} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), color: v || undefined } })} />
           <Swatches label="Appliances" value={d.finish?.app || 'steel'} opts={APP_FINISHES} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), app: v === 'steel' ? undefined : v } })} />
+          <Swatches label="Wall paint color" value={d.finish?.wall || ''} opts={[{ id: '', name: 'Standard', hex: '#f3f0e8' }, ...WALL_COLORS]} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), wall: v || undefined } })} />
+          <Swatches label="Floor tile color" value={d.floor?.color || ''} opts={[{ id: '', name: 'Standard', hex: '#e7e3d9' }, ...FLOOR_COLORS]} onPick={v => commit({ ...d, floor: { ...(d.floor || {}), color: v || undefined } })} />
         </Sec>
         <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>Tap anything to change it. Drag a wall to stretch the room, or drag a corner for odd shapes. Use Add to place things.</div>
         <div style={lbl}>Cabinets so far</div>
@@ -688,8 +723,9 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
       <button style={tab === 'edit' ? btnOn : btn} onClick={() => setTab('edit')}>Edit</button>
       <button style={tab === 'check' ? btnOn : btn} onClick={() => setTab('check')}>Check{checks.length ? ` (${checks.length})` : ''}</button>
       <button style={tab === 'list' ? btnOn : btn} onClick={() => setTab('list')}>List</button>
+      <button style={tab === 'trim' ? btnOn : btn} onClick={() => setTab('trim')}>Trim</button>
     </div>
-    {tab === 'edit' ? editPanel : tab === 'check' ? checkPanel : listPanel}
+    {tab === 'edit' ? editPanel : tab === 'check' ? checkPanel : tab === 'trim' ? (d && <TrimPanel d={d} commit={commit} />) : listPanel}
   </>);
 
   return (

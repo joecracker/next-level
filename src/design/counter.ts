@@ -106,7 +106,9 @@ export function countertopSvg(d: Design, S: number): string {
 }
 
 export const sinkOf = (it: DItem): string => (it.p?.sink as string) || '5050';
-export const SINK_NAMES: Record<string, string> = { single: 'Single bowl', '5050': '50/50 double bowl', farm: 'Farmhouse sink' };
+export const SINK_NAMES: Record<string, string> = { single: 'Full bowl', '5050': '50/50 double bowl', farm: 'Farmhouse sink' };
+/** Undermount sinks are stainless; a farmhouse sink can be stainless or white porcelain. */
+export const sinkMatOf = (it: DItem): string => (sinkOf(it) === 'farm' && it.p?.sinkMat === 'porcelain' ? 'porcelain' : 'steel');
 
 /** Sink bowls (and disposal rings) drawn on the tops of sink bases. */
 function sinksSvg(d: Design, S: number): string {
@@ -182,8 +184,8 @@ export function counterSummary(d: Design): { area: number; splashLen: number; ma
 export function fixtureLines(d: Design): Array<{ desc: string; qty: number; note: string }> {
   const out: Array<{ desc: string; qty: number; note: string }> = [];
   const sinks: Record<string, number> = {}; let disp = 0;
-  for (const q of d.items) if (q.kind === 'sinkbase') { const k = sinkOf(q); if (k !== 'none') sinks[k] = (sinks[k] || 0) + 1; if (q.p?.disposal) disp++; }
-  for (const [k, n] of Object.entries(sinks)) out.push({ desc: `Kitchen sink - ${SINK_NAMES[k] || k}`, qty: n, note: '' });
+  for (const q of d.items) if (q.kind === 'sinkbase') { const k = sinkOf(q); if (k !== 'none') { const key = k + '|' + sinkMatOf(q); sinks[key] = (sinks[key] || 0) + 1; } if (q.p?.disposal) disp++; }
+  for (const [key, n] of Object.entries(sinks)) { const [k, m] = key.split('|'); out.push({ desc: 'Kitchen sink - ' + (SINK_NAMES[k] || k) + ', ' + (m === 'porcelain' ? 'white porcelain' : k === 'farm' ? 'stainless' : 'stainless undermount'), qty: n, note: '' }); }
   if (disp) out.push({ desc: 'Garbage disposal', qty: disp, note: '' });
   const pf = d.items.filter(q => q.kind === 'potfiller').length; if (pf) out.push({ desc: 'Pot filler', qty: pf, note: '' });
   const ceil = d.ceiling || 96; const soffit = d.items.find(q => q.kind === 'soffit');

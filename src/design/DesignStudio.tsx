@@ -575,9 +575,10 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             const P = it.p || {}; const setP = (q: Record<string, any>) => upd(it.id, { p: { ...P, ...q } });
             const side: Array<[any, string]> = [['wall', 'Wall'], ['knee', 'Knee wall + glass'], ['glass', 'Glass'], ['open', 'Open']];
             if (it.kind === 'sinkbase') return (<>
-              <Chips label="Sink" value={sinkOf(it)} opts={[['single', 'Single bowl'], ['5050', '50/50'], ['farm', 'Farmhouse'], ['none', 'No sink']]} onPick={v => setP({ sink: v })} />
+              <Chips label="Sink" value={sinkOf(it)} opts={[['single', 'Full bowl'], ['5050', '50/50'], ['farm', 'Farmhouse'], ['none', 'No sink']]} onPick={v => setP({ sink: v })} />
               <Chips label="Garbage disposal" value={P.disposal ? 'on' : 'off'} opts={[['on', 'Yes'], ['off', 'No']]} onPick={v => setP({ disposal: v === 'on' })} />
-              {sinkOf(it) === 'farm' && it.w < 36 && <div style={{ fontSize: '13px', color: 'var(--muted)' }}>A farmhouse sink needs a 36" sink base.</div>}
+              {sinkOf(it) === 'farm' && <Chips label="Farmhouse sink material" value={P.sinkMat === 'porcelain' ? 'porcelain' : 'steel'} opts={[['steel', 'Stainless'], ['porcelain', 'White porcelain']]} onPick={v => setP({ sinkMat: v })} />}
+        {sinkOf(it) === 'farm' && it.w < 36 && <div style={{ fontSize: '13px', color: 'var(--muted)' }}>A farmhouse sink needs a 36" sink base.</div>}
               {!hasTop(it) && sinkOf(it) !== 'none' && <div style={{ fontSize: '13px', color: 'var(--muted)' }}>The sink shows when this base has a countertop on.</div>}
             </>);
             if (it.kind === 'fridge') return (<>

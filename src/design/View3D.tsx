@@ -111,9 +111,10 @@ function parts(it: DItem, d: Design): Part[] {
     case 'sinkbase': { // the cabinet and the sink bowls cut into its top
       const o: Part[] = [P({ h: it.h || k.h || 34.5 })]; const sk = (p.sink as string) || '5050';
       if (sk !== 'none' && p.top !== false) {
-        const bd = Math.min(Math.max(10, dp - 6), 16); const iw = Math.max(12, w - 3); const steel = '#b6bcc0';
+        const bd = Math.min(Math.max(10, dp - 6), 16); const iw = Math.max(12, w - 3); const steel = sk === 'farm' && p.sinkMat === 'porcelain' ? '#f4f4f1' : '#b6bcc0';
         if (sk === '5050') { const bw = (iw - 1.5) / 2; o.push(P({ lx: -(bw + 1.5) / 2, lz: -dp / 2 + 3.5 + bd / 2, w: bw, dd: bd, y0: 36, h: 0.15, color: steel }), P({ lx: (bw + 1.5) / 2, lz: -dp / 2 + 3.5 + bd / 2, w: bw, dd: bd, y0: 36, h: 0.15, color: steel })); }
         else o.push(P({ lz: -dp / 2 + 3.5 + bd / 2, w: Math.min(iw, sk === 'farm' ? 33 : 30), dd: sk === 'farm' ? Math.max(12, dp - 4.5) : bd, y0: 36, h: 0.15, color: steel }));
+        if (sk === 'farm') o.push(P({ lz: dp / 2 + 0.6, w: Math.min(iw, 33) + 0.5, dd: 1.5, y0: 25, h: 11, color: steel })); // the apron front
       }
       return o;
     }

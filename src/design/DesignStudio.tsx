@@ -124,11 +124,12 @@ function TrimPanel({ d, commit }: { d: Design; commit: (n: Design) => void }) {
   return (
     <div style={{ padding: '12px 14px 90px', display: 'flex', flexDirection: 'column', gap: '12px', color: 'var(--cream)' }}>
       <div style={{ fontWeight: 800, fontSize: '18px' }}>Trim and extras</div>
-      <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>Type the feet you counted. Each one goes on the takeoff. Handles are not listed.</div>
+      <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>Count them in 8 ft pieces. Each one goes on the takeoff. Handles are not listed.</div>
       {TRIM_ITEMS.map(t => (<div key={t.id}>
-        <Qty label={t.label + ' (linear feet)'} value={q[t.id] || 0} onCommit={v => setQ(t.id, v)} />
+        <Qty label={t.label + ' (8 ft pieces)'} value={q[t.id] || 0} onCommit={v => setQ(t.id, v)} />
+        {(q[t.id] || 0) > 0 && <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px' }}>That is {(q[t.id] || 0) * 8} ft.</div>}
         {t.hint && <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px', lineHeight: 1.4 }}>{t.hint}</div>}
-        {sug[t.id] > 0 && (q[t.id] || 0) !== sug[t.id] && <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', fontSize: '13px', color: 'var(--muted)' }}>From the drawing: about {sug[t.id]} ft <button style={{ ...btn, minHeight: '32px' }} onClick={() => setQ(t.id, sug[t.id])}>Use</button></div>}
+        {sug[t.id]?.pcs > 0 && (q[t.id] || 0) !== sug[t.id].pcs && <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', fontSize: '13px', color: 'var(--muted)' }}>From the drawing: about {sug[t.id].ft} ft, so {sug[t.id].pcs} piece{sug[t.id].pcs === 1 ? '' : 's'} <button style={{ ...btn, minHeight: '32px' }} onClick={() => setQ(t.id, sug[t.id].pcs)}>Use</button></div>}
       </div>))}
       <Chips label="Touch-up kit" value={q.touchup ? 'yes' : 'no'} opts={[['no', 'No'], ['yes', 'Yes']]} onPick={v => setQ('touchup', v === 'yes' ? 1 : 0)} />
       <div style={lbl}>Anything else</div>

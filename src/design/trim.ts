@@ -11,16 +11,19 @@ export const TRIM_ITEMS: Array<{ id: string; label: string; hint?: string }> = [
   { id: 'furn', label: 'Furniture molding', hint: 'Tall 1x with an ogee edge, stained to match the cabinets (usually the back of an island).' },
 ];
 
-/** Rough lengths worked out from the drawing, in feet, to compare against your own count. */
-export function trimSuggest(d: Design): Record<string, number> {
+/** Trim is bought in 8 ft pieces. */
+export const PIECE_FT = 8;
+
+/** Rough lengths worked out from the drawing: the feet, and how many 8 ft pieces that takes (rounded up). */
+export function trimSuggest(d: Design): Record<string, { ft: number; pcs: number }> {
   let toe = 0, crown = 0, furn = 0;
   for (const it of d.items) {
     const k = KINDS[it.kind]; if (!k) continue;
     if (it.kind === 'upper') crown += it.w;
     else if (k.cab && k.layer === 'floor' && it.kind !== 'endpanel') { toe += it.w; if (it.kind === 'island') furn += it.w; }
   }
-  const ft = (i: number) => Math.round((i / 12) * 10) / 10;
-  return { crown: ft(crown), toekick: ft(toe), furn: ft(furn) };
+  const m = (i: number) => ({ ft: Math.round((i / 12) * 10) / 10, pcs: i > 0 ? Math.ceil(i / 12 / PIECE_FT - 0.001) : 0 });
+  return { crown: m(crown), toekick: m(toe), furn: m(furn) };
 }
 
 const nameOf = (list: Array<{ id: string; name: string }>, id: string | undefined) => list.find(x => x.id === id)?.name;
@@ -29,7 +32,7 @@ const nameOf = (list: Array<{ id: string; name: string }>, id: string | undefine
 export function trimLines(d: Design): Array<{ desc: string; qty: number; note: string }> {
   const out: Array<{ desc: string; qty: number; note: string }> = [];
   const q = d.acc?.q || {};
-  for (const t of TRIM_ITEMS) if ((q[t.id] || 0) > 0) out.push({ desc: t.label, qty: q[t.id], note: 'linear feet' + (t.id === 'furn' ? ', stained to match the cabinets' : '') });
+  for (const t of TRIM_ITEMS) if ((q[t.id] || 0) > 0) out.push({ desc: t.label, qty: q[t.id], note: '8 ft pieces (' + q[t.id] * PIECE_FT + ' ft)' + (t.id === 'furn' ? ', stained to match the cabinets' : '') });
   const cab = nameOf(CAB_COLORS, d.finish?.cab);
   if (q.touchup) out.push({ desc: 'Touch-up kit', qty: 1, note: cab ? 'for ' + cab : '' });
   for (const r of d.acc?.x || []) if (r.label.trim() && r.qty > 0) out.push({ desc: r.label.trim(), qty: r.qty, note: r.unit === 'ft' ? 'linear feet' : '' });

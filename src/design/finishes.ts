@@ -2,6 +2,7 @@
 // so they cost the computer nothing. The room has defaults (d.finish, d.counter.color, d.floor.color); one item or
 // one countertop run can override with its own color (p.ccolor on a cabinet, p.tcolor on a top).
 import type { DItem, Design } from './model';
+import { findLineFinish } from './linefinishes';
 
 export interface Swatch { id: string; name: string; hex: string }
 
@@ -90,7 +91,12 @@ export function colorPaint(id: string | undefined): { fill: string; edge: string
 export function cabColor(d: Design, it: DItem): string {
   const upper = it.kind === 'upper' || it.kind === 'valance';
   const id = it.p?.ccolor || (upper ? d.finish?.upper || d.finish?.cab : d.finish?.cab);
-  return CAB_COLORS.find(x => x.id === id)?.hex || CAB_DEFAULT;
+  return CAB_COLORS.find(x => x.id === id)?.hex || findLineFinish(id)?.hex || CAB_DEFAULT;
+}
+/** The name of a cabinet color for the takeoff, with the maker when it is a maker's finish. */
+export function cabLabel(id: string | undefined): string | undefined {
+  const s = CAB_COLORS.find(x => x.id === id); if (s) return s.name;
+  const f = findLineFinish(id); return f ? f.line + ' ' + f.name : undefined;
 }
 export function appHex(d: Design): string {
   return APP_FINISHES.find(x => x.id === d.finish?.app)?.hex || APP_FINISHES[0].hex;

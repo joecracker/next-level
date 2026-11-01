@@ -9,6 +9,7 @@ import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf, sinkOf, ovOf, topRun } fr
 import { SIDE_TYPES, sidesOf } from './showerwalls';
 import { APP_FINISHES, CAB_COLORS, CAB_DEFAULT, FLOOR_COLORS, TOP_COLORS, WALL_COLORS } from './finishes';
 import { TRIM_ITEMS, trimSuggest } from './trim';
+import { LINES, lineGroups } from './linefinishes';
 import { FLOOR_TILES, floorOf, vaultOf, vaultText } from './finish';
 import { setWallHeight, wallHeights } from './walls';
 import { GLASS, WTYPES } from './model';
@@ -141,6 +142,20 @@ function TrimPanel({ d, commit }: { d: Design; commit: (n: Design) => void }) {
       <button style={btn} onClick={() => setX([...x, { label: '', qty: 1, unit: 'ea' }])}>+ Add a line</button>
     </div>
   );
+}
+/** Cabinet color picker: simple colors, or a maker's own finish names (glazed ones are folded away). */
+function CabPick({ label, value, line, first, onPick }: { label: string; value: string; line: string; first: { id: string; name: string; hex: string }; onPick: (id: string) => void }) {
+  const sw = (o: { id: string; name: string; hex: string }) => (
+    <button key={o.id} style={{ ...(value === o.id ? btnOn : btn), display: 'flex', alignItems: 'center', gap: '7px', padding: '0 10px' }} onClick={() => onPick(o.id)}>
+      <span style={{ width: 18, height: 18, borderRadius: 4, background: o.hex, border: '1px solid rgba(255,255,255,0.55)', flexShrink: 0 }} />{o.name}</button>);
+  const row = { display: 'flex', gap: '6px', flexWrap: 'wrap' as const };
+  const groups = line ? lineGroups(line) : [{ title: 'Colors', open: true, items: CAB_COLORS }];
+  return (<div><div style={lbl}>{label}</div>
+    <div style={row}>{sw(first)}</div>
+    {groups.map(g => g.open
+      ? (<div key={g.title}><div style={{ ...lbl, marginTop: '8px' }}>{g.title}</div><div style={row}>{g.items.map(sw)}</div></div>)
+      : (<details key={g.title} style={{ marginTop: '8px' }}><summary style={{ ...lbl, cursor: 'pointer' }}>{g.title} ({g.items.length})</summary><div style={{ ...row, marginTop: '6px' }}>{g.items.map(sw)}</div></details>))}
+  </div>);
 }
 function Swatches({ label, value, opts, onPick }: { label: string; value: string; opts: Array<{ id: string; name: string; hex: string }>; onPick: (id: string) => void }) {
   return (<div><div style={lbl}>{label}</div><div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -506,7 +521,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             <Num label="Width" value={it.w} onCommit={w => upd(it.id, { w: Math.max(1, w), ...(it.wall !== null ? { t: it.t + (Math.max(1, w) - it.w) / 2 } : {}) })} />
             <Num label="Depth" value={it.d} onCommit={dp => upd(it.id, { d: Math.max(1, dp) })} />
             {isCab(it.kind) && <Num label="Height" value={it.h || 0} onCommit={h => upd(it.id, { h })} />}
-          {isCab(it.kind) && <Swatches label="Color for this one" value={it.p?.ccolor || ''} opts={[{ id: '', name: 'Same as the room', hex: '#8a8f8c' }, ...CAB_COLORS]} onPick={v => upd(it.id, { p: { ...(it.p || {}), ccolor: v || undefined } })} />}
+          {isCab(it.kind) && <CabPick label="Color for this one" value={it.p?.ccolor || ''} line={d.finish?.line || ''} first={{ id: '', name: 'Same as the room', hex: '#8a8f8c' }} onPick={v => upd(it.id, { p: { ...(it.p || {}), ccolor: v || undefined } })} />}
           </div>
           {it.wall !== null ? (<>
             <Num label="Left edge from the left corner" value={it.t - it.w / 2} onCommit={x => upd(it.id, { t: x + it.w / 2 })} />
@@ -704,8 +719,10 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         <Chips label="Countertop material" value={counterOf(d).mat} opts={MATS.map(m => [m.id, m.name] as [string, string])} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), mat: v } })} />
         <Chips label="Backsplash" value={counterOf(d).splash} opts={SPLASHES} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), splash: v as 'stone' | 'tile' | 'none' } })} />
         <Sec title="Finishes (colors)" open>
-          <Swatches label="Cabinet color" value={d.finish?.cab || ''} opts={[{ id: '', name: 'Standard', hex: CAB_DEFAULT }, ...CAB_COLORS]} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), cab: v || undefined } })} />
-          <Swatches label="Upper cabinets (if different)" value={d.finish?.upper || ''} opts={[{ id: '', name: 'Same as the rest', hex: '#8a8f8c' }, ...CAB_COLORS]} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), upper: v || undefined } })} />
+          <Chips label="Cabinet line (for the finish names)" value={d.finish?.line || ''} opts={LINES} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), line: v || undefined } })} />
+          {d.finish?.line && <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.4 }}>Finish names come from the maker. The shade shown is close, not exact: check the maker's sample.</div>}
+          <CabPick label="Cabinet color" value={d.finish?.cab || ''} line={d.finish?.line || ''} first={{ id: '', name: 'Standard', hex: CAB_DEFAULT }} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), cab: v || undefined } })} />
+          <CabPick label="Upper cabinets (if different)" value={d.finish?.upper || ''} line={d.finish?.line || ''} first={{ id: '', name: 'Same as the rest', hex: '#8a8f8c' }} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), upper: v || undefined } })} />
           <Swatches label="Countertop color" value={counterOf(d).color === 'auto' ? '' : counterOf(d).color} opts={[{ id: '', name: 'Standard', hex: '#b7b4ac' }, ...TOP_COLORS]} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), color: v || undefined } })} />
           <Swatches label="Appliances" value={d.finish?.app || 'steel'} opts={APP_FINISHES} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), app: v === 'steel' ? undefined : v } })} />
           <Swatches label="Wall paint color" value={d.finish?.wall || ''} opts={[{ id: '', name: 'Standard', hex: '#f3f0e8' }, ...WALL_COLORS]} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), wall: v || undefined } })} />

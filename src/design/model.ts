@@ -24,7 +24,7 @@ export interface Design {
   items: DItem[];
   ceiling?: number;    // ceiling height, inches
   accepted?: Record<string, boolean>; // robot checks Tim chose to keep as they are
-  finish?: { cab?: string; upper?: string; app?: string; wall?: string }; // cabinet, upper-cabinet and appliance finishes for the whole room
+  finish?: { cab?: string; upper?: string; app?: string; wall?: string; line?: string }; // cabinet, upper-cabinet and appliance finishes for the whole room
   counter?: { mat?: string; splash?: 'stone' | 'tile' | 'none'; color?: string }; // countertop material and backsplash for the whole drawing
   acc?: { q?: Record<string, number>; x?: Array<{ label: string; qty: number; unit: string }> }; // trim and extras counted by hand
   wallH?: number[];   // wall heights in inches, one per wall in the same order as pts (0 = to the ceiling)

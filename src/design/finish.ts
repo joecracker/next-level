@@ -10,9 +10,9 @@ const ARROW = '#6f7f4a';
 export function floorOf(d: Design): { tile: string; dir: 'v' | 'h' } {
   return { tile: d.floor?.tile || 'plain', dir: d.floor?.dir === 'h' ? 'h' : 'v' };
 }
-export function vaultOf(d: Design): { shape: 'flat' | 'slope' | 'peak'; toward: 'top' | 'right' | 'bottom' | 'left'; ridge: 'lr' | 'ud'; pitch: number } {
+export function vaultOf(d: Design): { shape: 'flat' | 'slope' | 'peak'; toward: 'top' | 'right' | 'bottom' | 'left'; ridge: 'lr' | 'ud'; pitch: number; hide: boolean } {
   const v = d.vault || {};
-  return { shape: v.shape || 'flat', toward: v.toward || 'top', ridge: v.ridge || 'lr', pitch: v.pitch || 6 };
+  return { shape: v.shape || 'flat', toward: v.toward || 'top', ridge: v.ridge || 'lr', pitch: v.pitch || 6, hide: !!v.hide };
 }
 /** Tile size across (x) and down (y) the plan, inches. 12x24 "up and down" is 12 wide and 24 tall. */
 function tileSize(tile: string, dir: 'v' | 'h'): [number, number] | null {
@@ -48,8 +48,19 @@ export function floorTileSvg(d: Design, S: number): string {
   const f = floorOf(d); const ts = tileSize(f.tile, f.dir);
   if (!ts || d.pts.length < 3 || ts[0] * S < 5 || ts[1] * S < 5) return '';
   const b = box(d); const g: string[] = []; const sw = `stroke="${LINE}" stroke-width="${n(0.8 / S)}"`;
-  for (let x = b.minX + ts[0], c = 0; x < b.maxX - 0.01 && c < 400; x += ts[0], c++) g.push(`<line x1="${n(x)}" y1="${n(b.minY)}" x2="${n(x)}" y2="${n(b.maxY)}" ${sw}/>`);
-  for (let y = b.minY + ts[1], c = 0; y < b.maxY - 0.01 && c < 400; y += ts[1], c++) g.push(`<line x1="${n(b.minX)}" y1="${n(y)}" x2="${n(b.maxX)}" y2="${n(y)}" ${sw}/>`);
+  const seg = (x1: number, y1: number, x2: number, y2: number) => g.push(`<line x1="${n(x1)}" y1="${n(y1)}" x2="${n(x2)}" y2="${n(y2)}" ${sw}/>`);
+  if (f.tile !== '12x24') { // square tile: plain grid
+    for (let x = b.minX + ts[0], c = 0; x < b.maxX - 0.01 && c < 400; x += ts[0], c++) seg(x, b.minY, x, b.maxY);
+    for (let y = b.minY + ts[1], c = 0; y < b.maxY - 0.01 && c < 400; y += ts[1], c++) seg(b.minX, y, b.maxX, y);
+  } else if (f.dir === 'v') { // 12 wide, 24 tall: every other column is shifted up half a tile
+    for (let x = b.minX + ts[0], c = 0; x < b.maxX - 0.01 && c < 400; x += ts[0], c++) seg(x, b.minY, x, b.maxY);
+    for (let x = b.minX, col = 0; x < b.maxX - 0.01 && col < 400; x += ts[0], col++)
+      for (let y = b.minY + (col % 2 ? ts[1] / 2 : ts[1]), r = 0; y < b.maxY - 0.01 && r < 400; y += ts[1], r++) seg(x, y, Math.min(x + ts[0], b.maxX), y);
+  } else { // 24 wide, 12 tall: every other row is shifted sideways half a tile
+    for (let y = b.minY + ts[1], c = 0; y < b.maxY - 0.01 && c < 400; y += ts[1], c++) seg(b.minX, y, b.maxX, y);
+    for (let y = b.minY, row = 0; y < b.maxY - 0.01 && row < 400; y += ts[1], row++)
+      for (let x = b.minX + (row % 2 ? ts[0] / 2 : ts[0]), r = 0; x < b.maxX - 0.01 && r < 400; x += ts[0], r++) seg(x, y, x, Math.min(y + ts[1], b.maxY));
+  }
   return `<clipPath id="roomfloorclip"><polygon points="${polyPts(d)}"/></clipPath><g clip-path="url(#roomfloorclip)">${g.join('')}</g>`;
 }
 
@@ -67,7 +78,7 @@ export function floorArea(d: Design): number {
 
 /** Dashed ridge line, uphill arrows and a short tag for a vaulted ceiling. */
 export function ceilingSvg(d: Design, S: number): string {
-  const v = vaultOf(d); const info = vaultInfo(d); if (!info) return '';
+  const v = vaultOf(d); const info = vaultInfo(d); if (!info || v.hide) return '';
   const b = box(d); const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2; const fs = 12 / S; const a = 9 / S;
   const o: string[] = [];
   const arrow = (x: number, y: number, ux: number, uy: number) => {

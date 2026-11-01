@@ -627,6 +627,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         {vaultOf(d).shape === 'slope' && <Chips label="Ceiling rises toward" value={vaultOf(d).toward} opts={[['top', 'Top wall'], ['right', 'Right wall'], ['bottom', 'Bottom wall'], ['left', 'Left wall']]} onPick={v => commit({ ...d, vault: { ...(d.vault || {}), toward: v } })} />}
         {vaultOf(d).shape === 'peak' && <Chips label="Peak runs" value={vaultOf(d).ridge} opts={[['lr', 'Left to right'], ['ud', 'Up and down']]} onPick={v => commit({ ...d, vault: { ...(d.vault || {}), ridge: v } })} />}
         {vaultOf(d).shape !== 'flat' && (<>
+          <Chips label="Show ceiling on the plan" value={!vaultOf(d).hide} opts={[[true, 'Visible'], [false, 'Hidden']]} onPick={v => commit({ ...d, vault: { ...(d.vault || {}), hide: !v } })} />
           <Chips label="Pitch" value={vaultOf(d).pitch} opts={[[4, '4 in 12'], [6, '6 in 12'], [8, '8 in 12']]} onPick={v => commit({ ...d, vault: { ...(d.vault || {}), pitch: v } })} />
           <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>{vaultText(d)} Top, bottom, left and right are as the plan is drawn on screen.</div>
         </>)}

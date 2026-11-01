@@ -10,6 +10,7 @@ import { SIDE_TYPES, sidesOf } from './showerwalls';
 import { APP_FINISHES, CAB_COLORS, CAB_DEFAULT, FLOOR_COLORS, TOP_COLORS, WALL_COLORS } from './finishes';
 import { TRIM_ITEMS, trimSuggest } from './trim';
 import { LINES, lineGroups } from './linefinishes';
+import { cornerPlace, cuOf, faceLen, rightCorners } from './cornerunit';
 import { FLOOR_TILES, floorOf, vaultOf, vaultText } from './finish';
 import { setWallHeight, wallHeights } from './walls';
 import { GLASS, WTYPES } from './model';
@@ -597,6 +598,17 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
                 <Chips label="Tile behind it" value={P.tileUp === false ? 'off' : 'on'} opts={[['on', 'Tile up'], ['off', 'None']]} onPick={v => setP({ tileUp: v === 'on' })} />
                 {P.tileUp !== false && <Chips label="Tile goes up to" value={P.tileTo || 'ceiling'} opts={[['ceiling', 'The ceiling'], ['soffit', 'The soffit']]} onPick={v => setP({ tileTo: v })} />}
               </>}
+            </>);
+            if (it.kind === 'cornerunit') return (<>
+              <Num label="Along each wall" value={P.legs || it.w} onCommit={v => { const a = Math.max(12, v); upd(it.id, { w: a, d: a, p: { ...P, legs: a } }); }} />
+              <Num label="Side return (the small flat ends)" value={P.wing ?? 3} onCommit={v => setP({ wing: Math.max(0, v) })} />
+              <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>The open face works out to about {fmtIn(Math.round(faceLen(cuOf(it))))}. Make the legs longer for a wider face.</div>
+              <Num label="Height (under the top)" value={P.h || 34} onCommit={v => setP({ h: Math.max(12, v) })} />
+              <Num label="Granite top thickness" value={P.topT || 1.25} onCommit={v => setP({ topT: Math.max(0.5, v) })} />
+              <Chips label="Shelves above the bottom one" value={P.shelves ?? 1} opts={[[0, 'None'], [1, 'One'], [2, 'Two'], [3, 'Three']]} onPick={v => setP({ shelves: v })} />
+              <Num label="Bottom shelf off the floor" value={P.lift ?? 3} onCommit={v => setP({ lift: Math.max(0, v) })} />
+              <Chips label="Put it in a room corner" value={-1} opts={rightCorners(d!).map(i => [i, 'Corner ' + (i + 1)] as [number, string])} onPick={v => upd(it.id, cornerPlace(d!, it, v))} />
+              <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.4 }}>You can also drag it. It is tiled; the top takes the room's countertop color.</div>
             </>);
             if (it.kind === 'shower' && P.poly) return (<>
               <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>Drag an orange corner to reshape the floor. Tap a + on an edge to add a corner there.</div>

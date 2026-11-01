@@ -55,6 +55,7 @@ export const KINDS: Record<string, Kind> = {
   shower:   { name: 'Shower', layer: 'floor', snap: true, w: 60, d: 32, props: SHOWER, cat: 'Plumbing', modes: ['bath'] },
   tub:      { name: 'Tub', layer: 'floor', snap: true, w: 60, d: 30, props: { drain: 'left', door: false, doorH: 58, niche: 'none', shelves: 'none' }, cat: 'Plumbing', modes: ['bath'] },
   ftub:     { name: 'Freestanding tub', layer: 'floor', snap: false, w: 60, d: 30, cat: 'Plumbing', modes: ['bath'] },
+  cornerunit: { name: 'Corner storage unit', layer: 'floor', snap: false, w: 38, d: 38, props: { legs: 38, wing: 3, h: 34, topT: 1.25, shelves: 1, lift: 3 }, cat: 'Plumbing', modes: ['bath'] },
   tubfiller:{ name: 'Tub filler', layer: 'hung', snap: true, w: 6, d: 3, cat: 'Plumbing', modes: ['bath'] },
   rainhead: { name: 'Rain head', layer: 'ceiling', snap: false, w: 8, d: 8, props: { size: 8 }, cat: 'Plumbing', modes: ['bath'] },
   toilet:   { name: 'Toilet', layer: 'floor', snap: true, w: 20, d: 29, props: { bowl: 'elong' }, cat: 'Plumbing', modes: ['bath'] },
@@ -306,6 +307,7 @@ export function addList(c: Cat, mode: Mode): AddEntry[] {
     bases.forEach(([w, d]) => out.push({ key: `kb-${w}x${d}`, kind: 'shower', name: `Kohler base ${w} × ${d}`, sub: d === 42 ? '42" deep' : 'standard depth', w, d, section: 'Kohler shower bases (tile or wet wall panels on top)', p: { unit: 'base', tile: false, left: 'wall', right: 'wall', front: 'open', door: false, curb: true, drain: 'center', valve: 'back' } }));
     const su: Array<[number, number, string]> = [[36, 34, 'center drain'], [42, 34, 'curved front'], [48, 34, 'center drain'], [60, 34, 'center drain'], [60, 30, 'end drain'], [60, 32, 'end drain'], [36, 36, ''], [42, 36, ''], [48, 36, ''], [60, 36, ''], [48, 36, 'with seat'], [60, 36, 'with seat'], [39.375, 39.375, 'accessible, roll-in'], [63.25, 39.375, 'accessible, roll-in']];
     su.forEach(([w, d, n]) => out.push({ key: `su-${w}x${d}${n}`, kind: 'shower', name: `Sterling ${sz(w)} × ${sz(d)}`, sub: n || 'shower unit', w, d, section: 'Sterling by Kohler shower units', p: { unit: 'sterling', tile: false, left: 'wall', right: 'wall', front: 'open', door: false, curb: true, drain: n.includes('end') ? 'endR' : 'center', valve: 'back', ...(n.includes('seat') ? { bench: 'left', benchW: 15 } : {}) } }));
+    out.push({ key: 'corner-unit', kind: 'cornerunit', name: 'Corner storage unit (tiled, granite top)', sub: 'a triangle for a shower corner: set the legs, shelves and top', w: 38, d: 38, section: 'Custom pieces' });
     out.push({ key: 'tub-alcove', kind: 'tub', name: 'Tub', sub: 'alcove, set any size', w: 60, d: 30, section: 'Tubs' });
     out.push({ key: 'tub-free60', kind: 'ftub', name: 'Freestanding tub, small', sub: '60" long', w: 60, d: 30, section: 'Tubs' });
     out.push({ key: 'tub-free70', kind: 'ftub', name: 'Freestanding tub, large', sub: '70" long', w: 70, d: 32, section: 'Tubs' });

@@ -11,6 +11,7 @@ import { floorOf, vaultOf } from './finish';
 import { wallHeights } from './walls';
 import { windowOf } from './windows';
 import { sidesOf } from './showerwalls';
+import { cornerPoly, cuOf, dedupe, insetPoly, midShelves, topPoly } from './cornerunit';
 
 const COL = { wall: '#f3f0e8', floor: '#d8d4c9', cab: '#d3bd94', white: '#f4f4f1', steel: '#c4c8ca', dark: '#3b4144', soffit: '#e8dfc9', brass: '#a08a58', glass: '#9fd0e6' };
 
@@ -204,6 +205,7 @@ function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
     const f = frame(it, pts); const M = frameM(f.ux, f.uy, f.nx, f.ny, f.cx, f.cy);
     if (k.layer === 'ceiling') { ceilingItem(g, it, f.cx, f.cy, d); continue; }
     if (it.kind === 'shower') { shower(g, it, M, d); continue; }
+    if (it.kind === 'cornerunit') { cornerUnit3d(g, it, M, d); continue; }
     for (const p of parts(it, d)) boxAt(M, p);
   }
 
@@ -288,6 +290,31 @@ function shower(g: THREE.Group, it: DItem, M: THREE.Matrix4, d: Design) {
     else if (bs === 'cornerL') bm(T2(RB / 2 - w / 2, RB / 2 - dp / 2), RB, RB);
     else if (bs === 'cornerR') bm(T2(w / 2 - RB / 2, RB / 2 - dp / 2), RB, RB);
   }
+}
+
+/** The tiled corner storage unit: a toe recess, a raised bottom shelf, middle shelves, a top panel, end returns, and a granite top. */
+function cornerUnit3d(g: THREE.Group, it: DItem, M: THREE.Matrix4, d: Design) {
+  const c = cuOf(it); const w = it.w, dp = it.d; const tile = it.p?.tileColor || '#e6e2d6'; const granite = colorPaint(it.p?.tcolor || d.counter?.color)?.fill || '#b7b4ac'; const TH = 1;
+  const slab = (poly: Array<[number, number]>, y0: number, t: number, color: string) => {
+    const sh = new THREE.Shape(dedupe(poly).map(q => new THREE.Vector2(q[0] - w / 2, -(q[1] - dp / 2))));
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: t, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, y0, 0);
+    const m = new THREE.Mesh(geo, mat(color)); m.matrixAutoUpdate = false; m.matrix.copy(M); g.add(m);
+  };
+  const poly = cornerPoly(c);
+  slab(insetPoly(c), 0, c.lift, tile);                    // toe recess under the bottom shelf
+  slab(poly, c.lift, TH, tile);                           // bottom shelf, raised off the floor
+  midShelves(c, TH).forEach(y => slab(poly, y, TH, tile)); // middle shelves
+  slab(poly, c.h - TH, TH, tile);                         // underside of the top
+  slab(topPoly(c), c.h, c.topT, granite);                 // granite top, slightly past the face
+  const cx = poly.reduce((s, q) => s + q[0], 0) / poly.length, cy = poly.reduce((s, q) => s + q[1], 0) / poly.length;
+  const wing = (a: [number, number], b: [number, number]) => { // an end panel across the pocket ends
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1) return; const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+    let nx = uz, nz = -ux; if (nx * ((a[0] + b[0]) / 2 - cx) + nz * ((a[1] + b[1]) / 2 - cy) > 0) { nx = -nx; nz = -nz; } // push it inward
+    const mx = (a[0] + b[0]) / 2 + nx * 0.75 - w / 2, mz = (a[1] + b[1]) / 2 + nz * 0.75 - dp / 2; const hh = c.h - c.lift;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(L, hh, 1.5), mat(tile)); mesh.matrixAutoUpdate = false;
+    mesh.matrix.copy(M.clone().multiply(new THREE.Matrix4().makeTranslation(mx, c.lift + hh / 2, mz)).multiply(new THREE.Matrix4().makeBasis(new THREE.Vector3(ux, 0, uz), new THREE.Vector3(0, 1, 0), new THREE.Vector3(-uz, 0, ux)))); g.add(mesh);
+  };
+  if (c.r > 1) { wing([c.a, 0], [c.a, c.r]); wing([c.r, c.a], [0, c.a]); }
 }
 
 // ---------- the screen ----------

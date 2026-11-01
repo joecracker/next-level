@@ -3,6 +3,7 @@
 // corner against the wall, x runs along the wall, y runs out into the room. S = pixels per inch.
 import { T, benchSide, fmtIn, polyArea, type DItem } from './model';
 import { polySidesSvg } from './showerwalls';
+import { cornerPoly, cuOf, faceLen, topPoly } from './cornerunit';
 
 const INK = '#14191A', GL = '#3f8fa8', CURB = '#9ea49a', BRASS = '#9a7a2c', TILE = '#b9c0b6';
 const f = (n: number) => Math.round(n * 100) / 100;
@@ -32,6 +33,13 @@ function polyShower(it: DItem, S: number, fs: number): string {
   o.push(circ(cx, cy - 6, 2.5, `fill="#fff" stroke="${INK}" stroke-width="${line1}"`) + circ(cx, cy - 6, 0.9, `fill="${INK}"`));
   o.push(txt('SHOWER FLOOR', cx, cy + 2, fs * 0.9, '#333') + txt(`${Math.round(polyArea(poly) / 14.4) / 10} sq ft`, cx, cy + 2 + fs * 1.1, fs * 0.8, '#555'));
   return o.join('');
+}
+
+function cornerUnit2d(it: DItem, S: number, fs: number, stroke: string, sw: number): string {
+  const c = cuOf(it); const pp = (poly: Array<[number, number]>) => poly.map(q => f(q[0]) + ',' + f(q[1])).join(' ');
+  return '<polygon points="' + pp(topPoly(c)) + '" fill="rgba(160,138,88,0.18)" stroke="#8a6d2f" stroke-width="' + f(1.2 / S) + '" stroke-dasharray="' + f(4 / S) + ' ' + f(3 / S) + '"/>' +
+    '<polygon points="' + pp(cornerPoly(c)) + '" fill="#e6e2d6" stroke="' + stroke + '" stroke-width="' + f(sw) + '"/>' +
+    txt('CORNER UNIT', c.a * 0.36, c.a * 0.34, fs * 0.8, '#3b4440') + txt(fmtIn(Math.round(faceLen(c))) + ' face', c.a * 0.36, c.a * 0.34 + fs * 1.1, fs * 0.7, '#555');
 }
 
 function shower(it: DItem, S: number, fs: number, stroke: string, sw: number): string {
@@ -239,6 +247,7 @@ export function fixtureShape(it: DItem, S: number, fs: number, stroke: string, s
       case 'kneewall': return rect(0, 0, w, d, `fill="#a4a99f" stroke="${stroke}" stroke-width="${sw}"`) + (w * S > 40 ? txt(`KNEE ${Math.round(it.p?.height ?? 36)}"`, w / 2, d / 2, Math.min(fs * 0.7, d), '#222') : '');
       case 'partition': return rect(0, 0, w, d, `fill="${INK}" stroke="${stroke}" stroke-width="${sw}"`);
       case 'shower': return shower(it, S, fs, stroke, sw);
+    case 'cornerunit': return cornerUnit2d(it, S, fs, stroke, sw);
       case 'ftub': return ftub(it, S, fs, stroke, sw);
       case 'tub': return tub(it, S, fs, stroke, sw);
       case 'toilet': return toilet(it, S, fs, stroke, sw);

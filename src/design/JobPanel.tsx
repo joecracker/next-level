@@ -102,8 +102,17 @@ export default function JobPanel({ children }: { children: ReactNode }) {
             </>
           ) : (
             <div style={{ marginTop: '14px' }}>
+              {big ? (
+                <div>
+                  <button onClick={() => setBig(null)} style={{ minHeight: '44px', padding: '0 14px', borderRadius: '10px', border: '1px solid rgba(238,241,238,0.25)', background: 'rgba(238,241,238,0.06)', color: 'var(--cream)', fontWeight: 700, fontSize: '15px', cursor: 'pointer' }}>{'\u2039'} Back to pictures</button>
+                  <img src={big.url} alt={big.cap} style={{ display: 'block', width: '100%', height: 'auto', maxHeight: '72vh', objectFit: 'contain', marginTop: '10px', borderRadius: '8px', background: '#111' }} />
+                  <div style={{ marginTop: '10px', fontSize: '15px', lineHeight: 1.4 }}><b style={{ wordBreak: 'break-word' }}>{big.cap || '(no name)'}</b>{big.note && <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{big.note}</div>}</div>
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--muted)' }}>Want it bigger? Pull the panel edge wider, or use Split screen above. The drawing stays right beside it.</div>
+                </div>
+              ) : (<>
               {data.photos.length === 0 && <p style={{ color: 'var(--muted)' }}>No pictures on this job yet.</p>}
               {data.photos.map(p => <div key={p.id}><Thumb id={p.id} caption={p.caption} note={p.note} onOpen={(url, cap, note) => setBig({ url, cap, note })} /></div>)}
+              </>)}
             </div>
           )}
         </div>
@@ -120,12 +129,6 @@ export default function JobPanel({ children }: { children: ReactNode }) {
       </button>
       <div style={{ flex: 1, minWidth: 0, position: 'relative', display: 'flex', flexDirection: 'column' }}>{children}</div>
       {narrow && pref.open && panel}
-      {big && (
-        <div onClick={() => setBig(null)} style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <img src={big.url} alt={big.cap} style={{ maxWidth: '100%', maxHeight: '78vh', objectFit: 'contain' }} />
-          <div style={{ color: '#fff', marginTop: '10px', textAlign: 'center', maxWidth: '640px' }}><b>{big.cap}</b>{big.note && <div style={{ color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>{big.note}</div>}<div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '6px' }}>Tap anywhere to close</div></div>
-        </div>
-      )}
     </div>
   );
 }

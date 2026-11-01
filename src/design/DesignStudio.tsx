@@ -333,6 +333,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const [cabGroup, setCabGroup] = useState('Base cabinets');
   const [cabFam, setCabFam] = useState('');
   const [tab, setTab] = useState<'edit' | 'check' | 'list' | 'trim'>('edit');
+  const [menuOpen, setMenuOpenRaw] = useState(() => { try { return localStorage.getItem('nl.studiomenu.v1') !== 'closed'; } catch { return true; } });
+  const setMenuOpen = (v: boolean) => { setMenuOpenRaw(v); try { localStorage.setItem('nl.studiomenu.v1', v ? 'open' : 'closed'); } catch { /* not saved */ } };
   const [pageMenu, setPageMenu] = useState(false);
   const [pageModal, setPageModal] = useState<null | { mode: 'new' | 'rename'; name: string }>(null);
   const [delArmed, setDelArmed] = useState(false);
@@ -959,7 +961,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             </div>}
             {msg && <div style={{ position: 'absolute', left: '50%', bottom: 16, transform: 'translateX(-50%)', background: '#000c', color: '#fff', padding: '10px 16px', borderRadius: '10px', fontSize: '15px', maxWidth: '90%', textAlign: 'center' }}>{msg}</div>}
           </div>
-          {d && <div style={{ ...(wide ? { width: '320px', borderLeft: '1px solid rgba(238,241,238,0.12)' } : { maxHeight: sel ? '46%' : '30%', borderTop: '1px solid rgba(238,241,238,0.12)' }), overflowY: 'auto', flexShrink: 0, background: 'var(--ink)' }}>{inspector}</div>}
+          {d && wide && <button onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Put the menu away' : 'Bring the menu back'} title={menuOpen ? 'Put the menu away to give the drawing more room' : 'Bring the menu back'} style={{ flexShrink: 0, width: '30px', border: 'none', borderLeft: '1px solid rgba(238,241,238,0.12)', background: menuOpen ? 'rgba(238,241,238,0.06)' : 'rgba(232,115,26,0.25)', color: 'var(--cream)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={{ writingMode: 'vertical-rl', fontSize: '12px', fontWeight: 800, letterSpacing: '0.22em' }}>{menuOpen ? 'MENU \u203A' : '\u2039 MENU'}</span></button>}
+          {d && (menuOpen || !wide) && <div style={{ ...(wide ? { width: '320px', borderLeft: '1px solid rgba(238,241,238,0.12)' } : { maxHeight: sel ? '46%' : '30%', borderTop: '1px solid rgba(238,241,238,0.12)' }), overflowY: 'auto', flexShrink: 0, background: 'var(--ink)' }}>{inspector}</div>}
         </div>
       </JobPanel>
 

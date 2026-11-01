@@ -4,6 +4,7 @@
 import { KINDS, T, corners, fmtIn, frame, isCab, seg, type DItem, type Design } from './model';
 import { fixtureShape } from './shapes';
 import { countertopSvg, counterSummary, fixtureLines } from './counter';
+import { ceilingSvg, finishLines, floorTileSvg } from './finish';
 
 const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const INK = '#14191A';
@@ -55,6 +56,7 @@ export function designBody(d: Design, S: number, selId?: string | null, title?: 
     const poly = pts.map(p => `${p.x},${p.y}`).join(' ');
     out.push(`<polygon points="${poly}" fill="none" stroke="#6b6f6c" stroke-width="${T * 2}" stroke-linejoin="miter"/>`);
     out.push(`<polygon points="${poly}" fill="#f4f1ea" stroke="${INK}" stroke-width="${2 / S}" stroke-linejoin="miter"/>`);
+    out.push(floorTileSvg(d, S));
   }
   const order: string[] = ['inwall', 'floor', 'hung', 'ceiling'];
   const items = (d.items || []).slice().sort((a, b) => order.indexOf(KINDS[a.kind].layer) - order.indexOf(KINDS[b.kind].layer));
@@ -67,6 +69,7 @@ export function designBody(d: Design, S: number, selId?: string | null, title?: 
     out.push(`<g transform="translate(${f.cx} ${f.cy}) rotate(${f.rot})">${itemShape(it, S, it.id === selId, fs)}${ring}</g>`);
   }
   if (!topsDone) out.push(countertopSvg(d, S));
+  out.push(ceilingSvg(d, S));
   if (pts.length >= 3) { // wall lengths, outside the wall
     pts.forEach((p, i) => {
       const s = seg(pts, i); if (s.L < 1) return;
@@ -133,6 +136,7 @@ function counterLines(d: Design, pre: Array<string | number> = []): Array<Array<
     if (c.splash !== 'none') rows.push([...pre, 1, '', c.splash === 'tile' ? 'Backsplash - tile to the uppers' : `Backsplash - 4" ${c.mat}`, '', '', '', `about ${Math.round(c.splashLen * 10) / 10} linear ft along the wall runs`]);
   }
   for (const x of fixtureLines(d)) rows.push([...pre, x.qty, '', x.desc, '', '', '', x.note]);
+  for (const x of finishLines(d)) rows.push([...pre, x.qty, '', x.desc, '', '', '', x.note]);
   return rows;
 }
 export function takeoffCsv(d: Design, job?: { name?: string; customer?: string }): string | null {

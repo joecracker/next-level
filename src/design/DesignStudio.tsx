@@ -6,6 +6,7 @@ import { runChecks } from './checks';
 import { MAKERS, catalogFor, readyCatalogs, familiesFor, groupsFor, kindForEntry, matches, type CabEntry } from './catalog';
 import { designBody, designBounds, itemShape, takeoffRows } from './exports';
 import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf, sinkOf, ovOf } from './counter';
+import { FLOOR_TILES, floorOf, vaultOf, vaultText } from './finish';
 import {
   CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, polyPatch, polyWorld, toPolyLocal, seg, snapTo, template,
   type Cat, type DItem, type Design, type Pt,
@@ -622,6 +623,15 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
       </>) : (<>
         <div style={{ fontWeight: 800, fontSize: '18px' }}>{d.mode === 'bath' ? 'Bathroom' : 'Kitchen'}</div>
         <Num label="Ceiling height" value={d.ceiling || 96} onCommit={c => commit({ ...d, ceiling: Math.max(48, c) })} />
+        <Chips label="Ceiling shape" value={vaultOf(d).shape} opts={[['flat', 'Flat'], ['slope', 'Vaulted, one slope'], ['peak', 'Vaulted peak']]} onPick={v => commit({ ...d, vault: { ...(d.vault || {}), shape: v } })} />
+        {vaultOf(d).shape === 'slope' && <Chips label="Ceiling rises toward" value={vaultOf(d).toward} opts={[['top', 'Top wall'], ['right', 'Right wall'], ['bottom', 'Bottom wall'], ['left', 'Left wall']]} onPick={v => commit({ ...d, vault: { ...(d.vault || {}), toward: v } })} />}
+        {vaultOf(d).shape === 'peak' && <Chips label="Peak runs" value={vaultOf(d).ridge} opts={[['lr', 'Left to right'], ['ud', 'Up and down']]} onPick={v => commit({ ...d, vault: { ...(d.vault || {}), ridge: v } })} />}
+        {vaultOf(d).shape !== 'flat' && (<>
+          <Chips label="Pitch" value={vaultOf(d).pitch} opts={[[4, '4 in 12'], [6, '6 in 12'], [8, '8 in 12']]} onPick={v => commit({ ...d, vault: { ...(d.vault || {}), pitch: v } })} />
+          <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>{vaultText(d)} Top, bottom, left and right are as the plan is drawn on screen.</div>
+        </>)}
+        <Chips label="Room floor tile" value={floorOf(d).tile} opts={FLOOR_TILES} onPick={v => commit({ ...d, floor: { ...(d.floor || {}), tile: v } })} />
+        {floorOf(d).tile === '12x24' && <Chips label="Tile runs" value={floorOf(d).dir} opts={[['v', 'Up and down'], ['h', 'Side to side']]} onPick={v => commit({ ...d, floor: { ...(d.floor || {}), dir: v } })} />}
         <Chips label="Countertop material" value={counterOf(d).mat} opts={MATS.map(m => [m.id, m.name] as [string, string])} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), mat: v } })} />
         <Chips label="Backsplash" value={counterOf(d).splash} opts={SPLASHES} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), splash: v as 'stone' | 'tile' | 'none' } })} />
         <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>Tap anything to change it. Drag a wall to stretch the room, or drag a corner for odd shapes. Use Add to place things.</div>

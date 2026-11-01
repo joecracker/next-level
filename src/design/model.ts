@@ -25,6 +25,8 @@ export interface Design {
   ceiling?: number;    // ceiling height, inches
   accepted?: Record<string, boolean>; // robot checks Tim chose to keep as they are
   counter?: { mat?: string; splash?: 'stone' | 'tile' | 'none' }; // countertop material and backsplash for the whole drawing
+  floor?: { tile?: string; dir?: 'v' | 'h' }; // room floor tile (plain, 12, 12x24, 24, 2) and which way 12x24 runs
+  vault?: { shape?: 'flat' | 'slope' | 'peak'; toward?: 'top' | 'right' | 'bottom' | 'left'; ridge?: 'lr' | 'ud'; pitch?: number }; // ceiling shape
 }
 
 export type Layer = 'floor' | 'hung' | 'inwall' | 'ceiling';

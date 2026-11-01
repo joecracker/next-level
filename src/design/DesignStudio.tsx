@@ -606,6 +606,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
                 <Chips label="Bench along" value={bn ? bn.edge : -1} opts={[[-1, 'No bench'], ...poly.map((_, i) => [i, 'Side ' + (i + 1)] as [number, string])]} onPick={v => setP({ bench: v < 0 ? null : { edge: v, depth: bn?.depth || 15 } })} />
                 {bn && <Num label="Bench depth" value={bn.depth || 15} onCommit={v => setP({ bench: { edge: bn.edge, depth: Math.max(6, v) } })} />}
                 {bn && <Chips label="Bench top" value={P.benchTop || 'tile'} opts={[['tile', 'Tile'], ['granite', 'Granite']]} onPick={v => setP({ benchTop: v })} />}
+                {bn && <Chips label="Bench style (3D)" value={P.benchStyle || 'box'} opts={[['box', 'Boxed, to the floor'], ['float', 'Floating slab']]} onPick={v => setP({ benchStyle: v })} />}
               </Sec>); })()}
               <button style={btn} disabled={vtx === null || (P.poly as any[]).length <= 3 || vtx >= (P.poly as any[]).length} onClick={() => { const np = (P.poly as Array<[number, number]>).filter((_, i) => i !== vtx); commit(patchItem(d!, it.id, polyPatch(it, d!.pts, np))); setVtx(null); }}>Remove the selected corner</button>
               <Chips label="Threshold" value={P.curb ? 'curb' : 'flat'} opts={[['curb', 'Curb'], ['flat', 'Curbless']]} onPick={v => setP({ curb: v === 'curb' })} />
@@ -641,6 +642,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
               {!P.unit && <Sec title="Bench, niche & shelves">
               <Chips label="Bench" value={P.bench || 'none'} opts={[['none', 'None'], ['auto', 'Far from valve'], ['left', 'Left'], ['right', 'Right'], ['cornerL', 'Corner L'], ['cornerR', 'Corner R']]} onPick={v => setP({ bench: v })} />
               {P.bench && P.bench !== 'none' && <Num label="Bench depth" value={P.benchW || 15} onCommit={v => setP({ benchW: Math.max(10, v) })} />}
+                {P.bench && P.bench !== 'none' && <Chips label="Bench style (3D)" value={P.benchStyle || 'box'} opts={[['box', 'Boxed, to the floor'], ['float', 'Floating slab']]} onPick={v => setP({ benchStyle: v })} />}
               <Chips label="Niche" value={P.niche || 'none'} opts={[['none', 'None'], ['back', 'Back'], ['left', 'Left'], ['right', 'Right']]} onPick={v => setP({ niche: v })} />
               <Chips label="Corner shelves" value={P.shelves || 'none'} opts={[['none', 'None'], ['bl', 'Back-left'], ['br', 'Back-right'], ['both', 'Both']]} onPick={v => setP({ shelves: v })} />
               </Sec>}
@@ -662,7 +664,10 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             </>);
             if (it.kind === 'partition') return <div style={{ fontSize: '14px', color: 'var(--muted)' }}>Inside walls always run to the ceiling.</div>;
             if (it.kind === 'toilet') return <Chips label="Bowl" value={P.bowl} opts={[['elong', 'Elongated'], ['round', 'Round']]} onPick={v => setP({ bowl: v })} />;
-            if (it.kind === 'vanity') return <Chips label="Sinks" value={P.sinks} opts={[[1, 'One'], [2, 'Two']]} onPick={v => setP({ sinks: v })} />;
+            if (it.kind === 'vanity') return (<>
+              <Chips label="Sinks" value={P.sinks} opts={[[1, 'One'], [2, 'Two']]} onPick={v => setP({ sinks: v })} />
+              <Chips label="Sink bowl (3D)" value={P.bowlShape || 'oval'} opts={[['oval', 'Oval'], ['round', 'Round'], ['rect', 'Rectangular']]} onPick={v => setP({ bowlShape: v })} />
+            </>);
             if (it.kind === 'soffit') return <Num label="Drop below ceiling" value={P.drop ?? 12} onCommit={v => setP({ drop: Math.max(1, v) })} />;
             if (it.kind === 'switch') return <Chips label="Gangs" value={P.gang || 1} opts={[[1, '1'], [2, '2'], [3, '3']]} onPick={v => setP({ gang: v })} />;
             return null;

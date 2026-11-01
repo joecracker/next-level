@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { KINDS, T, frame, seg, type DItem, type Design, type Pt } from './model';
+import { KINDS, T, benchSide, frame, seg, type DItem, type Design, type Pt } from './model';
 import { counterSlabs, paintOf } from './counter';
 import { appHex, cabColor, colorPaint, floorHexOf, shade, wallHexOf } from './finishes';
 import { floorOf, vaultOf } from './finish';
@@ -99,8 +99,25 @@ function parts(it: DItem, d: Design): Part[] {
     case 'fridge': return [P({ h: 70, color: app })];
     case 'range': return [P({ h: 35, color: app }), P({ y0: 35, h: 1, color: COL.dark }), P({ y0: 36, h: 6, dd: 3, lz: -dp / 2 + 1.5, color: app })];
     case 'dw': return [P({ h: 34, color: app })];
-    case 'vanity': case 'desk': { const h = it.h || k.h || 34.5; return [P({ h }), top(h)]; }
-    case 'base': case 'sinkbase': case 'drawer': case 'island': case 'pantry': case 'linen': case 'utility': case 'endpanel':
+    case 'vanity': case 'desk': {
+      const h = it.h || k.h || 34.5; const o: Part[] = [P({ h }), top(h)];
+      if (it.kind === 'vanity') { // undermount bowls, sized like common ones: oval 19x13.3, round 15, rectangular 19x14
+        const sh = p.bowlShape === 'round' ? 'round' : p.bowlShape === 'rect' ? 'rect' : 'oval'; const n = p.sinks === 2 ? 2 : 1;
+        const bw = sh === 'round' ? 15 : 19, bd = sh === 'round' ? 15 : sh === 'oval' ? 13.3 : 14;
+        for (let i = 0; i < n; i++) o.push(P({ lx: n === 2 ? (i ? 1 : -1) * w / 4 : 0, lz: 0.5, w: Math.min(bw, w / n - 4), dd: bd, y0: h + 1.5, h: 0.15, round: sh !== 'rect', color: '#eef2f3' }));
+      }
+      return o;
+    }
+    case 'sinkbase': { // the cabinet and the sink bowls cut into its top
+      const o: Part[] = [P({ h: it.h || k.h || 34.5 })]; const sk = (p.sink as string) || '5050';
+      if (sk !== 'none' && p.top !== false) {
+        const bd = Math.min(Math.max(10, dp - 6), 16); const iw = Math.max(12, w - 3); const steel = '#b6bcc0';
+        if (sk === '5050') { const bw = (iw - 1.5) / 2; o.push(P({ lx: -(bw + 1.5) / 2, lz: -dp / 2 + 3.5 + bd / 2, w: bw, dd: bd, y0: 36, h: 0.15, color: steel }), P({ lx: (bw + 1.5) / 2, lz: -dp / 2 + 3.5 + bd / 2, w: bw, dd: bd, y0: 36, h: 0.15, color: steel })); }
+        else o.push(P({ lz: -dp / 2 + 3.5 + bd / 2, w: Math.min(iw, sk === 'farm' ? 33 : 30), dd: sk === 'farm' ? Math.max(12, dp - 4.5) : bd, y0: 36, h: 0.15, color: steel }));
+      }
+      return o;
+    }
+    case 'base': case 'drawer': case 'island': case 'pantry': case 'linen': case 'utility': case 'endpanel':
       return [P({ h: it.h || k.h || 34.5 })];
     case 'upper': return [P({ y0: 54, h: it.h || 30 })];
     case 'hood': return [P({ y0: 66, h: 14, color: app })];
@@ -252,6 +269,24 @@ function shower(g: THREE.Group, it: DItem, M: THREE.Matrix4, d: Design) {
     else if (t === 'glass') put(0, L, floorH, 72, 0.6, 0, COL.glass, 0.28);
     else if (t === 'door') { const dw = Math.min(p.doorW || 30, Math.max(6, L - 4)); const s0 = (L - dw) / 2; put(0, s0, floorH, 72, 0.6, 0, COL.glass, 0.28); put(s0 + dw, L, floorH, 72, 0.6, 0, COL.glass, 0.28); }
   });
+  // bench: a solid block 18 in high, or a thin slab floating 15 in off the floor
+  const float = p.benchStyle === 'float'; const bcol = p.benchTop === 'granite' ? '#d9d3c7' : '#e2e4dd'; const bh = float ? 3 : 18 - floorH; const by0 = float ? 15 : floorH;
+  const bm = (M2: THREE.Matrix4, bw: number, bd: number) => { const m2 = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), mat(bcol)); m2.matrixAutoUpdate = false; m2.matrix.copy(M2); g.add(m2); };
+  const bn = p.bench as { edge: number; depth: number } | null | undefined;
+  if (p.poly && bn && typeof bn === 'object' && bn.edge >= 0 && bn.edge < loc.length) {
+    const a = loc[bn.edge], b = loc[(bn.edge + 1) % loc.length]; const ex = b[0] - a[0], ez = b[1] - a[1]; const L = Math.hypot(ex, ez);
+    if (L > 1) {
+      const ux = ex / L, uz = ez / L; let nx = uz, nz = -ux; if (nx * ((a[0] + b[0]) / 2 - cx) + nz * ((a[1] + b[1]) / 2 - cz) < 0) { nx = -nx; nz = -nz; }
+      const dep = Math.max(6, bn.depth || 15); const mx = (a[0] + b[0]) / 2 - nx * dep / 2, mz = (a[1] + b[1]) / 2 - nz * dep / 2;
+      bm(M.clone().multiply(new THREE.Matrix4().makeTranslation(mx, by0 + bh / 2, mz)).multiply(new THREE.Matrix4().makeBasis(new THREE.Vector3(ux, 0, uz), new THREE.Vector3(0, 1, 0), new THREE.Vector3(-uz, 0, ux))), L, dep);
+    }
+  } else if (!p.poly) {
+    const bs = benchSide(p); const bw = Math.min(p.benchW || 15, w - 6); const RB = 18; const T2 = (lx: number, lz: number) => M.clone().multiply(new THREE.Matrix4().makeTranslation(lx, by0 + bh / 2, lz));
+    if (bs === 'left') bm(T2(bw / 2 - w / 2, -0.5), bw, dp - 1);
+    else if (bs === 'right') bm(T2(w / 2 - bw / 2, -0.5), bw, dp - 1);
+    else if (bs === 'cornerL') bm(T2(RB / 2 - w / 2, RB / 2 - dp / 2), RB, RB);
+    else if (bs === 'cornerR') bm(T2(w / 2 - RB / 2, RB / 2 - dp / 2), RB, RB);
+  }
 }
 
 // ---------- the screen ----------

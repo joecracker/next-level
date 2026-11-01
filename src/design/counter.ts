@@ -67,6 +67,9 @@ function slabs(d: Design): Slab[] {
   return out;
 }
 
+/** The drawn countertop slabs (corner points on the plan and material), for the 3D view. */
+export function counterSlabs(d: Design) { return slabs(d); }
+
 /** Backsplash strips: one per continuous run of tops along a wall. */
 function splashRuns(d: Design): Array<{ poly: Pt[]; len: number; mat: string }> {
   const out: Array<{ poly: Pt[]; len: number; mat: string }> = [];

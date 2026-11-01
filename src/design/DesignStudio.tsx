@@ -1,6 +1,6 @@
 // Design Studio: draw the room, place and size things with live numbers, then save a plan picture and a
 // cabinet takeoff to the job. The drawing is stored on the job (project.design) and travels with it.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as RPE } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as RPE } from 'react';
 import JobPanel from './JobPanel';
 import { runChecks } from './checks';
 import { MAKERS, catalogFor, readyCatalogs, familiesFor, groupsFor, kindForEntry, matches, type CabEntry } from './catalog';
@@ -15,6 +15,8 @@ import {
   CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, polyPatch, polyWorld, toPolyLocal, seg, snapTo, template,
   type Cat, type DItem, type Design, type Pt,
 } from './model';
+
+const View3D = lazy(() => import('./View3D')); // the 3D library only loads when 3D is opened
 
 type Sel = { type: 'item'; id: string } | { type: 'wall'; i: number } | { type: 'corner'; i: number } | null;
 type View = { cx: number; cy: number; s: number };
@@ -150,6 +152,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const [design, setDesignState] = useState<Design | null>(() => { const d = NL?.getDesign(); return hasDesign(d) ? (d as Design) : null; });
   const designRef = useRef(design); designRef.current = design;
   const [sel, setSel] = useState<Sel>(null);
+  const [show3d, setShow3d] = useState(false);
   const [pEdge, setPEdge] = useState(0); // which side of a drawn shower floor is being set
   const [vtx, setVtx] = useState<number | null>(null); // the selected corner of a drawn shower floor
   const [view, setView] = useState<View | null>(null);
@@ -686,6 +689,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           <button style={{ ...btn, opacity: hist.current.length ? 1 : 0.4 }} onClick={undo} disabled={!hist.current.length}>Undo</button>
           <button style={{ ...btn, opacity: fut.current.length ? 1 : 0.4 }} onClick={redo} disabled={!fut.current.length}>Redo</button>
           <button style={btnOn} onClick={() => { setSearch(''); setAddOpen(true); }}>+ Add</button>
+          <button style={btn} onClick={() => setShow3d(true)}>3D</button>
+          {show3d && <Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 300, background: '#e6e9e4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b4440', fontWeight: 700 }}>Loading 3D...</div>}><View3D design={d} onClose={() => setShow3d(false)} /></Suspense>}
           <div style={{ position: 'relative' }}>
             <button style={btn} onClick={() => setSaveOpen(o => !o)}>Save ▾</button>
             {saveOpen && (

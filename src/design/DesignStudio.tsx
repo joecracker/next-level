@@ -11,6 +11,7 @@ import { APP_FINISHES, CAB_COLORS, CAB_DEFAULT, FLOOR_COLORS, TOP_COLORS, WALL_C
 import { TRIM_ITEMS, trimSuggest } from './trim';
 import { LINES, lineGroups } from './linefinishes';
 import { cornerPlace, cuOf, faceLen, rightCorners } from './cornerunit';
+import { customOf, deletePiece, loadPieces, newPart, partPoly, partsBounds, pieceEntry, savePiece, starterParts, SHAPES as PART_SHAPES, MATS as PART_MATS, matColor as partMatColor, type Part, type PartShape, type Saved as SavedPiece } from './custom';
 import { FLOOR_TILES, floorOf, vaultOf, vaultText } from './finish';
 import { setWallHeight, wallHeights } from './walls';
 import { GLASS, WTYPES } from './model';
@@ -83,6 +84,76 @@ function openSpot(d: Design, kind: string, w: number, dp: number, loose = false)
 }
 
 // ---------- editing the room ----------
+const SWATCHES = ['#ffffff', '#e8e6df', '#e6e2d6', '#c9c4b8', '#9a9a96', '#4a4f52', '#1f2326', '#1f3a5f', '#4f6f52', '#a0764e', '#6b4a32', '#3b2a1f', '#b7b4ac', '#d9c9a8'];
+/** The custom piece editor: a list of parts, each with a shape, material, color and position/size; a plan and front preview; and the saved-pieces folder. */
+function CustomEditor({ it, upd }: { it: DItem; upd: (id: string, p: Partial<DItem>) => void }) {
+  const v = customOf(it); const parts = v.parts; const P = it.p || {};
+  const [si, setSi] = useState(0); useEffect(() => { setSi(0); }, [it.id]); const [lib, setLib] = useState<SavedPiece[]>(() => loadPieces()); const [msg, setMsg] = useState('');
+  const i = Math.max(0, Math.min(si, parts.length - 1)); const pt: Part | undefined = parts[i];
+  const apply = (np: Part[]) => { // edit the parts but keep the piece's current stretch
+    const b = partsBounds(np);
+    upd(it.id, { w: b.w * v.sx, d: b.d * v.sy, h: b.h * v.sz, p: { ...P, parts: np, bw: b.w, bd: b.d, bh: b.h } });
+  };
+  const setPart = (q: Partial<Part>) => apply(parts.map((x, k) => (k === i ? { ...x, ...q } : x)));
+  const addPart = (shape: PartShape) => { const np = [...parts, newPart(shape, 'paint', shape === 'box' ? 'Box' : shape === 'tri' ? 'Triangle' : 'Corner wedge', { w: 12, d: 12, h: 12 })]; apply(np); setSi(np.length - 1); };
+  const b = partsBounds(parts); const sc = 150 / Math.max(b.w, b.d, b.h, 1);
+  const pv = { sx: 1, sy: 1 };
+  const preview = (<div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+    <svg width={b.w * sc + 8} height={b.d * sc + 8} viewBox={`-4 -4 ${b.w * sc + 8} ${b.d * sc + 8}`} style={{ background: '#fff', borderRadius: '8px' }}>
+      {[...parts.keys()].sort((x, y) => parts[x].z - parts[y].z).map(k => <polygon key={parts[k].id} points={partPoly(parts[k], pv).map(q => q[0] * sc + ',' + q[1] * sc).join(' ')} fill={parts[k].color} fillOpacity={parts[k].z > 0.5 ? 0.8 : 1} stroke={k === i ? '#e8742a' : '#444'} strokeWidth={k === i ? 3 : 1} />)}
+    </svg>
+    <svg width={b.w * sc + 8} height={b.h * sc + 8} viewBox={`-4 -4 ${b.w * sc + 8} ${b.h * sc + 8}`} style={{ background: '#fff', borderRadius: '8px' }}>
+      {[...parts.keys()].sort((x, y) => parts[y].y - parts[x].y).map(k => { const q = parts[k]; return <rect key={q.id} x={q.x * sc} y={(b.h - q.z - q.h) * sc} width={Math.max(1, q.w * sc)} height={Math.max(1, q.h * sc)} fill={q.color} stroke={k === i ? '#e8742a' : '#444'} strokeWidth={k === i ? 3 : 1} />; })}
+    </svg>
+  </div>);
+  return (<>
+    <Text label="Name of this piece" value={String(P.name || 'Custom piece')} onCommit={t => upd(it.id, { p: { ...P, name: t.trim() || 'Custom piece' } })} />
+    <div style={{ fontSize: '13px', color: 'var(--muted)' }}>Left: looking down. Right: looking from the front. The part you are editing is outlined in orange.</div>
+    {preview}
+    <Sec title="Whole piece size (stretches every part)" open>
+      <Num label="Width" value={it.w} onCommit={x => upd(it.id, { w: Math.max(1, x) })} />
+      <Num label="Depth" value={it.d} onCommit={x => upd(it.id, { d: Math.max(1, x) })} />
+      <Num label="Height" value={it.h || b.h} onCommit={x => upd(it.id, { h: Math.max(1, x) })} />
+    </Sec>
+    <Sec title={'Parts (' + parts.length + ')'} open>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        {parts.map((q, k) => <button key={q.id} style={k === i ? btnOn : btn} onClick={() => setSi(k)}>{q.name}</button>)}
+      </div>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <button style={btn} onClick={() => addPart('box')}>+ Box or panel</button>
+        <button style={btn} onClick={() => addPart('tri')}>+ Triangle</button>
+        <button style={btn} onClick={() => addPart('wedge')}>+ Corner wedge</button>
+      </div>
+      {pt && (<>
+        <Text label="Part name" value={pt.name} onCommit={t => setPart({ name: t.trim() || 'Part' })} />
+        <Chips label="Shape" value={pt.shape} opts={PART_SHAPES} onPick={x => setPart({ shape: x })} />
+        <Chips label="Material" value={pt.mat} opts={PART_MATS.map(m => [m[0], m[1]] as [any, string])} onPick={x => setPart({ mat: x, color: partMatColor(x) })} />
+        <div><div style={lbl}>Color</div><div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {SWATCHES.map(c => <button key={c} aria-label={c} onClick={() => setPart({ color: c })} style={{ width: '40px', height: '40px', borderRadius: '8px', cursor: 'pointer', background: c, border: pt.color === c ? '3px solid var(--ember)' : '1px solid rgba(238,241,238,0.35)' }} />)}
+          <input type="color" key={pt.id + pt.color} defaultValue={pt.color} onBlur={e => { if (e.target.value !== pt.color) setPart({ color: e.target.value }); }} style={{ width: '56px', height: '40px' }} />
+        </div></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <Num label="Across (left edge)" value={pt.x} onCommit={x => setPart({ x: Math.max(0, x) })} />
+          <Num label="Back to front (back edge)" value={pt.y} onCommit={x => setPart({ y: Math.max(0, x) })} />
+          <Num label="Off the floor (underside)" value={pt.z} onCommit={x => setPart({ z: Math.max(0, x) })} />
+          <Num label="Width" value={pt.w} onCommit={x => setPart({ w: Math.max(0.25, x) })} />
+          <Num label="Depth" value={pt.d} onCommit={x => setPart({ d: Math.max(0.25, x) })} />
+          <Num label="Thickness / height" value={pt.h} onCommit={x => setPart({ h: Math.max(0.25, x) })} />
+        </div>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <button style={btn} onClick={() => { const c = { ...pt, id: Math.random().toString(36).slice(2, 8), name: pt.name + ' copy', x: pt.x + 2 }; const np = [...parts, c]; apply(np); setSi(np.length - 1); }}>Duplicate this part</button>
+          <button style={btn} disabled={parts.length <= 1} onClick={() => { apply(parts.filter((_, k) => k !== i)); setSi(0); }}>Delete this part</button>
+        </div>
+      </>)}
+    </Sec>
+    <Sec title="My pieces (saved)" open>
+      <button style={btnOn} onClick={() => { setLib(savePiece(String(P.name || 'Custom piece'), parts)); setMsg('Saved. It is in Add, Accessories, Custom pieces.'); }}>Save this piece to My pieces</button>
+      {msg && <div style={{ fontSize: '13px', color: 'var(--muted)' }}>{msg}</div>}
+      {lib.map(s => (<div key={s.id} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}><span style={{ flex: 1 }}>{s.name}</span><button style={btn} onClick={() => setLib(deletePiece(s.id))}>Remove</button></div>))}
+      <div style={{ fontSize: '12px', color: 'var(--muted)', lineHeight: 1.4 }}>Saved pieces are kept on this device. A piece you have placed stays inside the drawing either way.</div>
+    </Sec>
+  </>);
+}
 function Thumb({ e, size = 56 }: { e: { kind: string; w: number; d: number; p?: Record<string, any>; extra?: Partial<DItem> }; size?: number }) {
   const it = mkItem(e.kind, { w: e.w, d: e.d, p: { ...(mkItem(e.kind).p || {}), ...(e.p || {}) }, ...(e.extra || {}) });
   const S0 = size / Math.max(e.w, e.d, 24) * 0.8; const m0 = Math.max(e.w, e.d, 24) * (e.kind === 'door' ? 1.9 : 1.35); const cy0 = it.kind === 'door' ? e.w * 0.4 : 0;
@@ -599,6 +670,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
                 {P.tileUp !== false && <Chips label="Tile goes up to" value={P.tileTo || 'ceiling'} opts={[['ceiling', 'The ceiling'], ['soffit', 'The soffit']]} onPick={v => setP({ tileTo: v })} />}
               </>}
             </>);
+            if (it.kind === 'custom') return <CustomEditor it={it} upd={upd} />;
             if (it.kind === 'cornerunit') return (<>
               <Num label="Along each wall" value={P.legs || it.w} onCommit={v => { const a = Math.max(12, v); upd(it.id, { w: a, d: a, p: { ...P, legs: a } }); }} />
               <Num label="Side return (the small flat ends)" value={P.wing ?? 3} onCommit={v => setP({ wing: Math.max(0, v) })} />
@@ -858,6 +930,10 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         const q = search.trim().toLowerCase();
         const list = q ? all.filter(e => (e.name + ' ' + (e.sub || '')).toLowerCase().includes(q)) : addList(addGroup, d.mode);
         const secs: Array<[string, AddEntry[]]> = []; list.forEach(e => { const n = q ? 'Results' : e.section || ''; const f = secs.find(x => x[0] === n); if (f) f[1].push(e); else secs.push([n, [e]]); });
+        if (!q && addGroup === 'Accessories') { // build-your-own pieces: a new one, then the saved ones
+          const mk2 = (key: string, name: string, sub: string, parts: Part[]): AddEntry => { const pe = pieceEntry(name, parts); return { key, kind: 'custom', name, sub, w: pe.w, d: pe.d, p: pe.p, extra: pe.extra, section: 'Custom pieces' }; };
+          secs.unshift(['Custom pieces', [mk2('custom-new', 'New custom piece', 'start from a simple open cabinet and change the parts', starterParts()), ...loadPieces().map(s => mk2('my-' + s.id, s.name, 'saved piece', s.parts))]]);
+        }
         const selStyle: CSSProperties = { ...input, minHeight: '48px', width: '100%' };
         const catMatches: CabEntry[] = q ? readyCatalogs().filter(e => matches(e, q)).slice(0, 80) : [];
         const cabCard = (e: CabEntry) => (

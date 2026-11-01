@@ -12,6 +12,7 @@ import { wallHeights } from './walls';
 import { windowOf } from './windows';
 import { sidesOf } from './showerwalls';
 import { cornerPoly, cuOf, dedupe, insetPoly, midShelves, topPoly } from './cornerunit';
+import { customOf, partPoly, partZ } from './custom';
 
 const COL = { wall: '#f3f0e8', floor: '#d8d4c9', cab: '#d3bd94', white: '#f4f4f1', steel: '#c4c8ca', dark: '#3b4144', soffit: '#e8dfc9', brass: '#a08a58', glass: '#9fd0e6' };
 
@@ -206,6 +207,7 @@ function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
     if (k.layer === 'ceiling') { ceilingItem(g, it, f.cx, f.cy, d); continue; }
     if (it.kind === 'shower') { shower(g, it, M, d); continue; }
     if (it.kind === 'cornerunit') { cornerUnit3d(g, it, M, d); continue; }
+    if (it.kind === 'custom') { customPiece3d(g, it, M); continue; }
     for (const p of parts(it, d)) boxAt(M, p);
   }
 
@@ -289,6 +291,17 @@ function shower(g: THREE.Group, it: DItem, M: THREE.Matrix4, d: Design) {
     else if (bs === 'right') bm(T2(w / 2 - bw / 2, -0.5), bw, dp - 1);
     else if (bs === 'cornerL') bm(T2(RB / 2 - w / 2, RB / 2 - dp / 2), RB, RB);
     else if (bs === 'cornerR') bm(T2(w / 2 - RB / 2, RB / 2 - dp / 2), RB, RB);
+  }
+}
+
+/** A custom piece: each part is its footprint pushed straight up from its underside to its top. */
+function customPiece3d(g: THREE.Group, it: DItem, M: THREE.Matrix4) {
+  const v = customOf(it); const w = it.w, dp = it.d;
+  for (const pt of v.parts) {
+    const [z0, z1] = partZ(pt, v); if (z1 - z0 < 0.05) continue;
+    const sh = new THREE.Shape(partPoly(pt, v).map(q => new THREE.Vector2(q[0] - w / 2, -(q[1] - dp / 2))));
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: z1 - z0, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, z0, 0);
+    const m = new THREE.Mesh(geo, mat(pt.color)); m.matrixAutoUpdate = false; m.matrix.copy(M); g.add(m);
   }
 }
 

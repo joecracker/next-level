@@ -6,6 +6,7 @@ import { windowLines } from './windows';
 import { showerLines } from './showerwalls';
 import { trimLines } from './trim';
 import { cornerLines } from './cornerunit';
+import { customLines } from './custom';
 
 export const FLOOR_TILES: Array<[string, string]> = [['plain', 'Plain'], ['12', '12×12'], ['12x24', '12×24'], ['24', '24×24'], ['2', '2×2']];
 const TILE_NAME: Record<string, string> = { '12': '12x12', '12x24': '12x24', '24': '24x24', '2': '2x2' };
@@ -126,6 +127,7 @@ export function finishLines(d: Design): Array<{ desc: string; qty: number; note:
   out.push(...windowLines(d));
   out.push(...showerLines(d));
   out.push(...cornerLines(d));
+  out.push(...customLines(d));
   out.push(...trimLines(d));
   return out;
 }

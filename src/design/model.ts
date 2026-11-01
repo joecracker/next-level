@@ -56,6 +56,7 @@ export const KINDS: Record<string, Kind> = {
   tub:      { name: 'Tub', layer: 'floor', snap: true, w: 60, d: 30, props: { drain: 'left', door: false, doorH: 58, niche: 'none', shelves: 'none' }, cat: 'Plumbing', modes: ['bath'] },
   ftub:     { name: 'Freestanding tub', layer: 'floor', snap: false, w: 60, d: 30, cat: 'Plumbing', modes: ['bath'] },
   cornerunit: { name: 'Corner storage unit', layer: 'floor', snap: false, w: 38, d: 38, props: { legs: 38, wing: 3, h: 34, topT: 1.25, shelves: 1, lift: 3 }, cat: 'Plumbing', modes: ['bath'] },
+  custom:   { name: 'Custom piece', layer: 'floor', snap: false, w: 24, d: 14, h: 36, props: { name: 'Custom piece' }, cat: 'Accessories', modes: ['bath', 'kitchen'] },
   tubfiller:{ name: 'Tub filler', layer: 'hung', snap: true, w: 6, d: 3, cat: 'Plumbing', modes: ['bath'] },
   rainhead: { name: 'Rain head', layer: 'ceiling', snap: false, w: 8, d: 8, props: { size: 8 }, cat: 'Plumbing', modes: ['bath'] },
   toilet:   { name: 'Toilet', layer: 'floor', snap: true, w: 20, d: 29, props: { bowl: 'elong' }, cat: 'Plumbing', modes: ['bath'] },

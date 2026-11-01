@@ -4,6 +4,7 @@
 import { T, benchSide, fmtIn, polyArea, type DItem } from './model';
 import { polySidesSvg } from './showerwalls';
 import { cornerPoly, cuOf, faceLen, topPoly } from './cornerunit';
+import { customOf, partPoly } from './custom';
 
 const INK = '#14191A', GL = '#3f8fa8', CURB = '#9ea49a', BRASS = '#9a7a2c', TILE = '#b9c0b6';
 const f = (n: number) => Math.round(n * 100) / 100;
@@ -40,6 +41,16 @@ function cornerUnit2d(it: DItem, S: number, fs: number, stroke: string, sw: numb
   return '<polygon points="' + pp(topPoly(c)) + '" fill="rgba(160,138,88,0.18)" stroke="#8a6d2f" stroke-width="' + f(1.2 / S) + '" stroke-dasharray="' + f(4 / S) + ' ' + f(3 / S) + '"/>' +
     '<polygon points="' + pp(cornerPoly(c)) + '" fill="#e6e2d6" stroke="' + stroke + '" stroke-width="' + f(sw) + '"/>' +
     txt('CORNER UNIT', c.a * 0.36, c.a * 0.34, fs * 0.8, '#3b4440') + txt(fmtIn(Math.round(faceLen(c))) + ' face', c.a * 0.36, c.a * 0.34 + fs * 1.1, fs * 0.7, '#555');
+}
+
+/** A custom piece: every part's footprint, lowest first, higher parts a little see-through so what is under them still shows. */
+function custom2d(it: DItem, S: number, fs: number, stroke: string, sw: number): string {
+  const v = customOf(it); const pp = (poly: Array<[number, number]>) => poly.map(q => f(q[0]) + ',' + f(q[1])).join(' ');
+  if (!v.parts.length) return rect(0, 0, it.w, it.d, `fill="none" stroke="${stroke}" stroke-width="${f(sw)}" stroke-dasharray="${f(4 / S)} ${f(3 / S)}"`) + txt('CUSTOM PIECE', it.w / 2, it.d / 2, fs * 0.8, '#555');
+  const order = v.parts.map((_, i) => i).sort((a, b) => v.parts[a].z - v.parts[b].z);
+  const o = order.map(i => { const pt = v.parts[i]; const high = pt.z > 0.5;
+    return '<polygon points="' + pp(partPoly(pt, v)) + '" fill="' + pt.color + '" fill-opacity="' + (high ? '0.8' : '1') + '" stroke="' + stroke + '" stroke-width="' + f(sw * 0.8) + '"/>'; });
+  return o.join('') + txt(v.name.toUpperCase(), it.w / 2, it.d / 2 + fs * 0.3, fs * 0.8, '#3b4440');
 }
 
 function shower(it: DItem, S: number, fs: number, stroke: string, sw: number): string {
@@ -248,6 +259,7 @@ export function fixtureShape(it: DItem, S: number, fs: number, stroke: string, s
       case 'partition': return rect(0, 0, w, d, `fill="${INK}" stroke="${stroke}" stroke-width="${sw}"`);
       case 'shower': return shower(it, S, fs, stroke, sw);
     case 'cornerunit': return cornerUnit2d(it, S, fs, stroke, sw);
+    case 'custom': return custom2d(it, S, fs, stroke, sw);
       case 'ftub': return ftub(it, S, fs, stroke, sw);
       case 'tub': return tub(it, S, fs, stroke, sw);
       case 'toilet': return toilet(it, S, fs, stroke, sw);

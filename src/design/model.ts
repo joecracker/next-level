@@ -35,6 +35,18 @@ export type Cat = 'Walls' | 'Doors' | 'Plumbing' | 'Electrical' | 'Cabinets' | '
 export type Mode = 'bath' | 'kitchen';
 export interface Kind { name: string; layer: Layer; snap: boolean; w: number; d: number; h?: number; cab?: boolean; cat: Cat; modes: Mode[]; inWall?: boolean; props?: Record<string, any> }
 export const T = 4.5; // wall thickness
+/** Kinds of window. `open` = share of the glass that opens (used for the bath ventilation rule). */
+export const WTYPES: Array<{ id: string; name: string; sub: string; open: number }> = [
+  { id: 'dh', name: 'Double-hung window', sub: 'both sashes slide up and down', open: 0.5 },
+  { id: 'sh', name: 'Single-hung window', sub: 'only the bottom sash moves', open: 0.5 },
+  { id: 'slider', name: 'Slider window', sub: 'slides sideways', open: 0.5 },
+  { id: 'casement', name: 'Casement window', sub: 'swings out like a door, crank handle', open: 1 },
+  { id: 'awning', name: 'Awning window', sub: 'hinged at the top, tips out', open: 1 },
+  { id: 'picture', name: 'Picture window', sub: 'fixed glass, does not open', open: 0 },
+  { id: 'block', name: 'Glass block window', sub: 'privacy light, does not open', open: 0 },
+  { id: 'garden', name: 'Garden window', sub: 'pops out over the sink, shelf for plants', open: 0.5 },
+];
+export const GLASS: Array<[string, string]> = [['clear', 'Clear'], ['obscure', 'Frosted (privacy)'], ['tempered', 'Tempered (safety)']];
 const SHOWER = { left: 'wall', right: 'wall', front: 'glass', entry: 'front', doorPos: 'left', door: true, doorType: 'swing', doorW: 30, curb: true, drain: 'endL', valve: 'left', valveType: 'standard', tile: true, tileSize: '2', tileDir: 'v', free: false, bench: 'none', benchW: 15, benchTop: 'granite', niche: 'none', nicheH: 24, shelves: 'none' };
 
 export const KINDS: Record<string, Kind> = {
@@ -76,7 +88,7 @@ export const KINDS: Record<string, Kind> = {
   medcab:   { name: 'Medicine cabinet', layer: 'hung', snap: true, w: 16, d: 4, cat: 'Accessories', modes: ['bath'] },
   grab:     { name: 'Grab bar', layer: 'hung', snap: true, w: 24, d: 3, cat: 'Accessories', modes: ['bath'] },
   door:     { name: 'Door', layer: 'inwall', snap: true, w: 30, d: T, props: { type: 'swing' }, cat: 'Doors', modes: ['bath', 'kitchen'] },
-  window:   { name: 'Window', layer: 'inwall', snap: true, w: 36, d: T, cat: 'Doors', modes: ['bath', 'kitchen'] },
+  window:   { name: 'Window', layer: 'inwall', snap: true, w: 36, d: T, props: { wtype: 'dh', glass: 'clear' }, cat: 'Doors', modes: ['bath', 'kitchen'] },
   kneewall: { name: 'Knee wall', layer: 'floor', snap: false, w: 48, d: 4.5, h: 36, props: { height: 36 }, cat: 'Walls', modes: ['bath', 'kitchen'] },
   partition:{ name: 'Inside wall (to the ceiling)', layer: 'floor', snap: false, w: 48, d: 4.5, cat: 'Walls', modes: ['bath', 'kitchen'] },
   vlight:   { name: 'Vanity light', layer: 'hung', snap: true, w: 24, d: 2, cat: 'Electrical', modes: ['bath'] },
@@ -281,7 +293,7 @@ export function addList(c: Cat, mode: Mode): AddEntry[] {
     dd('d-barn', 'Barn door', 'barn', 36, 'slides on a track, outside the room', { swing: 'out' });
     dd('d-bifold', 'Bi-fold door', 'bifold', 48, 'folds in the middle');
     dd('d-open', 'Plain opening', 'opening', 36, 'no door at all');
-    out.push({ key: 'window', kind: 'window', name: 'Window', w: 36, d: T, section: 'Windows', extra: { sill: mode === 'kitchen' ? 42 : 36 } });
+    for (const t of WTYPES) out.push({ key: 'win-' + t.id, kind: 'window', name: t.name, sub: t.sub, w: 36, d: T, section: 'Windows', p: { wtype: t.id, glass: 'clear' }, extra: { sill: mode === 'kitchen' ? 42 : 36, h: mode === 'kitchen' ? 36 : 24 } });
     return out;
   }
   if (c === 'Plumbing' && mode === 'bath') {

@@ -8,6 +8,8 @@ import { designBody, designBounds, itemShape, takeoffRows } from './exports';
 import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf, sinkOf, ovOf } from './counter';
 import { FLOOR_TILES, floorOf, vaultOf, vaultText } from './finish';
 import { setWallHeight, wallHeights } from './walls';
+import { GLASS, WTYPES } from './model';
+import { windowNotes, windowOf } from './windows';
 import {
   CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, polyPatch, polyWorld, toPolyLocal, seg, snapTo, template,
   type Cat, type DItem, type Design, type Pt,
@@ -502,7 +504,13 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
               {it.p?.type !== 'pocket' && <button style={btn} onClick={() => upd(it.id, { swing: it.swing === 'out' ? 'in' : 'out' })}>{it.p?.type === 'barn' ? (it.swing === 'out' ? 'Hangs outside the room' : 'Hangs inside the room') : (it.p?.type === 'bifold' ? 'Folds ' : 'Swings ') + (it.swing === 'out' ? 'out' : 'in')}</button>}
             </div>}
           </Sec>)}
-          {it.kind === 'window' && <Sec title="Window" open><Num label="Sill height" value={it.sill ?? 36} onCommit={s => upd(it.id, { sill: s })} /></Sec>}
+          {it.kind === 'window' && <Sec title="Window" open>
+            <Chips label="Kind of window" value={windowOf(d, it).type} opts={WTYPES.map(t => [t.id, t.name.replace(' window', '')] as [string, string])} onPick={v => upd(it.id, { p: { ...(it.p || {}), wtype: v } })} />
+            <Chips label="Glass" value={windowOf(d, it).glass} opts={GLASS} onPick={v => upd(it.id, { p: { ...(it.p || {}), glass: v } })} />
+            <Num label="Window height" value={windowOf(d, it).h} onCommit={h => upd(it.id, { h: Math.max(6, h) })} />
+            <Num label="Sill height" value={windowOf(d, it).sill} onCommit={s => upd(it.id, { sill: s })} />
+            {windowNotes(d, it).map((t, i) => <div key={i} style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>{t}</div>)}
+          </Sec>}
           {(() => {
             const P = it.p || {}; const setP = (q: Record<string, any>) => upd(it.id, { p: { ...P, ...q } });
             const side: Array<[any, string]> = [['wall', 'Wall'], ['knee', 'Knee wall + glass'], ['glass', 'Glass'], ['open', 'Open']];

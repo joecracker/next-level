@@ -1,6 +1,7 @@
 // The robot check: reads the drawing and flags things that will not work or break code.
 // ok = nothing said, tight = legal but cramped, fix = should be changed. Tim can "keep it anyway".
 import { wallHeights } from './walls';
+import { windowChecks, windowVents } from './windows';
 import { KINDS, benchSide, corners, frame, fmtIn, inPoly, overlap, ray, segsOf, toWorld, type DItem, type Design } from './model';
 
 export interface Check { id: string; itemId?: string; lvl: 'tight' | 'fix'; title: string; detail: string }
@@ -19,6 +20,7 @@ export function runChecks(d: Design): Check[] {
   };
 
   wallHeights(d).forEach((h, i) => { if (h > (d.ceiling || 96) + 0.01) add('wallh' + i, undefined, 'fix', 'Wall ' + (i + 1) + ' is taller than the ceiling', fmtIn(h) + ' wall under a ' + fmtIn(d.ceiling || 96) + ' ceiling.'); });
+  out.push(...windowChecks(d));
   for (const it of items) {
     const k = KINDS[it.kind]; const f = F(it); const p = it.p || {};
     // things outside the room
@@ -95,7 +97,7 @@ export function runChecks(d: Design): Check[] {
       const fv = F(v); const near = items.some(o => ['outlet', 'gfci'].includes(o.kind) && Math.hypot(F(o).cx - fv.cx, F(o).cy - fv.cy) <= 36 + v.w / 2);
       if (!near) add('nooutlet', v, 'tight', 'No outlet within 3 feet of the sink', 'Add a GFCI outlet beside the vanity.');
     }
-    if (!items.some(o => o.kind === 'fan')) out.push({ id: 'nofan:', lvl: 'tight', title: 'No exhaust fan', detail: 'A bathroom needs a vent fan. Add one under Electrical.' });
+    if (!items.some(o => o.kind === 'fan') && !windowVents(d)) out.push({ id: 'nofan:', lvl: 'tight', title: 'No exhaust fan', detail: 'A bathroom needs a vent fan. Add one under Electrical.' });
   } else {
     const dw = items.find(o => o.kind === 'dw'), sk = items.find(o => o.kind === 'sinkbase');
     for (const r of items.filter(o => o.kind === 'range' && o.p?.fuel === 'electric')) if (!items.some(o => o.kind === 'out240')) { add('no240', r, 'tight', 'No 240V outlet for the range', 'An electric range needs its own 240V outlet. Add one under Electrical.'); break; }

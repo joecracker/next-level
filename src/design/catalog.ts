@@ -7,7 +7,7 @@ export interface CabEntry { maker: string; line: string; group: string; family: 
 
 export interface Line { id: string; ready: boolean; note: string }
 export const MAKERS: Array<{ id: string; note: string; ready: boolean; lines?: Line[] }> = [
-  { id: 'Homecrest', note: 'from Homecrest\'s Specifications Guide (2019 sheet)', ready: true },
+  { id: 'Homecrest', note: 'from Homecrest\'s Price and Specification Guide (June 2026)', ready: true },
   { id: 'Wellborn', note: 'from Wellborn\'s own specification catalogs', ready: true, lines: [
     { id: 'Select', ready: true, note: 'Select Specification Catalog 2024-2025. Sizes come from the model codes and the catalog headings.' },
     { id: 'Premier', ready: true, note: 'Premier Specification Catalog (updated 4/16/26). Sizes come from the model codes and the catalog headings.' },
@@ -41,11 +41,13 @@ export function kindForEntry(e: CabEntry): string {
   if (e.group === 'Wall cabinets') return 'upper';
   if (e.group === 'Tall cabinets') return 'pantry';
   if (e.group === 'Vanities & bath') {
+    if (/wall hung/.test(f)) return 'vanity';
     if (/medicine|mirror|vanity wall|boutique/.test(f)) return 'upper';
     if (/linen/.test(f)) return 'linen';
     return 'vanity';
   }
-  if (/pantry|utility|oven|laundry utility/.test(f) && (e.h ?? 0) > 60) return 'pantry';
+  if (e.group === 'Laundry, desk & other' && /^wall /.test(f)) return 'upper';
+  if (/pantry|utility|oven|laundry utility|bookcase/.test(f) && (e.h ?? 0) > 60) return 'pantry';
   if (e.group === 'Base cabinets' && /sink/.test(f)) return 'sinkbase';
   return 'base';
 }

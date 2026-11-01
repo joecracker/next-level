@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback, type CSSProperties } from 're
 import Webcam from 'react-webcam';
 import { initNextLevel } from './app';
 import DesignStudio from './design/DesignStudio';
+import { template } from './design/model';
 import CaptureScreen, { type CaptureData, type CapturePatch, type ScratchItem } from './CaptureScreen';
 import { BUILD_STAMP } from './buildStamp';
 import { driveError } from './lib/driveError';
@@ -383,12 +384,26 @@ export default function App() {
     }
   };
 
+  // A job can hold several drawings (Bathroom, Kitchen, Before, After...). Picking a job that already has one asks which
+  // to open, or to start another; a job with no drawing yet goes straight in.
+  const [pagePick, setPagePick] = useState<null | { title: string; pages: Array<{ id: string; name: string; has: boolean }>; cur: string | null }>(null);
   const openExistingJob = (id: string) => {
-    window.NextLevel?.openJob(id);
+    const nl = window.NextLevel;
+    nl?.openJob(id);
+    const info = nl?.getPages?.();
+    if (info && info.pages.length >= 1) {
+      const c = nl?.getCapture?.();
+      setOpenPicker(false);
+      setPagePick({ title: (c?.customer || c?.name || 'This job') as string, pages: info.pages, cur: info.cur });
+      return;
+    }
     setOpenPicker(false);
     setShowLauncher(false);
     setDesignOn(true);
   };
+  const enterPage = () => { setPagePick(null); setShowLauncher(false); setDesignOn(true); };
+  const choosePage = (pid: string) => { window.NextLevel?.openPage(pid); enterPage(); };
+  const addNewPage = (kind: 'bath' | 'kitchen') => { window.NextLevel?.addPage(kind === 'kitchen' ? 'Kitchen' : 'Bathroom', template(kind)); enterPage(); };
 
   const startCapture = (id: string) => {
     window.history.pushState({ nl: 'capture' }, '');
@@ -425,6 +440,25 @@ export default function App() {
   return (
     <>
       {showLauncher && <Launcher onPick={pickDoor} />}
+      {pagePick && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'var(--ink)', display: 'flex', flexDirection: 'column', padding: '20px', boxSizing: 'border-box', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+            <button onClick={() => { setPagePick(null); setOpenPicker(true); }} aria-label="Back to the job list" style={{ background: 'none', border: 'none', color: 'var(--cream)', fontSize: '26px', cursor: 'pointer', lineHeight: 1 }}>&larr;</button>
+            <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--cream)' }}>{pagePick.title}</div>
+          </div>
+          <div style={{ color: 'var(--muted)', fontSize: '15px', margin: '0 0 16px 38px' }}>Which drawing do you want to work on?</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '560px', width: '100%' }}>
+            {pagePick.pages.map(pg => (
+              <button key={pg.id} onClick={() => choosePage(pg.id)} style={{ padding: '16px', borderRadius: '14px', border: pg.id === pagePick.cur ? '2px solid var(--moss)' : '1px solid rgba(238,241,238,0.25)', background: 'rgba(238,241,238,0.06)', color: 'var(--cream)', fontSize: '18px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}>
+                {pg.name}{pg.has ? '' : ' (empty)'}{pg.id === pagePick.cur ? <span style={{ color: 'var(--muted)', fontWeight: 500, fontSize: '14px' }}>{'  \u00b7 where you left off'}</span> : null}
+              </button>
+            ))}
+            <div style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '0.14em', color: 'var(--muted)', margin: '10px 0 0' }}>START ANOTHER DRAWING</div>
+            <button onClick={() => addNewPage('kitchen')} style={{ padding: '16px', borderRadius: '14px', border: 'none', background: 'var(--ember)', color: 'var(--ink)', fontSize: '17px', fontWeight: 800, cursor: 'pointer' }}>+ New kitchen</button>
+            <button onClick={() => addNewPage('bath')} style={{ padding: '16px', borderRadius: '14px', border: '1px solid rgba(238,241,238,0.3)', background: 'transparent', color: 'var(--cream)', fontSize: '17px', fontWeight: 800, cursor: 'pointer' }}>+ New bathroom</button>
+          </div>
+        </div>
+      )}
       {openPicker && <OpenJobPicker title="Design Studio" onGetFile={() => window.NextLevel?.pickJobFile()} onOpen={openExistingJob} onCancel={() => { setOpenPicker(false); setShowLauncher(true); }} />}
       {capturePicker && <OpenJobPicker title="Open Job" onGetFile={() => window.NextLevel?.pickJobFile()} onNew={newCapture} onOpen={startCapture} onCancel={() => backOne('picker', () => { setCapturePicker(false); setShowLauncher(true); })} />}
       {captureOn && <CaptureScreen onHome={() => backOne('capture', () => { setCaptureOn(false); setCapturePicker(true); })} onFull={captureToDesign} onTakePhoto={() => takePhoto(() => setCameraOpen(true))} />}

@@ -50,6 +50,16 @@ export async function saveBackup(data: unknown) {
   return saveToDrive(cfg(), data);
 }
 
+// ---- Shared library files (saved custom pieces and the like): one small file each in a "Next Level Library" Drive folder,
+// the same on every device, separate from the per-device backups above. -----
+const LIBRARY_FOLDER_NAME = 'Next Level Library';
+export async function saveLibraryFile(name: string, data: unknown) {
+  return saveToDrive({ clientId: CLIENT_ID, folderName: LIBRARY_FOLDER_NAME, fileName: name }, data);
+}
+export async function loadLibraryFile<T = unknown>(name: string): Promise<T | null> {
+  return loadFromDrive<T>({ clientId: CLIENT_ID, folderName: LIBRARY_FOLDER_NAME, fileName: name });
+}
+
 export async function restoreBackup<T = unknown>(): Promise<T | null> {
   return loadFromDrive<T>(cfg());
 }

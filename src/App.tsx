@@ -41,6 +41,8 @@ declare global {
       pickJobFile: () => void;
   buildJobFile: (withPhotos?: boolean) => Promise<File | null>;
       driveState: () => { configured: boolean; connected: boolean };
+  saveLibrary?: (name: string, data: unknown) => Promise<void>;
+  loadLibrary?: (name: string) => Promise<unknown>;
       driveConnect: () => Promise<void>;
       driveSavedAt: (id: string) => number;
       saveJobToDrive: (id?: string) => Promise<void>;

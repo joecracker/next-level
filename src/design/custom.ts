@@ -96,16 +96,62 @@ export function customLines(d: Design): Array<{ desc: string; qty: number; note:
   return out;
 }
 
+/** Take parts from anywhere (the AI helper, an old file) and make them safe: known shapes and materials, a real color, numbers inside sane limits. */
+export function cleanParts(raw: unknown): Part[] {
+  if (!Array.isArray(raw)) return [];
+  const n = (v: unknown, lo: number, hi: number, dflt: number): number => { const x = Number(v); return isFinite(x) ? Math.round(Math.min(hi, Math.max(lo, x)) * 8) / 8 : dflt; };
+  return raw.slice(0, 60).map((r: any, i: number): Part => {
+    const shape: PartShape = r?.shape === 'tri' || r?.shape === 'wedge' ? r.shape : 'box';
+    const mat: PartMat = r?.mat === 'tile' || r?.mat === 'wood' || r?.mat === 'stone' ? r.mat : 'paint';
+    const color = /^#[0-9a-f]{6}$/i.test(String(r?.color)) ? String(r.color) : matColor(mat);
+    return { id: uid(), name: String(r?.name || 'Part ' + (i + 1)).slice(0, 40), shape, mat, color, x: n(r?.x, 0, 240, 0), y: n(r?.y, 0, 240, 0), z: n(r?.z, 0, 120, 0), w: n(r?.w, 0.125, 240, 1), d: n(r?.d, 0.125, 240, 1), h: n(r?.h, 0.125, 120, 1) };
+  });
+}
+
 // ---------- the library of saved pieces ("My pieces") ----------
-export interface Saved { id: string; name: string; parts: Part[] }
-const KEY = 'nl-my-pieces';
+// Kept on this device AND, when Google Drive is connected, in a file in the "Next Level Library" Drive folder
+// (my-pieces.json), so clearing the browser or changing computers loses nothing. The two copies are merged:
+// the newest copy of each piece wins, and a removed piece stays removed (its id is remembered).
+export interface Saved { id: string; name: string; parts: Part[]; at: number }
+const KEY = 'nl-my-pieces', GONE = 'nl-my-pieces-gone', FILE = 'my-pieces.json';
+const NLW = (): any => (typeof window !== 'undefined' ? (window as any).NextLevel : undefined);
+export const driveReady = (): boolean => { try { return !!NLW()?.driveState?.().connected; } catch { return false; } };
 export function loadPieces(): Saved[] {
-  try { const v = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(v) ? v.filter(x => x && Array.isArray(x.parts)) : []; } catch { return []; }
+  try { const v = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(v) ? v.filter(x => x && Array.isArray(x.parts)).map(x => ({ ...x, at: Number(x.at) || 0 })) : []; } catch { return []; }
 }
-function storePieces(list: Saved[]) { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch { /* storage can be off; the piece still lives in the drawing */ } }
-/** Save a piece under a name (the same name replaces the old one). */
+function goneIds(): string[] { try { const v = JSON.parse(localStorage.getItem(GONE) || '[]'); return Array.isArray(v) ? v.map(String) : []; } catch { return []; } }
+function store(list: Saved[], gone?: string[]) {
+  try { localStorage.setItem(KEY, JSON.stringify(list)); if (gone) localStorage.setItem(GONE, JSON.stringify(gone.slice(-300))); } catch { /* storage can be off; the piece still lives in the drawing */ }
+}
+/** Send the whole library to Drive (quietly does nothing when Drive is not connected). */
+export async function pushPieces(): Promise<boolean> {
+  const nl = NLW(); if (!driveReady() || !nl?.saveLibrary) return false;
+  try { await nl.saveLibrary(FILE, { v: 1, pieces: loadPieces(), gone: goneIds() }); return true; } catch { return false; }
+}
+/** Merge the Drive copy with this device's copy, keep both up to date, and return the result. */
+export async function syncPieces(): Promise<Saved[]> {
+  const nl = NLW(); if (!driveReady() || !nl?.loadLibrary) return loadPieces();
+  try {
+    const remote: any = await nl.loadLibrary(FILE);
+    const gone = new Set<string>([...goneIds(), ...(Array.isArray(remote?.gone) ? remote.gone.map(String) : [])]);
+    const byId = new Map<string, Saved>();
+    for (const s of [...(Array.isArray(remote?.pieces) ? remote.pieces : []), ...loadPieces()]) {
+      if (!s || !Array.isArray(s.parts) || gone.has(s.id)) continue;
+      const old = byId.get(s.id); if (!old || (Number(s.at) || 0) >= old.at) byId.set(s.id, { id: String(s.id), name: String(s.name || 'Piece'), parts: cleanParts(s.parts), at: Number(s.at) || 0 });
+    }
+    const byName = new Map<string, Saved>(); // two copies with the same name: keep the newest
+    for (const s of byId.values()) { const k = s.name.toLowerCase(); const o = byName.get(k); if (!o || s.at > o.at) byName.set(k, s); }
+    const list = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+    store(list, [...gone]); await pushPieces(); return list;
+  } catch { return loadPieces(); }
+}
+/** Save a piece under a name (the same name replaces the old one) and send it to Drive in the background. */
 export function savePiece(name: string, parts: Part[]): Saved[] {
-  const list = loadPieces().filter(x => x.name.toLowerCase() !== name.toLowerCase());
-  list.push({ id: uid(), name, parts: JSON.parse(JSON.stringify(parts)) }); list.sort((a, b) => a.name.localeCompare(b.name)); storePieces(list); return list;
+  const gone = goneIds(); const keep: Saved[] = [];
+  for (const x of loadPieces()) { if (x.name.toLowerCase() === name.toLowerCase()) gone.push(x.id); else keep.push(x); }
+  keep.push({ id: uid(), name, parts: JSON.parse(JSON.stringify(parts)), at: Date.now() }); keep.sort((a, b) => a.name.localeCompare(b.name));
+  store(keep, gone); void pushPieces(); return keep;
 }
-export function deletePiece(id: string): Saved[] { const list = loadPieces().filter(x => x.id !== id); storePieces(list); return list; }
+export function deletePiece(id: string): Saved[] {
+  const list = loadPieces().filter(x => x.id !== id); store(list, [...goneIds(), id]); void pushPieces(); return list;
+}

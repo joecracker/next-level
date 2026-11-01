@@ -1,4 +1,4 @@
-import { driveConfigured, isDriveConnected, connectBackup, saveBackup, saveJobFolder, listJobBackups, loadJobBackup } from './lib/backup';
+import { driveConfigured, isDriveConnected, connectBackup, saveBackup, saveJobFolder, listJobBackups, loadJobBackup, saveLibraryFile, loadLibraryFile } from './lib/backup';
 import {
   putPhoto, deletePhotoBlob, getDisplayURL, getPhotoBlob, downscaleImage,
   dehydrateProjects, hydrateProjects, estimateStorage, revokeURL,
@@ -492,6 +492,9 @@ export function initNextLevel() {
     // Google Drive hand-off: the phone saves each job as its own Drive file; the PC lists them and pulls them in.
     driveState(): { configured: boolean; connected: boolean } { return { configured: driveConfigured, connected: isDriveConnected() }; },
     async driveConnect(): Promise<void> { await connectBackup(); },
+    // Shared library files (saved custom pieces): one small JSON file each in the Drive folder "Next Level Library".
+    async saveLibrary(name: string, data: unknown): Promise<void> { await saveLibraryFile(name, data); },
+    async loadLibrary(name: string): Promise<unknown> { return loadLibraryFile(name); },
     driveSavedAt(id: string): number {
       try { return Number(JSON.parse(localStorage.getItem('nextlevel_job_drive_saved') || '{}')[id]) || 0; } catch { return 0; }
     },

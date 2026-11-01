@@ -11,7 +11,7 @@ import { APP_FINISHES, CAB_COLORS, CAB_DEFAULT, FLOOR_COLORS, TOP_COLORS, WALL_C
 import { TRIM_ITEMS, trimSuggest } from './trim';
 import { LINES, lineGroups } from './linefinishes';
 import { cornerPlace, cuOf, faceLen, rightCorners } from './cornerunit';
-import { customOf, deletePiece, loadPieces, newPart, partPoly, partsBounds, pieceEntry, savePiece, starterParts, SHAPES as PART_SHAPES, MATS as PART_MATS, matColor as partMatColor, type Part, type PartShape, type Saved as SavedPiece } from './custom';
+import { cleanParts, customOf, deletePiece, driveReady, loadPieces, syncPieces, newPart, partPoly, partsBounds, pieceEntry, savePiece, starterParts, SHAPES as PART_SHAPES, MATS as PART_MATS, matColor as partMatColor, type Part, type PartShape, type Saved as SavedPiece } from './custom';
 import { FLOOR_TILES, floorOf, vaultOf, vaultText } from './finish';
 import { setWallHeight, wallHeights } from './walls';
 import { GLASS, WTYPES } from './model';
@@ -89,12 +89,35 @@ const SWATCHES = ['#ffffff', '#e8e6df', '#e6e2d6', '#c9c4b8', '#9a9a96', '#4a4f5
 function CustomEditor({ it, upd }: { it: DItem; upd: (id: string, p: Partial<DItem>) => void }) {
   const v = customOf(it); const parts = v.parts; const P = it.p || {};
   const [si, setSi] = useState(0); useEffect(() => { setSi(0); }, [it.id]); const [lib, setLib] = useState<SavedPiece[]>(() => loadPieces()); const [msg, setMsg] = useState('');
+  const [aiText, setAiText] = useState(''); const [aiHow, setAiHow] = useState<'new' | 'change'>('new'); const [aiBusy, setAiBusy] = useState(false); const [aiMsg, setAiMsg] = useState('');
+  const [aiAsk, setAiAsk] = useState<string[]>([]); const [aiAns, setAiAns] = useState<string[]>([]); const [aiPrev, setAiPrev] = useState<Part[] | null>(null); const [, setDriveTick] = useState(0);
+  useEffect(() => { let on = true; syncPieces().then(l => { if (on) setLib(l); }); return () => { on = false; }; }, []);
   const i = Math.max(0, Math.min(si, parts.length - 1)); const pt: Part | undefined = parts[i];
   const apply = (np: Part[]) => { // edit the parts but keep the piece's current stretch
     const b = partsBounds(np);
     upd(it.id, { w: b.w * v.sx, d: b.d * v.sy, h: b.h * v.sz, p: { ...P, parts: np, bw: b.w, bd: b.d, bh: b.h } });
   };
   const setPart = (q: Partial<Part>) => apply(parts.map((x, k) => (k === i ? { ...x, ...q } : x)));
+  const applyNew = (np: Part[], name?: string) => { // a whole new list of parts at true size
+    const b2 = partsBounds(np);
+    upd(it.id, { w: b2.w, d: b2.d, h: b2.h, p: { ...P, ...(name ? { name } : {}), parts: np, bw: b2.w, bd: b2.d, bh: b2.h } }); setSi(0);
+  };
+  const askAI = async (answers?: Array<{ q: string; a: string }>) => {
+    setAiBusy(true); setAiMsg('');
+    try {
+      const r = await fetch('/api/design-piece', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request: aiText, answers, current: aiHow === 'change' ? parts : undefined }) });
+      const j: any = await r.json().catch(() => ({}));
+      if (r.status === 503) setAiMsg('The helper is not connected on the server yet (its Google key is missing).');
+      else if (!r.ok) setAiMsg('The helper could not answer just now. Try again in a minute.');
+      else if (!answers && Array.isArray(j.ask) && j.ask.length) { setAiAsk(j.ask.map(String)); setAiAns(j.ask.map(() => '')); }
+      else {
+        const np = cleanParts(j.parts);
+        if (!np.length) setAiMsg('It did not come back with a piece. Try describing it a little differently.');
+        else { setAiPrev(parts); setAiAsk([]); applyNew(np, j.name ? String(j.name).slice(0, 40) : undefined); setAiMsg(String(j.note || '') || 'Done. Check the preview, then change anything you like.'); }
+      }
+    } catch { setAiMsg('Could not reach the helper. Check the connection and try again.'); }
+    setAiBusy(false);
+  };
   const addPart = (shape: PartShape) => { const np = [...parts, newPart(shape, 'paint', shape === 'box' ? 'Box' : shape === 'tri' ? 'Triangle' : 'Corner wedge', { w: 12, d: 12, h: 12 })]; apply(np); setSi(np.length - 1); };
   const b = partsBounds(parts); const sc = 150 / Math.max(b.w, b.d, b.h, 1);
   const pv = { sx: 1, sy: 1 };
@@ -146,11 +169,25 @@ function CustomEditor({ it, upd }: { it: DItem; upd: (id: string, p: Partial<DIt
         </div>
       </>)}
     </Sec>
+    <Sec title="Ask AI to build it" open>
+      <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.4 }}>Describe the piece in plain words, like "linen tower 14 wide, 72 tall, four shelves, painted white". The helper builds it from simple parts and may ask a question or two first. You can change anything it makes.</div>
+      <Chips label="The helper should" value={aiHow} opts={[['new', 'Start a new design'], ['change', 'Change what is here']]} onPick={x => setAiHow(x)} />
+      <textarea value={aiText} onChange={e => setAiText(e.target.value)} rows={3} placeholder="What do you want to build?" style={{ ...input, minHeight: '84px', padding: '10px', fontFamily: 'inherit' }} />
+      {aiAsk.length > 0 && (<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {aiAsk.map((q, k) => (<label key={k} style={{ display: 'block' }}><div style={{ ...lbl, textTransform: 'none', letterSpacing: 0, fontSize: '14px' }}>{q}</div>
+          <input value={aiAns[k] || ''} onChange={e => setAiAns(aiAns.map((a, j) => (j === k ? e.target.value : a)))} style={input} /></label>))}
+        <button style={btnOn} disabled={aiBusy} onClick={() => askAI(aiAsk.map((q, k) => ({ q, a: aiAns[k] || 'your choice' })))}>{aiBusy ? 'Working...' : 'Send my answers'}</button>
+      </div>)}
+      {aiAsk.length === 0 && <button style={btnOn} disabled={aiBusy || !aiText.trim()} onClick={() => askAI()}>{aiBusy ? 'Working...' : 'Build it'}</button>}
+      {aiMsg && <div style={{ fontSize: '14px', lineHeight: 1.4 }}>{aiMsg}</div>}
+      {aiPrev && <button style={btn} onClick={() => { applyNew(aiPrev); setAiPrev(null); setAiMsg('Put back what you had.'); }}>Put back what I had before</button>}
+    </Sec>
     <Sec title="My pieces (saved)" open>
-      <button style={btnOn} onClick={() => { setLib(savePiece(String(P.name || 'Custom piece'), parts)); setMsg('Saved. It is in Add, Accessories, Custom pieces.'); }}>Save this piece to My pieces</button>
+      <button style={btnOn} onClick={() => { setLib(savePiece(String(P.name || 'Custom piece'), parts)); setMsg(driveReady() ? 'Saved on this device and in your Drive folder. It is in Add, Accessories, Custom pieces.' : 'Saved on this device only. Connect Google Drive below to keep it permanently. It is in Add, Accessories, Custom pieces.'); }}>Save this piece to My pieces</button>
       {msg && <div style={{ fontSize: '13px', color: 'var(--muted)' }}>{msg}</div>}
       {lib.map(s => (<div key={s.id} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}><span style={{ flex: 1 }}>{s.name}</span><button style={btn} onClick={() => setLib(deletePiece(s.id))}>Remove</button></div>))}
-      <div style={{ fontSize: '12px', color: 'var(--muted)', lineHeight: 1.4 }}>Saved pieces are kept on this device. A piece you have placed stays inside the drawing either way.</div>
+      {!driveReady() && <button style={btn} onClick={async () => { try { await (window as any).NextLevel.driveConnect(); setLib(await syncPieces()); setDriveTick(t => t + 1); setMsg('Drive connected. Your pieces are kept in the Next Level Library folder.'); } catch { setMsg('Could not connect to Google Drive.'); } }}>Connect Google Drive to keep these permanently</button>}
+      <div style={{ fontSize: '12px', color: 'var(--muted)', lineHeight: 1.4 }}>{driveReady() ? 'Kept in the Next Level Library folder on your Google Drive, so clearing the browser or changing computers loses nothing.' : 'Without Drive these are only on this device.'} A piece you have placed stays inside the drawing either way.</div>
     </Sec>
   </>);
 }
@@ -468,6 +505,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   // ----- edits from the side panel -----
   const d = design;
   const selItem = d && sel?.type === 'item' ? d.items.find(q => q.id === sel.id) || null : null;
+  const [, setLibTick] = useState(0); useEffect(() => { if (addOpen) syncPieces().then(() => setLibTick(t => t + 1)); }, [addOpen]);
   const upd = (id: string, p: Partial<DItem>) => d && commit(patchItem(d, id, p));
   const delItem = (id: string) => { const cur = designRef.current; if (!cur) return; commit({ ...cur, items: cur.items.filter(q => q.id !== id) }); setSel(null); };
   const dupItem = (it: DItem) => { if (!d) return; const c: DItem = { ...it, id: mkItem(it.kind).id, ...(it.wall !== null ? { t: it.t + it.w } : { x: it.x + 12, y: it.y + 12 }) }; commit(normalize({ ...d, items: [...d.items, c] })); setSel({ type: 'item', id: c.id }); };

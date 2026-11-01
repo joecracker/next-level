@@ -2,6 +2,7 @@
 // in-wall outlets and switches, ceiling items. Each is drawn in the item's own box: (0,0) is its back-left
 // corner against the wall, x runs along the wall, y runs out into the room. S = pixels per inch.
 import { T, benchSide, fmtIn, polyArea, type DItem } from './model';
+import { polySidesSvg } from './showerwalls';
 
 const INK = '#14191A', GL = '#3f8fa8', CURB = '#9ea49a', BRASS = '#9a7a2c', TILE = '#b9c0b6';
 const f = (n: number) => Math.round(n * 100) / 100;
@@ -26,6 +27,7 @@ function polyShower(it: DItem, S: number, fs: number): string {
   }
   o.push(`<polygon points="${pts}" fill="none" stroke="${p.curb ? CURB : '#9aa09a'}" stroke-width="${(p.curb ? 4 : 1.5) / S}" stroke-linejoin="round"/>`);
   o.push(`<polygon points="${pts}" fill="none" stroke="${INK}" stroke-width="${line1}" stroke-linejoin="round"/>`);
+  o.push(polySidesSvg(it, S, fs));
   const cx = poly.reduce((a, q) => a + q[0], 0) / poly.length, cy = poly.reduce((a, q) => a + q[1], 0) / poly.length;
   o.push(circ(cx, cy - 6, 2.5, `fill="#fff" stroke="${INK}" stroke-width="${line1}"`) + circ(cx, cy - 6, 0.9, `fill="${INK}"`));
   o.push(txt('SHOWER FLOOR', cx, cy + 2, fs * 0.9, '#333') + txt(`${Math.round(polyArea(poly) / 14.4) / 10} sq ft`, cx, cy + 2 + fs * 1.1, fs * 0.8, '#555'));

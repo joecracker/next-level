@@ -3,8 +3,9 @@
 // the studio, from Capture's Save-to-Drive, or anywhere else with the studio closed.
 import { KINDS, T, corners, fmtIn, frame, isCab, seg, type DItem, type Design } from './model';
 import { fixtureShape } from './shapes';
-import { countertopSvg, counterSummary, fixtureLines } from './counter';
+import { countertopSvg, counterByMat, fixtureLines } from './counter';
 import { ceilingSvg, finishLines, floorTileSvg, vaultOf } from './finish';
+import { windowSymbol } from './windowsym';
 import { lowWallsSvg, wallTag } from './walls';
 
 const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -26,8 +27,7 @@ export function itemShape(it: DItem, S: number, sel: boolean, fs: number): strin
       `<path d="M ${ox} ${y0} A ${it.w} ${it.w} 0 0 ${(sgn > 0) === (it.hinge === 'right') ? 1 : 0} ${hx} ${y0 + sgn * it.w}" fill="none" stroke="${stroke}" stroke-width="${sw}" stroke-dasharray="${4 / S} ${3 / S}"/>` +
       `<line x1="${-hw}" y1="${-hd}" x2="${-hw}" y2="${hd}" stroke="${stroke}" stroke-width="${strokeW}"/><line x1="${hw}" y1="${-hd}" x2="${hw}" y2="${hd}" stroke="${stroke}" stroke-width="${strokeW}"/>`;
   } else if (it.kind === 'window') {
-    body = `<rect x="${-hw}" y="${-hd}" width="${it.w}" height="${it.d}" fill="#ffffff" stroke="${stroke}" stroke-width="${strokeW}"/>` +
-      `<line x1="${-hw}" y1="0" x2="${hw}" y2="0" stroke="${stroke}" stroke-width="${sw}"/>`;
+    body = windowSymbol(it, S, stroke, strokeW);
   } else if (it.kind === 'blank') { // open space: just an outline, so a freestanding top looks open
     body = `<rect x="${-hw}" y="${-hd}" width="${it.w}" height="${it.d}" fill="none" stroke="${stroke}" stroke-width="${strokeW}" stroke-dasharray="${6 / S} ${4 / S}"/>`;
   } else if (it.kind === 'ucl') { // light strip under an upper: a box for the reach, a bright line at its front edge
@@ -133,10 +133,10 @@ export function takeoffRows(d: Design): Array<{ qty: number; code: string; desc:
 
 /** Cabinet takeoff as CSV text (opens in Excel, LibreOffice, or anything else). Sizes in inches. */
 function counterLines(d: Design, pre: Array<string | number> = []): Array<Array<string | number>> {
-  const c = counterSummary(d); const rows: Array<Array<string | number>> = [];
-  if (c) {
-    rows.push([...pre, 1, '', `Countertop - ${c.mat}`, '', '', '', `about ${Math.round(c.area * 10) / 10} sq ft (drawn tops with 1 1/2" front overhang)`]);
-    if (c.splash !== 'none') rows.push([...pre, 1, '', c.splash === 'tile' ? 'Backsplash - tile to the uppers' : `Backsplash - 4" ${c.mat}`, '', '', '', `about ${Math.round(c.splashLen * 10) / 10} linear ft along the wall runs`]);
+  const c = counterByMat(d); const rows: Array<Array<string | number>> = [];
+  if (c) for (const m of c.mats) {
+    rows.push([...pre, 1, '', 'Countertop - ' + m.name, '', '', '', 'about ' + Math.round(m.area * 10) / 10 + ' sq ft (drawn tops with 1 1/2" front overhang)']);
+    if (c.splash !== 'none' && m.splashLen > 0) rows.push([...pre, 1, '', c.splash === 'tile' ? 'Backsplash - tile to the uppers' : 'Backsplash - 4" ' + m.name, '', '', '', 'about ' + Math.round(m.splashLen * 10) / 10 + ' linear ft along the wall runs']);
   }
   for (const x of fixtureLines(d)) rows.push([...pre, x.qty, '', x.desc, '', '', '', x.note]);
   for (const x of finishLines(d)) rows.push([...pre, x.qty, '', x.desc, '', '', '', x.note]);

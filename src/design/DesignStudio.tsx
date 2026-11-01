@@ -5,7 +5,8 @@ import JobPanel from './JobPanel';
 import { runChecks } from './checks';
 import { MAKERS, catalogFor, readyCatalogs, familiesFor, groupsFor, kindForEntry, matches, type CabEntry } from './catalog';
 import { designBody, designBounds, itemShape, takeoffRows } from './exports';
-import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf, sinkOf, ovOf } from './counter';
+import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf, sinkOf, ovOf, topRun } from './counter';
+import { SIDE_TYPES, sidesOf } from './showerwalls';
 import { FLOOR_TILES, floorOf, vaultOf, vaultText } from './finish';
 import { setWallHeight, wallHeights } from './walls';
 import { GLASS, WTYPES } from './model';
@@ -149,6 +150,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const [design, setDesignState] = useState<Design | null>(() => { const d = NL?.getDesign(); return hasDesign(d) ? (d as Design) : null; });
   const designRef = useRef(design); designRef.current = design;
   const [sel, setSel] = useState<Sel>(null);
+  const [pEdge, setPEdge] = useState(0); // which side of a drawn shower floor is being set
   const [vtx, setVtx] = useState<number | null>(null); // the selected corner of a drawn shower floor
   const [view, setView] = useState<View | null>(null);
   const viewRef = useRef(view); viewRef.current = view;
@@ -539,6 +541,14 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             </>);
             if (it.kind === 'shower' && P.poly) return (<>
               <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>Drag an orange corner to reshape the floor. Tap a + on an edge to add a corner there.</div>
+              {(() => { const poly = P.poly as Array<[number, number]>; const n = poly.length; const sd = sidesOf(P, n); const e = Math.min(pEdge, n - 1); const bn = P.bench as { edge: number; depth: number } | null | undefined; return (<Sec title="Walls, glass and bench" open>
+                <Chips label="Side to set (lit up on the plan)" value={e} opts={poly.map((_, i) => [i, 'Side ' + (i + 1)] as [number, string])} onPick={v => setPEdge(v)} />
+                <Chips label={'Side ' + (e + 1) + ' is'} value={sd[e]} opts={SIDE_TYPES} onPick={v => setP({ sides: sd.map((t, i) => i === e ? v : t) })} />
+                {sd[e] === 'door' && <Num label="Door width" value={P.doorW || 30} onCommit={v => setP({ doorW: Math.max(18, v) })} />}
+                <Chips label="Bench along" value={bn ? bn.edge : -1} opts={[[-1, 'No bench'], ...poly.map((_, i) => [i, 'Side ' + (i + 1)] as [number, string])]} onPick={v => setP({ bench: v < 0 ? null : { edge: v, depth: bn?.depth || 15 } })} />
+                {bn && <Num label="Bench depth" value={bn.depth || 15} onCommit={v => setP({ bench: { edge: bn.edge, depth: Math.max(6, v) } })} />}
+                {bn && <Chips label="Bench top" value={P.benchTop || 'tile'} opts={[['tile', 'Tile'], ['granite', 'Granite']]} onPick={v => setP({ benchTop: v })} />}
+              </Sec>); })()}
               <button style={btn} disabled={vtx === null || (P.poly as any[]).length <= 3 || vtx >= (P.poly as any[]).length} onClick={() => { const np = (P.poly as Array<[number, number]>).filter((_, i) => i !== vtx); commit(patchItem(d!, it.id, polyPatch(it, d!.pts, np))); setVtx(null); }}>Remove the selected corner</button>
               <Chips label="Threshold" value={P.curb ? 'curb' : 'flat'} opts={[['curb', 'Curb'], ['flat', 'Curbless']]} onPick={v => setP({ curb: v === 'curb' })} />
               <Chips label="Tile lines" value={P.tile ? P.tileSize : 'off'} opts={[['off', 'Off'], ['2', '2"'], ['12', '12×12'], ['12x24', '12×24'], ['24', '24×24']]} onPick={v => v === 'off' ? setP({ tile: false }) : setP({ tile: true, tileSize: v })} />
@@ -601,6 +611,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           })()}
           {TOP_KINDS.has(it.kind) && KINDS[it.kind].layer === 'floor' && (<Sec title="Countertop" open>
             <Chips label="Countertop on this" value={hasTop(it) ? 'on' : 'off'} opts={[['on', 'On'], ['off', 'Off']]} onPick={v => upd(it.id, { p: { ...(it.p || {}), top: v === 'on' } })} />
+            {hasTop(it) && <Chips label="Material for this run" value={it.p?.mat || 'room'} opts={[['room', 'Same as room'], ...MATS.map(m => [m.id, m.name] as [string, string])]} onPick={v => { const ids = new Set(topRun(d!, it.id)); commit({ ...d!, items: d!.items.map(q => ids.has(q.id) ? { ...q, p: { ...(q.p || {}), mat: v === 'room' ? undefined : v } } : q) }); }} />}
             {hasTop(it) && (() => { const o = ovOf(it); const free = it.wall === null; const set = (k: string, v: number) => upd(it.id, { p: { ...(it.p || {}), [k]: Math.max(0, v) } });
               return (<>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -730,6 +741,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
                 {sel?.type === 'wall' && (() => { const s = seg(d.pts, sel.i); return <line x1={s.ax} y1={s.ay} x2={s.bx} y2={s.by} stroke="#E8731A" strokeWidth={4 * px} strokeLinecap="round" />; })()}
                 {selItem?.kind === 'shower' && selItem.p?.poly && (() => { const W = polyWorld(selItem, d.pts); return <g>
                   {W.map((q, i) => { const r = W[(i + 1) % W.length]; return <g key={'m' + i}><circle cx={(q.x + r.x) / 2} cy={(q.y + r.y) / 2} r={9 * px} fill="#ffffff" stroke="#E8731A" strokeWidth={1.5 * px} /><path d={`M${(q.x + r.x) / 2 - 4 * px} ${(q.y + r.y) / 2} h${8 * px} M${(q.x + r.x) / 2} ${(q.y + r.y) / 2 - 4 * px} v${8 * px}`} stroke="#E8731A" strokeWidth={2 * px} /></g>; })}
+                  {(() => { const e = Math.min(pEdge, W.length - 1), r = W[(e + 1) % W.length]; return <line x1={W[e].x} y1={W[e].y} x2={r.x} y2={r.y} stroke="#E8731A" strokeWidth={6 * px} strokeLinecap="round" opacity={0.4} />; })()}
                   {W.map((q, i) => <circle key={'v' + i} cx={q.x} cy={q.y} r={(vtx === i ? 10 : 8) * px} fill={vtx === i ? '#E8731A' : '#ffffff'} stroke="#E8731A" strokeWidth={2.5 * px} />)}
                 </g>; })()}
                 {d.pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={(sel?.type === 'corner' && sel.i === i ? 10 : 7) * px} fill={sel?.type === 'corner' && sel.i === i ? '#E8731A' : '#ffffff'} stroke="#14191A" strokeWidth={2 * px} />)}

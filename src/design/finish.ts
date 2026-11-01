@@ -3,6 +3,7 @@
 import { fmtIn, polyArea, type Design } from './model';
 import { wallLines } from './walls';
 import { windowLines } from './windows';
+import { showerLines } from './showerwalls';
 
 export const FLOOR_TILES: Array<[string, string]> = [['plain', 'Plain'], ['12', '12×12'], ['12x24', '12×24'], ['24', '24×24'], ['2', '2×2']];
 const TILE_NAME: Record<string, string> = { '12': '12x12', '12x24': '12x24', '24': '24x24', '2': '2x2' };
@@ -121,5 +122,6 @@ export function finishLines(d: Design): Array<{ desc: string; qty: number; note:
   }
   out.push(...wallLines(d));
   out.push(...windowLines(d));
+  out.push(...showerLines(d));
   return out;
 }

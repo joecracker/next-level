@@ -337,13 +337,28 @@ export function toPolyLocal(it: DItem, pts: Pt[], P: Pt): [number, number] {
   const f = frame(it, pts); const dx = P.x - f.cx, dy = P.y - f.cy;
   return [dx * f.ux + dy * f.uy + it.w / 2, dx * f.nx + dy * f.ny + it.d / 2];
 }
+/** When a corner is added or removed, the per-side settings (p.sides, p.bench) must stay on the right sides. */
+function polySideFix(it: DItem, poly: Array<[number, number]>): Record<string, any> {
+  const old = (it.p?.poly || []) as Array<[number, number]>; const sides = it.p?.sides as string[] | undefined; const bench = it.p?.bench as { edge: number; depth: number } | null | undefined;
+  if (poly.length === old.length || (!sides && !bench)) return {};
+  let k = 0; while (k < Math.min(old.length, poly.length) && old[k][0] === poly[k][0] && old[k][1] === poly[k][1]) k++;
+  const out: Record<string, any> = {};
+  if (poly.length === old.length + 1) { // a corner was added at k: side k-1 became two sides
+    if (sides && sides.length === old.length) { const s = sides.slice(); s.splice(k, 0, s[k - 1] ?? 'open'); out.sides = s; }
+    if (bench && bench.edge >= k) out.bench = { ...bench, edge: bench.edge + 1 };
+  } else if (poly.length === old.length - 1) { // corner k was removed: its two sides became one
+    if (sides && sides.length === old.length) { const s = sides.slice(); s.splice(k, 1); out.sides = s; }
+    if (bench) out.bench = bench.edge === k ? { ...bench, edge: Math.max(0, k - 1) } : bench.edge > k ? { ...bench, edge: bench.edge - 1 } : bench;
+  } else { out.sides = undefined; out.bench = null; }
+  return out;
+}
 /** New corner list -> the changes to the item: the box shrinks or grows to fit, and the item stays put on the drawing. */
 export function polyPatch(it: DItem, pts: Pt[], poly: Array<[number, number]>): Partial<DItem> {
   const xs = poly.map(q => q[0]), ys = poly.map(q => q[1]);
   const mx = Math.min(...xs), my = Math.min(...ys), Mx = Math.max(...xs), My = Math.max(...ys);
   const w = Math.max(6, Mx - mx), d = Math.max(6, My - my);
   const f = frame(it, pts); const lx = (mx + Mx) / 2 - it.w / 2, ly = (my + My) / 2 - it.d / 2;
-  return { wall: null, rot: Math.round(f.rot * 100) / 100, x: f.cx + f.ux * lx + f.nx * ly, y: f.cy + f.uy * lx + f.ny * ly, w, d, p: { ...(it.p || {}), poly: poly.map(([a, b]) => [a - mx, b - my]) } };
+  return { wall: null, rot: Math.round(f.rot * 100) / 100, x: f.cx + f.ux * lx + f.nx * ly, y: f.cy + f.uy * lx + f.ny * ly, w, d, p: { ...(it.p || {}), poly: poly.map(([a, b]) => [a - mx, b - my]), ...polySideFix(it, poly) } };
 }
 export function polyArea(poly: Array<[number, number]>): number {
   let a = 0; for (let i = 0; i < poly.length; i++) { const [x1, y1] = poly[i], [x2, y2] = poly[(i + 1) % poly.length]; a += x1 * y2 - x2 * y1; } return Math.abs(a) / 2;

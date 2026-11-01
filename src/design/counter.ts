@@ -33,7 +33,7 @@ export function ovOf(it: DItem): Ov {
   return { f: g('ovF', OVERHANG), b: wall ? 0 : g('ovB', OVERHANG), l: g('ovL', wall ? 0 : OVERHANG), r: g('ovR', wall ? 0 : OVERHANG) };
 }
 
-interface Slab { poly: Pt[]; area: number; id: string }
+interface Slab { poly: Pt[]; area: number; id: string; mat: string }
 /** One rectangle per top-carrying item. Sides that touch a neighbour's top get no overhang, so neighbours read as one slab. */
 function slabs(d: Design): Slab[] {
   const out: Slab[] = []; const items = d.items.filter(hasTop);
@@ -62,20 +62,20 @@ function slabs(d: Design): Slab[] {
       const a = -q.w / 2 - L, b = q.w / 2 + R, c = -q.d / 2 - o.b, e = q.d / 2 + o.f;
       poly = ([[a, c], [b, c], [b, e], [a, e]] as Array<[number, number]>).map(([x, y]) => ({ x: f.cx + f.ux * x + f.nx * y, y: f.cy + f.uy * x + f.ny * y }));
     }
-    out.push({ poly, area: w * dd, id: q.id });
+    out.push({ poly, area: w * dd, id: q.id, mat: q.p?.mat || counterOf(d).mat });
   }
   return out;
 }
 
 /** Backsplash strips: one per continuous run of tops along a wall. */
-function splashRuns(d: Design): Array<{ poly: Pt[]; len: number }> {
-  const out: Array<{ poly: Pt[]; len: number }> = [];
+function splashRuns(d: Design): Array<{ poly: Pt[]; len: number; mat: string }> {
+  const out: Array<{ poly: Pt[]; len: number; mat: string }> = [];
   d.pts.forEach((_, wi) => {
     const L = seg(d.pts, wi); const row = d.items.filter(q => q.wall === wi && hasTop(q)).sort((a, b) => a.t - b.t);
     let run: DItem[] = [];
     const P = (t: number, y: number): Pt => ({ x: L.ax + L.ux * t + L.nx * y, y: L.ay + L.uy * t + L.ny * y });
-    const flush = () => { if (!run.length) return; const t0 = run[0].t - run[0].w / 2 - ovOf(run[0]).l, t1 = run[run.length - 1].t + run[run.length - 1].w / 2 + ovOf(run[run.length - 1]).r; out.push({ poly: [P(t0, 0), P(t1, 0), P(t1, 1), P(t0, 1)], len: t1 - t0 }); run = []; };
-    for (const q of row) { const last = run[run.length - 1]; if (last && q.t - q.w / 2 - (last.t + last.w / 2) > 0.75) flush(); run.push(q); }
+    const flush = () => { if (!run.length) return; const t0 = run[0].t - run[0].w / 2 - ovOf(run[0]).l, t1 = run[run.length - 1].t + run[run.length - 1].w / 2 + ovOf(run[run.length - 1]).r; out.push({ poly: [P(t0, 0), P(t1, 0), P(t1, 1), P(t0, 1)], len: t1 - t0, mat: run[0].p?.mat || counterOf(d).mat }); run = []; };
+    for (const q of row) { const last = run[run.length - 1]; if (last && (q.t - q.w / 2 - (last.t + last.w / 2) > 0.75 || (q.p?.mat || '') !== (last.p?.mat || ''))) flush(); run.push(q); }
     flush();
   });
   return out;
@@ -83,12 +83,12 @@ function splashRuns(d: Design): Array<{ poly: Pt[]; len: number }> {
 
 /** The slabs and backsplash as drawing markup (drawn under the wall-hung things, over the cabinets). */
 export function countertopSvg(d: Design, S: number): string {
-  const sl = slabs(d); const c = counterOf(d); const m = matOf(c.mat); const o: string[] = [];
+  const sl = slabs(d); const c = counterOf(d); const o: string[] = [];
   const path = (p: Pt[]) => p.map(q => `${Math.round(q.x * 100) / 100},${Math.round(q.y * 100) / 100}`).join(' ');
   if (sl.length) {
     // two passes inside one translucent group: outlines first, then fills, so neighbours merge into one slab with a clean outer edge
-    o.push(`<g opacity="0.4">` + sl.map(t => `<polygon points="${path(t.poly)}" fill="${m.edge}" stroke="${m.edge}" stroke-width="${2.8 / S}" stroke-linejoin="round"/>`).join('') + sl.map(t => `<polygon points="${path(t.poly)}" fill="${m.fill}" stroke="${m.fill}" stroke-width="${0.8 / S}" stroke-linejoin="round"/>`).join('') + `</g>`);
-    if (c.splash !== 'none') for (const r of splashRuns(d)) o.push(`<polygon points="${path(r.poly)}" fill="${c.splash === 'tile' ? '#6f9fb4' : m.edge}" stroke="none"/>`);
+    o.push(`<g opacity="0.4">` + sl.map(t => `<polygon points="${path(t.poly)}" fill="${matOf(t.mat).edge}" stroke="${matOf(t.mat).edge}" stroke-width="${2.8 / S}" stroke-linejoin="round"/>`).join('') + sl.map(t => `<polygon points="${path(t.poly)}" fill="${matOf(t.mat).fill}" stroke="${matOf(t.mat).fill}" stroke-width="${0.8 / S}" stroke-linejoin="round"/>`).join('') + `</g>`);
+    if (c.splash !== 'none') for (const r of splashRuns(d)) o.push(`<polygon points="${path(r.poly)}" fill="${c.splash === 'tile' ? '#6f9fb4' : matOf(r.mat).edge}" stroke="none"/>`);
   }
   // tile up behind a freestanding range hood
   for (const q of d.items) if (q.kind === 'chimney' && q.p?.tileUp !== false && q.wall !== null && q.wall < d.pts.length) {
@@ -140,6 +140,31 @@ function slabArea(sl: Slab[]): number {
   let t = sl.reduce((a, x) => a + x.area, 0);
   for (let i = 0; i < sl.length; i++) for (let j = i + 1; j < sl.length; j++) t -= overlapArea(sl[i].poly, sl[j].poly);
   return t;
+}
+
+/** Area and backsplash length for each material in use (a run can have its own material). */
+export function counterByMat(d: Design): { splash: string; mats: Array<{ name: string; area: number; splashLen: number }> } | null {
+  const sl = slabs(d); if (!sl.length) return null; const c = counterOf(d); const runs = splashRuns(d);
+  const ids = [...new Set(sl.map(s => s.mat))];
+  return { splash: c.splash, mats: ids.map(id => ({ name: matOf(id).name, area: slabArea(sl.filter(s => s.mat === id)) / 144, splashLen: runs.filter(r => r.mat === id).reduce((a, r) => a + r.len, 0) / 12 })) };
+}
+
+function polyGap(a: Pt[], b: Pt[]): number {
+  const ds = (p: Pt, u: Pt, v: Pt) => { const dx = v.x - u.x, dy = v.y - u.y; const L2 = dx * dx + dy * dy || 1; const t = Math.max(0, Math.min(1, ((p.x - u.x) * dx + (p.y - u.y) * dy) / L2)); return Math.hypot(p.x - (u.x + t * dx), p.y - (u.y + t * dy)); };
+  let m = 1e9;
+  for (const p of a) for (let i = 0; i < b.length; i++) m = Math.min(m, ds(p, b[i], b[(i + 1) % b.length]));
+  for (const p of b) for (let i = 0; i < a.length; i++) m = Math.min(m, ds(p, a[i], a[(i + 1) % a.length]));
+  return m;
+}
+/** Every item whose top is joined to this one (touching or overlapping), this one included: a "run". */
+export function topRun(d: Design, id: string): string[] {
+  const sl = slabs(d); const k = sl.findIndex(s => s.id === id); if (k < 0) return [id];
+  const seen = new Set<number>([k]); const stack = [k];
+  while (stack.length) {
+    const i = stack.pop() as number;
+    for (let j = 0; j < sl.length; j++) if (!seen.has(j) && (overlapArea(sl[i].poly, sl[j].poly) > 0.5 || polyGap(sl[i].poly, sl[j].poly) <= 0.8)) { seen.add(j); stack.push(j); }
+  }
+  return [...seen].map(i => sl[i].id);
 }
 
 export function counterSummary(d: Design): { area: number; splashLen: number; mat: string; splash: string } | null {

@@ -4,7 +4,8 @@
 import { KINDS, T, corners, fmtIn, frame, isCab, seg, type DItem, type Design } from './model';
 import { fixtureShape } from './shapes';
 import { countertopSvg, counterSummary, fixtureLines } from './counter';
-import { ceilingSvg, finishLines, floorTileSvg } from './finish';
+import { ceilingSvg, finishLines, floorTileSvg, vaultOf } from './finish';
+import { lowWallsSvg, wallTag } from './walls';
 
 const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const INK = '#14191A';
@@ -57,16 +58,17 @@ export function designBody(d: Design, S: number, selId?: string | null, title?: 
     out.push(`<polygon points="${poly}" fill="none" stroke="#6b6f6c" stroke-width="${T * 2}" stroke-linejoin="miter"/>`);
     out.push(`<polygon points="${poly}" fill="#f4f1ea" stroke="${INK}" stroke-width="${2 / S}" stroke-linejoin="miter"/>`);
     out.push(floorTileSvg(d, S));
+    out.push(lowWallsSvg(d));
   }
   const order: string[] = ['inwall', 'floor', 'hung', 'ceiling'];
   const items = (d.items || []).slice().sort((a, b) => order.indexOf(KINDS[a.kind].layer) - order.indexOf(KINDS[b.kind].layer));
-  let topsDone = false;
+  let topsDone = false; const flatCeil = vaultOf(d).shape === 'flat' ? (d.ceiling || 96) : 0; // soffit underside is only worked out for a flat ceiling
   for (const it of items) {
     if (!topsDone && order.indexOf(KINDS[it.kind].layer) >= 2) { out.push(countertopSvg(d, S)); topsDone = true; }
     const f = frame(it, pts);
     const fl = flags?.[it.id];
     const ring = fl ? `<rect x="${-it.w / 2 - 1.5}" y="${-it.d / 2 - 1.5}" width="${it.w + 3}" height="${it.d + 3}" fill="none" stroke="${fl === 'fix' ? '#d9482b' : '#d9a441'}" stroke-width="${3 / S}" stroke-dasharray="${6 / S} ${4 / S}"/>` : '';
-    out.push(`<g transform="translate(${f.cx} ${f.cy}) rotate(${f.rot})">${itemShape(it, S, it.id === selId, fs)}${ring}</g>`);
+    out.push(`<g transform="translate(${f.cx} ${f.cy}) rotate(${f.rot})">${itemShape(it.kind === 'soffit' ? { ...it, p: { ...(it.p || {}), ceil: flatCeil } } : it, S, it.id === selId, fs)}${ring}</g>`);
   }
   if (!topsDone) out.push(countertopSvg(d, S));
   out.push(ceilingSvg(d, S));
@@ -75,6 +77,7 @@ export function designBody(d: Design, S: number, selId?: string | null, title?: 
       const s = seg(pts, i); if (s.L < 1) return;
       const mx = (s.ax + s.bx) / 2 - s.nx * (T + fs * 1.3), my = (s.ay + s.by) / 2 - s.ny * (T + fs * 1.3);
       out.push(`<text x="${mx}" y="${my + fs * 0.35}" font-size="${fs}" text-anchor="middle" fill="#3b4440">${fmtIn(s.L)}</text>`);
+      const ht = wallTag(d, i); if (ht) out.push('<text x="' + (mx - s.nx * fs * 1.3) + '" y="' + (my - s.ny * fs * 1.3 + fs * 0.35) + '" font-size="' + (fs * 0.9) + '" text-anchor="middle" fill="#7a6a3a">' + ht + '</text>');
       void p;
     });
   }

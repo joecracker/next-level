@@ -1,5 +1,6 @@
 // The robot check: reads the drawing and flags things that will not work or break code.
 // ok = nothing said, tight = legal but cramped, fix = should be changed. Tim can "keep it anyway".
+import { wallHeights } from './walls';
 import { KINDS, benchSide, corners, frame, fmtIn, inPoly, overlap, ray, segsOf, toWorld, type DItem, type Design } from './model';
 
 export interface Check { id: string; itemId?: string; lvl: 'tight' | 'fix'; title: string; detail: string }
@@ -17,6 +18,7 @@ export function runChecks(d: Design): Check[] {
     return ray(o[0], o[1], dx, dy, segs);
   };
 
+  wallHeights(d).forEach((h, i) => { if (h > (d.ceiling || 96) + 0.01) add('wallh' + i, undefined, 'fix', 'Wall ' + (i + 1) + ' is taller than the ceiling', fmtIn(h) + ' wall under a ' + fmtIn(d.ceiling || 96) + ' ceiling.'); });
   for (const it of items) {
     const k = KINDS[it.kind]; const f = F(it); const p = it.p || {};
     // things outside the room

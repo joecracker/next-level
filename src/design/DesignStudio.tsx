@@ -7,6 +7,7 @@ import { MAKERS, catalogFor, readyCatalogs, familiesFor, groupsFor, kindForEntry
 import { designBody, designBounds, itemShape, takeoffRows } from './exports';
 import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf, sinkOf, ovOf } from './counter';
 import { FLOOR_TILES, floorOf, vaultOf, vaultText } from './finish';
+import { setWallHeight, wallHeights } from './walls';
 import {
   CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, polyPatch, polyWorld, toPolyLocal, seg, snapTo, template,
   type Cat, type DItem, type Design, type Pt,
@@ -111,7 +112,8 @@ function splitWall(d: Design, i: number): Design {
     if (it.wall > i) return { ...it, wall: it.wall + 1 };
     return it;
   });
-  return normalize({ ...d, pts, items });
+  const wh = d.wallH && d.wallH.length === d.pts.length ? d.wallH.slice() : undefined; if (wh) wh.splice(i + 1, 0, wh[i]);
+  return normalize({ ...d, pts, items, wallH: wh });
 }
 function removeCorner(d: Design, j: number): Design {
   const n = d.pts.length; if (n <= 3) return d;
@@ -124,7 +126,8 @@ function removeCorner(d: Design, j: number): Design {
     if (it.wall === j) return { ...it, wall: prevNew, t: it.t + Lprev };
     return it.wall > j ? { ...it, wall: it.wall - 1 } : it;
   });
-  return normalize({ ...d, pts, items });
+  const wh = d.wallH && d.wallH.length === d.pts.length ? d.wallH.slice() : undefined; if (wh) wh.splice(j, 1);
+  return normalize({ ...d, pts, items, wallH: wh });
 }
 function setLen(d: Design, i: number, L: number): Design {
   const s = seg(d.pts, i); const j = (i + 1) % d.pts.length; const pts = clonePts(d.pts);
@@ -612,6 +615,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         return (<>
           <div style={{ fontWeight: 800, fontSize: '18px' }}>Wall {sel.i + 1}</div>
           <Num label="Length" value={s.L} onCommit={L => commit(setLen(d, sel.i, Math.max(6, L)))} />
+          <Chips label="Wall height" value={wallHeights(d)[sel.i]} opts={[[0, 'To the ceiling'], [36, "3'"], [72, "6'"], [84, "7'"], [96, "8'"], [120, "10'"], [144, "12'"]]} onPick={v => commit(setWallHeight(d, sel.i, v))} />
+          <Num label="Wall height (type it)" value={wallHeights(d)[sel.i] || d.ceiling || 96} onCommit={v => commit(setWallHeight(d, sel.i, Math.max(6, v)))} />
           <div style={{ fontSize: '14px', color: 'var(--muted)' }}>Drag the wall to push it in or out. Its neighbors stretch with it.</div>
           <button style={btn} onClick={() => { commit(splitWall(d, sel.i)); setSel(null); }}>Add a corner in the middle</button>
         </>);

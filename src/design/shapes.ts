@@ -1,7 +1,7 @@
 // Drawings for the fixtures that have more to them than a labelled box: showers, tubs, toilets, vanities,
 // in-wall outlets and switches, ceiling items. Each is drawn in the item's own box: (0,0) is its back-left
 // corner against the wall, x runs along the wall, y runs out into the room. S = pixels per inch.
-import { T, benchSide, polyArea, type DItem } from './model';
+import { T, benchSide, fmtIn, polyArea, type DItem } from './model';
 
 const INK = '#14191A', GL = '#3f8fa8', CURB = '#9ea49a', BRASS = '#9a7a2c', TILE = '#b9c0b6';
 const f = (n: number) => Math.round(n * 100) / 100;
@@ -247,7 +247,7 @@ export function fixtureShape(it: DItem, S: number, fs: number, stroke: string, s
       case 'wet': return circ(w / 2, d / 2, w / 2, `fill="#fff" stroke="${GL}" stroke-width="${sw}"`) + txt('WET', w / 2, d + fs * 0.9, fs * 0.7, '#555');
       case 'pendant': return circ(w / 2, d / 2, w / 2, `fill="#fff" stroke="${stroke}" stroke-width="${sw}"`) + circ(w / 2, d / 2, w * 0.33, `fill="none" stroke="${INK}" stroke-width="${1 / S}"`);
       case 'fridge': case 'range': case 'dw': case 'microwave': case 'hood': case 'chimney': case 'potfiller': case 'cfan': case 'islout': return appliance(it, S, fs, stroke, sw);
-      case 'soffit': return rect(0, 0, w, d, `fill="rgba(160,138,88,0.14)" stroke="${stroke === INK ? '#8a6d2f' : stroke}" stroke-width="${2 / S}" stroke-dasharray="${6 / S} ${4 / S}"`) + txt(`SOFFIT ${Math.round(it.p?.drop ?? 12)}" DROP`, w / 2, d / 2, fs * 0.85, '#5c4614');
+      case 'soffit': return rect(0, 0, w, d, `fill="rgba(160,138,88,0.14)" stroke="${stroke === INK ? '#8a6d2f' : stroke}" stroke-width="${2 / S}" stroke-dasharray="${6 / S} ${4 / S}"`) + txt(`SOFFIT ${Math.round(it.p?.drop ?? 12)}" DROP`, w / 2, d / 2 - (it.p?.ceil ? fs * 0.5 : 0), fs * 0.85, '#5c4614') + (it.p?.ceil ? txt('UNDER ' + fmtIn(it.p.ceil - (it.p?.drop ?? 12)), w / 2, d / 2 + fs * 0.65, fs * 0.8, '#5c4614') : '');
       case 'outlet': case 'gfci': case 'switch': case 'dedout': case 'out240': case 'gfci20': case 'dswitch': {
         const g = it.kind === 'gfci' ? 'GFCI' : it.kind === 'dedout' ? 'D' : it.kind === 'out240' ? '240' : it.kind === 'gfci20' ? 'G20' : it.kind === 'dswitch' ? 'DS' : it.kind === 'switch' ? (it.p?.gang > 1 ? `S${it.p.gang}` : 'S') : 'O';
         return rect(-w / 2 + w / 2, 0, w, d, `fill="#fff" stroke="${stroke}" stroke-width="${sw}"`) + txt(g, w / 2, d + fs * 0.85, fs * 0.8, '#222');

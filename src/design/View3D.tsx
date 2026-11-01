@@ -5,7 +5,8 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { KINDS, T, frame, seg, type DItem, type Design, type Pt } from './model';
-import { counterSlabs, matOf } from './counter';
+import { counterSlabs, paintOf } from './counter';
+import { appHex, cabColor, colorPaint } from './finishes';
 import { floorOf, vaultOf } from './finish';
 import { wallHeights } from './walls';
 import { windowOf } from './windows';
@@ -74,8 +75,9 @@ interface Part { lx: number; lz: number; w: number; dd: number; y0: number; h: n
 /** Clean boxes for an item, in its own frame: x along the wall, z out into the room, centered on the item. */
 function parts(it: DItem, d: Design): Part[] {
   const k = KINDS[it.kind]; const p = it.p || {}; const w = it.w, dp = it.d; const ceil = d.ceiling || 96;
-  const P = (o: Partial<Part> & { h: number }): Part => ({ lx: 0, lz: 0, w, dd: dp, y0: 0, color: COL.cab, ...o });
-  const top = (h: number, color = '#b7b4ac'): Part => P({ y0: h, h: 1.5, dd: dp + 1.5, lz: 0.75, w: w + 0.5, color });
+  const cab = cabColor(d, it); const app = appHex(d); const tcol = colorPaint(it.p?.tcolor || d.counter?.color)?.fill || '#b7b4ac';
+  const P = (o: Partial<Part> & { h: number }): Part => ({ lx: 0, lz: 0, w, dd: dp, y0: 0, color: cab, ...o });
+  const top = (h: number, color = tcol): Part => P({ y0: h, h: 1.5, dd: dp + 1.5, lz: 0.75, w: w + 0.5, color });
   switch (it.kind) {
     case 'toilet': return [P({ lz: dp * 0.15, dd: dp * 0.7, h: 15, color: COL.white }), P({ lz: -dp * 0.35, dd: dp * 0.3, w: w * 0.8, h: 28, color: COL.white })];
     case 'pedestal': return [P({ w: w * 0.35, dd: dp * 0.4, lz: -dp * 0.2, h: 30, color: COL.white }), P({ y0: 30, h: 5, color: COL.white })];
@@ -84,15 +86,15 @@ function parts(it: DItem, d: Design): Part[] {
       if (p.door) o.push(P({ y0: 20, h: (p.doorH || 58) - 20, dd: 0.6, lz: dp / 2, color: COL.glass, opacity: 0.25 }));
       return o;
     }
-    case 'fridge': return [P({ h: 70, color: COL.steel })];
-    case 'range': return [P({ h: 35, color: COL.steel }), P({ y0: 35, h: 1, color: COL.dark }), P({ y0: 36, h: 6, dd: 3, lz: -dp / 2 + 1.5, color: COL.steel })];
-    case 'dw': return [P({ h: 34, color: COL.steel })];
-    case 'vanity': case 'desk': { const h = it.h || k.h || 34.5; return [P({ h, color: COL.cab }), top(h)]; }
+    case 'fridge': return [P({ h: 70, color: app })];
+    case 'range': return [P({ h: 35, color: app }), P({ y0: 35, h: 1, color: COL.dark }), P({ y0: 36, h: 6, dd: 3, lz: -dp / 2 + 1.5, color: app })];
+    case 'dw': return [P({ h: 34, color: app })];
+    case 'vanity': case 'desk': { const h = it.h || k.h || 34.5; return [P({ h }), top(h)]; }
     case 'base': case 'sinkbase': case 'drawer': case 'island': case 'pantry': case 'linen': case 'utility': case 'endpanel':
-      return [P({ h: it.h || k.h || 34.5, color: COL.cab })];
-    case 'upper': return [P({ y0: 54, h: it.h || 30, color: COL.cab })];
-    case 'hood': return [P({ y0: 66, h: 14, color: COL.steel })];
-    case 'chimney': return [P({ y0: 66, h: 12, color: COL.steel }), P({ y0: 78, h: Math.max(4, ceil - 78), w: 12, dd: 10, lz: -dp / 2 + 5, color: COL.steel })];
+      return [P({ h: it.h || k.h || 34.5 })];
+    case 'upper': return [P({ y0: 54, h: it.h || 30 })];
+    case 'hood': return [P({ y0: 66, h: 14, color: app })];
+    case 'chimney': return [P({ y0: 66, h: 12, color: app }), P({ y0: 78, h: Math.max(4, ceil - 78), w: 12, dd: 10, lz: -dp / 2 + 5, color: app })];
     case 'mirror': return [P({ y0: 42, h: 30, dd: 1.5, lz: -dp / 2 + 0.75, color: '#cfe3ea' })];
     case 'medcab': return [P({ y0: 42, h: 26, color: COL.white })];
     case 'vlight': return [P({ y0: 72, h: 3, color: COL.dark })];
@@ -134,7 +136,7 @@ function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
 
   // walls, with door and window openings cut in
   const n = pts.length; const hs = wallHeights(d); const area = signedArea(pts);
-  const walls: Array<{ m: THREE.MeshStandardMaterial; mx: number; mz: number; ox: number; oz: number }> = [];
+  const walls: Array<{ m: THREE.MeshStandardMaterial; mesh: THREE.Mesh; x: THREE.Mesh[]; mx: number; mz: number; ox: number; oz: number }> = [];
   for (let i = 0; i < n; i++) {
     const s = seg(pts, i); if (s.L < 1) continue; const nx = seg(pts, (i + 1) % n);
     const convex = (s.ux * nx.uy - s.uy * nx.ux) * area > 0; const Lx = s.L + (convex ? T : 0);
@@ -156,12 +158,13 @@ function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
       const hole = new THREE.Path(); hole.moveTo(a, y0); hole.lineTo(b, y0); hole.lineTo(b, y1); hole.lineTo(a, y1); hole.closePath(); sh.holes.push(hole);
     }
     const M = frameM(s.ux, s.uy, -s.nx, -s.ny, s.ax, s.ay); // x along the wall, z out through the wall
-    const wm = mat(COL.wall); wm.transparent = true; add(new THREE.ExtrudeGeometry(sh, { depth: T, bevelEnabled: false }), wm, M);
-    walls.push({ m: wm, mx: s.ax + s.ux * s.L / 2 - s.nx * T / 2, mz: s.ay + s.uy * s.L / 2 - s.ny * T / 2, ox: -s.nx, oz: -s.ny });
+    const wm = mat(COL.wall); wm.transparent = true; const wmesh = add(new THREE.ExtrudeGeometry(sh, { depth: T, bevelEnabled: false }), wm, M);
+    const entry = { m: wm, mesh: wmesh, x: [] as THREE.Mesh[], mx: s.ax + s.ux * s.L / 2 - s.nx * T / 2, mz: s.ay + s.uy * s.L / 2 - s.ny * T / 2, ox: -s.nx, oz: -s.ny };
+    walls.push(entry);
     for (const q of d.items) if (q.kind === 'window' && q.wall === i) { // glass in each window
       const o = windowOf(d, q); const y0 = Math.max(0.5, o.sill), y1 = Math.min(o.sill + o.h, minTop(q.t - q.w / 2, q.t + q.w / 2) - 0.5); if (y1 - y0 < 2) continue;
       const frosted = o.glass === 'obscure' || o.type === 'block';
-      add(new THREE.PlaneGeometry(q.w, y1 - y0), mat(frosted ? '#f2f6f8' : COL.glass, frosted ? 0.75 : 0.28), M.clone().multiply(new THREE.Matrix4().makeTranslation(q.t, (y0 + y1) / 2, T / 2)));
+      entry.x.push(add(new THREE.PlaneGeometry(q.w, y1 - y0), mat(frosted ? '#f2f6f8' : COL.glass, frosted ? 0.75 : 0.28), M.clone().multiply(new THREE.Matrix4().makeTranslation(q.t, (y0 + y1) / 2, T / 2))));
     }
   }
 
@@ -179,7 +182,7 @@ function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
   for (const sl of counterSlabs(d)) {
     const shape = new THREE.Shape(sl.poly.map(p => new THREE.Vector2(p.x, -p.y)));
     const geo = new THREE.ExtrudeGeometry(shape, { depth: 1.5, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, 34.5, 0);
-    add(geo, mat(matOf(sl.mat).fill));
+    add(geo, mat(paintOf(sl.mat, sl.color).fill));
   }
 
   // soffits: a flat underside at (ceiling - drop); in a vaulted room it reaches up into the slope
@@ -247,9 +250,14 @@ export default function View3D({ design, onClose }: { design: Design; onClose: (
   const host = useRef<HTMLDivElement>(null);
   const three = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; room: THREE.Group | null; render: () => void } | null>(null);
   const [ceiling, setCeiling] = useState(false);
-  const [cut, setCut] = useState(true); // cutaway: walls between you and the room fade out
-  const cutRef = useRef(true);
+  const [wallMode, setWallMode] = useState<'fade' | 'hide' | 'solid'>('fade'); // the walls between you and the room: faded, gone, or solid
+  const modeRef = useRef<'fade' | 'hide' | 'solid'>('fade');
   const [err, setErr] = useState('');
+
+  const savePhoto = () => { // a PNG of exactly what is on screen (without the buttons)
+    const t = three.current; if (!t) return; t.render();
+    t.renderer.domElement.toBlob(b => { if (!b) return; const url = URL.createObjectURL(b); const a = document.createElement('a'); a.href = url; a.download = 'Room 3D.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }, 'image/png');
+  };
 
   const look = (preset: 'corner' | 'top' | 'inside') => {
     const t = three.current; if (!t) return; const b = bounds(design.pts); const size = Math.max(b.W, b.H, 60); const base = design.ceiling || 96;
@@ -269,8 +277,11 @@ export default function View3D({ design, onClose }: { design: Design; onClose: (
     const camera = new THREE.PerspectiveCamera(50, 1, 2, 6000);
     const controls = new OrbitControls(camera, renderer.domElement); controls.maxPolarAngle = Math.PI * 0.495; controls.minDistance = 12; controls.maxDistance = 2500;
     const render = () => {
-      const ws = three.current?.room?.userData.walls as Array<{ m: THREE.MeshStandardMaterial; mx: number; mz: number; ox: number; oz: number }> | undefined;
-      if (ws) for (const w of ws) { const ghost = cutRef.current && (camera.position.x - w.mx) * w.ox + (camera.position.z - w.mz) * w.oz > 0; w.m.opacity = ghost ? 0.1 : 1; w.m.depthWrite = !ghost; }
+      const ws = three.current?.room?.userData.walls as Array<{ m: THREE.MeshStandardMaterial; mesh: THREE.Mesh; x: THREE.Mesh[]; mx: number; mz: number; ox: number; oz: number }> | undefined;
+      if (ws) for (const w of ws) {
+        const near = (camera.position.x - w.mx) * w.ox + (camera.position.z - w.mz) * w.oz > 0; const fade = near && modeRef.current === 'fade', hide = near && modeRef.current === 'hide';
+        w.m.opacity = fade ? 0.1 : 1; w.m.depthWrite = !fade; w.mesh.visible = !hide; w.x.forEach(q => { q.visible = !hide; });
+      }
       renderer.render(scene, camera);
     };
     controls.addEventListener('change', render);
@@ -302,7 +313,8 @@ export default function View3D({ design, onClose }: { design: Design; onClose: (
         <button style={bar} onClick={() => look('corner')}>Corner</button>
         <button style={bar} onClick={() => look('top')}>Top</button>
         <button style={bar} onClick={() => look('inside')}>Inside</button>
-        <button style={{ ...bar, background: cut ? 'rgba(160,138,88,0.95)' : bar.background }} onClick={() => { cutRef.current = !cut; setCut(!cut); three.current?.render(); }}>Cutaway {cut ? 'on' : 'off'}</button>
+        <button style={{ ...bar, background: wallMode !== 'solid' ? 'rgba(160,138,88,0.95)' : bar.background }} onClick={() => { const nx = wallMode === 'fade' ? 'hide' : wallMode === 'hide' ? 'solid' : 'fade'; modeRef.current = nx; setWallMode(nx); three.current?.render(); }}>Front walls: {wallMode === 'fade' ? 'faded' : wallMode === 'hide' ? 'gone' : 'solid'}</button>
+        <button style={bar} onClick={savePhoto}>Save picture</button>
         <button style={{ ...bar, background: ceiling ? 'rgba(160,138,88,0.95)' : bar.background }} onClick={() => setCeiling(c => !c)}>Ceiling {ceiling ? 'on' : 'off'}</button>
       </div>
       <div style={{ position: 'absolute', left: 10, bottom: 10, color: '#3b4440', fontSize: '13px', background: 'rgba(255,255,255,0.7)', borderRadius: '8px', padding: '4px 8px' }}>Drag to turn · pinch or scroll to zoom · two fingers to slide. Clean boxes for now.</div>

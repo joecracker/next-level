@@ -24,7 +24,8 @@ export interface Design {
   items: DItem[];
   ceiling?: number;    // ceiling height, inches
   accepted?: Record<string, boolean>; // robot checks Tim chose to keep as they are
-  counter?: { mat?: string; splash?: 'stone' | 'tile' | 'none' }; // countertop material and backsplash for the whole drawing
+  finish?: { cab?: string; upper?: string; app?: string }; // cabinet, upper-cabinet and appliance finishes for the whole room
+  counter?: { mat?: string; splash?: 'stone' | 'tile' | 'none'; color?: string }; // countertop material and backsplash for the whole drawing
   wallH?: number[];   // wall heights in inches, one per wall in the same order as pts (0 = to the ceiling)
   floor?: { tile?: string; dir?: 'v' | 'h' }; // room floor tile (plain, 12, 12x24, 24, 2) and which way 12x24 runs
   vault?: { shape?: 'flat' | 'slope' | 'peak'; toward?: 'top' | 'right' | 'bottom' | 'left'; ridge?: 'lr' | 'ud'; pitch?: number; hide?: boolean }; // ceiling shape

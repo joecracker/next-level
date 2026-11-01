@@ -7,6 +7,7 @@ import { MAKERS, catalogFor, readyCatalogs, familiesFor, groupsFor, kindForEntry
 import { designBody, designBounds, itemShape, takeoffRows } from './exports';
 import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf, sinkOf, ovOf, topRun } from './counter';
 import { SIDE_TYPES, sidesOf } from './showerwalls';
+import { APP_FINISHES, CAB_COLORS, CAB_DEFAULT, TOP_COLORS } from './finishes';
 import { FLOOR_TILES, floorOf, vaultOf, vaultText } from './finish';
 import { setWallHeight, wallHeights } from './walls';
 import { GLASS, WTYPES } from './model';
@@ -106,6 +107,10 @@ function Sec({ title, open, children }: { title: string; open?: boolean; childre
 function Chips({ label, value, opts, onPick }: { label: string; value: any; opts: Array<[any, string]>; onPick: (v: any) => void }) {
   return (<div><div style={lbl}>{label}</div><div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
     {opts.map(([v, t]) => <button key={String(v)} style={value === v ? btnOn : btn} onClick={() => onPick(v)}>{t}</button>)}</div></div>);
+}
+function Swatches({ label, value, opts, onPick }: { label: string; value: string; opts: Array<{ id: string; name: string; hex: string }>; onPick: (id: string) => void }) {
+  return (<div><div style={lbl}>{label}</div><div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+    {opts.map(o => <button key={o.id} style={{ ...(value === o.id ? btnOn : btn), display: 'flex', alignItems: 'center', gap: '7px', padding: '0 10px' }} onClick={() => onPick(o.id)}><span style={{ width: 18, height: 18, borderRadius: 4, background: o.hex, border: '1px solid rgba(255,255,255,0.55)', flexShrink: 0 }} />{o.name}</button>)}</div></div>);
 }
 const clonePts = (p: Pt[]) => p.map(q => ({ x: q.x, y: q.y }));
 function splitWall(d: Design, i: number): Design {
@@ -467,6 +472,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             <Num label="Width" value={it.w} onCommit={w => upd(it.id, { w: Math.max(1, w), ...(it.wall !== null ? { t: it.t + (Math.max(1, w) - it.w) / 2 } : {}) })} />
             <Num label="Depth" value={it.d} onCommit={dp => upd(it.id, { d: Math.max(1, dp) })} />
             {isCab(it.kind) && <Num label="Height" value={it.h || 0} onCommit={h => upd(it.id, { h })} />}
+          {isCab(it.kind) && <Swatches label="Color for this one" value={it.p?.ccolor || ''} opts={[{ id: '', name: 'Same as the room', hex: '#8a8f8c' }, ...CAB_COLORS]} onPick={v => upd(it.id, { p: { ...(it.p || {}), ccolor: v || undefined } })} />}
           </div>
           {it.wall !== null ? (<>
             <Num label="Left edge from the left corner" value={it.t - it.w / 2} onCommit={x => upd(it.id, { t: x + it.w / 2 })} />
@@ -615,6 +621,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           {TOP_KINDS.has(it.kind) && KINDS[it.kind].layer === 'floor' && (<Sec title="Countertop" open>
             <Chips label="Countertop on this" value={hasTop(it) ? 'on' : 'off'} opts={[['on', 'On'], ['off', 'Off']]} onPick={v => upd(it.id, { p: { ...(it.p || {}), top: v === 'on' } })} />
             {hasTop(it) && <Chips label="Material for this run" value={it.p?.mat || 'room'} opts={[['room', 'Same as room'], ...MATS.map(m => [m.id, m.name] as [string, string])]} onPick={v => { const ids = new Set(topRun(d!, it.id)); commit({ ...d!, items: d!.items.map(q => ids.has(q.id) ? { ...q, p: { ...(q.p || {}), mat: v === 'room' ? undefined : v } } : q) }); }} />}
+            {hasTop(it) && <Swatches label="Color for this run" value={it.p?.tcolor || ''} opts={[{ id: '', name: 'Same as the room', hex: '#8a8f8c' }, ...TOP_COLORS]} onPick={v => { const ids = new Set(topRun(d!, it.id)); commit({ ...d!, items: d!.items.map(q => ids.has(q.id) ? { ...q, p: { ...(q.p || {}), tcolor: v || undefined } } : q) }); }} />}
             {hasTop(it) && (() => { const o = ovOf(it); const free = it.wall === null; const set = (k: string, v: number) => upd(it.id, { p: { ...(it.p || {}), [k]: Math.max(0, v) } });
               return (<>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -662,6 +669,12 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         {floorOf(d).tile === '12x24' && <Chips label="Tile runs" value={floorOf(d).dir} opts={[['v', 'Up and down'], ['h', 'Side to side']]} onPick={v => commit({ ...d, floor: { ...(d.floor || {}), dir: v } })} />}
         <Chips label="Countertop material" value={counterOf(d).mat} opts={MATS.map(m => [m.id, m.name] as [string, string])} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), mat: v } })} />
         <Chips label="Backsplash" value={counterOf(d).splash} opts={SPLASHES} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), splash: v as 'stone' | 'tile' | 'none' } })} />
+        <Sec title="Finishes (colors)" open>
+          <Swatches label="Cabinet color" value={d.finish?.cab || ''} opts={[{ id: '', name: 'Standard', hex: CAB_DEFAULT }, ...CAB_COLORS]} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), cab: v || undefined } })} />
+          <Swatches label="Upper cabinets (if different)" value={d.finish?.upper || ''} opts={[{ id: '', name: 'Same as the rest', hex: '#8a8f8c' }, ...CAB_COLORS]} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), upper: v || undefined } })} />
+          <Swatches label="Countertop color" value={counterOf(d).color === 'auto' ? '' : counterOf(d).color} opts={[{ id: '', name: 'Standard', hex: '#b7b4ac' }, ...TOP_COLORS]} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), color: v || undefined } })} />
+          <Swatches label="Appliances" value={d.finish?.app || 'steel'} opts={APP_FINISHES} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), app: v === 'steel' ? undefined : v } })} />
+        </Sec>
         <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>Tap anything to change it. Drag a wall to stretch the room, or drag a corner for odd shapes. Use Add to place things.</div>
         <div style={lbl}>Cabinets so far</div>
         {rows.length === 0 ? <div style={{ color: 'var(--muted)', fontSize: '14px' }}>None yet.</div> : rows.map((r, i) => (

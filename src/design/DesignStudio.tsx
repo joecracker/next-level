@@ -245,9 +245,11 @@ function Thumb({ e, size = 56 }: { e: { kind: string; w: number; d: number; p?: 
   return <svg width={size} height={size} viewBox={vb} style={{ background: '#fff', borderRadius: '8px', flexShrink: 0 }}><g ref={gRef} dangerouslySetInnerHTML={{ __html: itemShape(it, S, false, 10 / S).replace(/<text[\s\S]*?<\/text>/g, '') }} /></svg>;
 }
 function Sec({ title, open, children }: { title: string; open?: boolean; children: any }) {
-  const [o, setO] = useState(!!open);
+  const key = 'nl.sec.v1.' + String(title).replace(/\d+/g, '#'); // remembers open or closed for each section, across restarts
+  const [o, setO] = useState(() => { try { const v = localStorage.getItem(key); if (v === '1') return true; if (v === '0') return false; } catch { /* use the default */ } return !!open; });
+  const flip = () => { const n = !o; setO(n); try { localStorage.setItem(key, n ? '1' : '0'); } catch { /* not saved */ } };
   return (<div style={{ borderTop: '1px solid rgba(238,241,238,0.12)', paddingTop: '8px' }}>
-    <button onClick={() => setO(!o)} style={{ ...btn, width: '100%', textAlign: 'left', minHeight: '40px', background: 'transparent', border: 'none', padding: '0 2px', display: 'flex', justifyContent: 'space-between' }}><span style={{ ...lbl, marginBottom: 0 }}>{title}</span><span>{o ? '▾' : '▸'}</span></button>
+    <button onClick={flip} style={{ ...btn, width: '100%', textAlign: 'left', minHeight: '40px', background: 'transparent', border: 'none', padding: '0 2px', display: 'flex', justifyContent: 'space-between' }}><span style={{ ...lbl, marginBottom: 0 }}>{title}</span><span>{o ? '▾' : '▸'}</span></button>
     {o && <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>{children}</div>}
   </div>);
 }
@@ -916,7 +918,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         {floorOf(d).tile === '12x24' && <Chips label="Tile runs" value={floorOf(d).dir} opts={[['v', 'Up and down'], ['h', 'Side to side']]} onPick={v => commit({ ...d, floor: { ...(d.floor || {}), dir: v } })} />}
         <Chips label="Countertop material" value={counterOf(d).mat} opts={MATS.map(m => [m.id, m.name] as [string, string])} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), mat: v } })} />
         <Chips label="Backsplash" value={counterOf(d).splash} opts={SPLASHES} onPick={v => commit({ ...d, counter: { ...(d.counter || {}), splash: v as 'stone' | 'tile' | 'none' } })} />
-        <Sec title="Finishes (colors)" open>
+        <Sec title="Finishes (colors)">
           <Chips label="Cabinet line (for the finish names)" value={d.finish?.line || ''} opts={LINES} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), line: v || undefined } })} />
           {d.finish?.line && <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.4 }}>Finish names come from the maker. The shade shown is close, not exact: check the maker's sample.</div>}
           <CabPick label="Cabinet color" value={d.finish?.cab || ''} line={d.finish?.line || ''} first={{ id: '', name: 'Standard', hex: CAB_DEFAULT }} onPick={v => commit({ ...d, finish: { ...(d.finish || {}), cab: v || undefined } })} />

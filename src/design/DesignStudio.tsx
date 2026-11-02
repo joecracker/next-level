@@ -113,7 +113,7 @@ function CustomEditor({ it, upd }: { it: DItem; upd: (id: string, p: Partial<DIt
       else {
         const np = cleanParts(j.parts);
         if (!np.length) setAiMsg('It did not come back with a piece. Try describing it a little differently.');
-        else { setAiPrev(parts); setAiAsk([]); applyNew(np, j.name ? String(j.name).slice(0, 40) : undefined); setAiMsg(String(j.note || '') || 'Done. Check the preview, then change anything you like.'); }
+        else { setAiPrev(parts); setAiAsk([]); setAiText(''); applyNew(np, j.name ? String(j.name).slice(0, 40) : undefined); setAiMsg(String(j.note || '') || 'Done. Check the preview, then change anything you like.'); }
       }
     } catch { setAiMsg('Could not reach the helper. Check the connection and try again.'); }
     setAiBusy(false);
@@ -190,6 +190,40 @@ function CustomEditor({ it, upd }: { it: DItem; upd: (id: string, p: Partial<DIt
       <div style={{ fontSize: '12px', color: 'var(--muted)', lineHeight: 1.4 }}>{driveReady() ? 'Kept in the Next Level Library folder on your Google Drive, so clearing the browser or changing computers loses nothing.' : 'Without Drive these are only on this device.'} A piece you have placed stays inside the drawing either way.</div>
     </Sec>
   </>);
+}
+function AskAIPiece({ onClose, onDone }: { onClose: () => void; onDone: (name: string, parts: Part[]) => void }) {
+  const [text, setText] = useState(''); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState('');
+  const [ask, setAsk] = useState<string[]>([]); const [ans, setAns] = useState<string[]>([]);
+  const go = async (answers?: Array<{ q: string; a: string }>) => {
+    setBusy(true); setMsg('');
+    try {
+      const r = await fetch('/api/design-piece', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request: text, answers }) });
+      const j: any = await r.json().catch(() => ({}));
+      if (r.status === 503) setMsg('The helper is not connected on the server yet (its Google key is missing).');
+      else if (!r.ok) setMsg('The helper could not answer just now. Try again in a minute.');
+      else if (!answers && Array.isArray(j.ask) && j.ask.length) { setAsk(j.ask.map(String)); setAns(j.ask.map(() => '')); }
+      else {
+        const np = cleanParts(j.parts);
+        if (!np.length) setMsg('It did not come back with a piece. Try describing it a little differently.');
+        else { onDone(j.name ? String(j.name).slice(0, 40) : 'Custom piece', np); return; }
+      }
+    } catch { setMsg('Could not reach the helper. Check the connection and try again.'); }
+    setBusy(false);
+  };
+  return (<div style={{ position: 'fixed', inset: 0, zIndex: 2100, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
+    <div style={{ width: '100%', maxWidth: '560px', maxHeight: '88vh', overflowY: 'auto', background: '#1d2425', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><b style={{ fontSize: '18px' }}>Ask AI to build a piece</b><button style={btn} onClick={onClose}>Close</button></div>
+      <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>Describe it in plain words with the sizes you want, like "linen tower 84 tall, 24 wide, 14 deep, four shelves, painted white". It may ask a question or two first. The finished piece lands in your room and you can change anything in the Edit menu.</div>
+      <textarea value={text} onChange={e => setText(e.target.value)} rows={4} disabled={busy || ask.length > 0} placeholder="What do you want to build?" style={{ ...input, minHeight: '110px', padding: '10px', fontFamily: 'inherit' }} />
+      {ask.length > 0 && (<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {ask.map((q, k) => (<label key={k} style={{ display: 'block' }}><div style={{ ...lbl, textTransform: 'none', letterSpacing: 0, fontSize: '14px' }}>{q}</div>
+          <input value={ans[k] || ''} onChange={e => setAns(ans.map((a, j) => (j === k ? e.target.value : a)))} style={input} /></label>))}
+        <button style={btnOn} disabled={busy} onClick={() => go(ask.map((q, k) => ({ q, a: ans[k] || 'your choice' })))}>{busy ? 'Working...' : 'Send my answers'}</button>
+      </div>)}
+      {ask.length === 0 && <button style={btnOn} disabled={busy || !text.trim()} onClick={() => go()}>{busy ? 'Working...' : 'Create'}</button>}
+      {msg && <div style={{ fontSize: '14px', lineHeight: 1.4 }}>{msg}</div>}
+    </div>
+  </div>);
 }
 function Thumb({ e, size = 56 }: { e: { kind: string; w: number; d: number; p?: Record<string, any>; extra?: Partial<DItem> }; size?: number }) {
   const it = mkItem(e.kind, { w: e.w, d: e.d, p: { ...(mkItem(e.kind).p || {}), ...(e.p || {}) }, ...(e.extra || {}) });
@@ -322,7 +356,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const viewRef = useRef(view); viewRef.current = view;
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [nudge, setNudge] = useState(0.25);
-  const [addOpen, setAddOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false); const [aiOpen, setAiOpen] = useState(false);
   const [addGroup, setAddGroup] = useState<Cat>('Walls');
   const [saveOpen, setSaveOpen] = useState(false);
   const [msg, setMsg] = useState('');
@@ -886,6 +920,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           <button style={{ ...btn, opacity: hist.current.length ? 1 : 0.4 }} onClick={undo} disabled={!hist.current.length}>Undo</button>
           <button style={{ ...btn, opacity: fut.current.length ? 1 : 0.4 }} onClick={redo} disabled={!fut.current.length}>Redo</button>
           <button style={btnOn} onClick={() => { setSearch(''); setAddOpen(true); }}>+ Add</button>
+          <button style={btn} onClick={() => setAiOpen(true)}>Ask AI</button>
           <button style={btn} onClick={() => setShow3d(true)}>3D</button>
           {show3d && <Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 300, background: '#e6e9e4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b4440', fontWeight: 700 }}>Loading 3D...</div>}><View3D design={d} onClose={() => setShow3d(false)} /></Suspense>}
           <div style={{ position: 'relative' }}>
@@ -966,7 +1001,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         </div>
       </JobPanel>
 
-      {addOpen && d && (() => {
+      {aiOpen && d && <AskAIPiece onClose={() => setAiOpen(false)} onDone={(name, parts) => { const pe = pieceEntry(name, parts); setAiOpen(false); setMenuOpen(true); addItem({ key: 'custom-ai', kind: 'custom', name, sub: '', w: pe.w, d: pe.d, p: pe.p, extra: pe.extra, section: 'Custom pieces' }); }} />}
+        {addOpen && d && (() => {
         const all = CATS.flatMap(c => addList(c, d.mode));
         const q = search.trim().toLowerCase();
         const list = q ? all.filter(e => (e.name + ' ' + (e.sub || '')).toLowerCase().includes(q)) : addList(addGroup, d.mode);
@@ -1019,6 +1055,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '860px', height: 'min(82vh, 640px)', background: '#1d2425', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ display: 'flex', gap: '8px', padding: '12px', borderBottom: '1px solid rgba(238,241,238,0.12)' }}>
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search: pocket door, GFCI, vanity…" style={{ ...input, flex: 1 }} />
+              <button style={btnOn} onClick={() => { setAddOpen(false); setAiOpen(true); }}>Ask AI to build a piece</button>
               <button style={btn} onClick={() => setAddOpen(false)}>Close</button>
             </div>
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: wide ? 'row' : 'column' }}>

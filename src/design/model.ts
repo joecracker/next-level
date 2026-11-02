@@ -250,7 +250,7 @@ export function gaps(it: DItem, d: Design): { a: number; b: number } {
   const segs: number[][] = [];
   d.pts.forEach((a, i) => { const b = d.pts[(i + 1) % d.pts.length]; segs.push([a.x, a.y, b.x, b.y]); });
   d.items.forEach(o => {
-    if (o.id === it.id || !layers.includes(KINDS[o.kind].layer)) return;
+    if (o.id === it.id || !(layers.includes(KINDS[o.kind].layer) || (k.layer === 'inwall' && it.wall !== null && (o.kind === 'partition' || o.kind === 'kneewall')))) return;
     const c = corners(o, frame(o, d.pts));
     for (let j = 0; j < 4; j++) segs.push([c[j][0], c[j][1], c[(j + 1) % 4][0], c[(j + 1) % 4][1]]);
   });

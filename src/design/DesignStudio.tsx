@@ -584,7 +584,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
       commit(patchItem(d, target.id, { p: { ...(target.p || {}), ...(e.p || {}) } })); setSel({ type: 'item', id: target.id }); setAddOpen(false); return;
     }
     const b = designBounds(d); const kind = e.kind; const k = KINDS[kind];
-    if ((kind === 'door' || kind === 'window') && selItem?.kind === 'partition') { const h = selItem; const b0 = mkItem(kind); const nit = mkItem(kind, { w: e.w, d: h.d, wall: null, rot: h.rot || 0, p: { ...(b0.p || {}), ...(e.p || {}), host: h.id, hs: 0 }, ...(e.extra || {}) }); commit(normalize({ ...d, items: [...d.items, nit] })); justAdded.current = nit.id; setSel({ type: 'item', id: nit.id }); setTab('edit'); setAddOpen(false); return; }
+    if ((kind === 'door' || kind === 'window') && selItem?.kind === 'partition') { const h = selItem; const b0 = mkItem(kind); const fw = e.w + 6 > h.w ? Math.max(12, Math.min(e.w, h.w >= 24 ? 24 : h.w)) : e.w; const nit = mkItem(kind, { w: fw, d: h.d, wall: null, rot: h.rot || 0, p: { ...(b0.p || {}), ...(e.p || {}), host: h.id, hs: 0 }, ...(e.extra || {}) }); commit(normalize({ ...d, items: [...d.items, nit] })); justAdded.current = nit.id; setSel({ type: 'item', id: nit.id }); setTab('edit'); setAddOpen(false); return; }
     const over: Partial<DItem> = openSpot(d, kind, e.w, e.d, !!e.p?.poly);
     const base0 = mkItem(kind);
     const it = mkItem(kind, { w: e.w, d: e.d, p: base0.p ? { ...base0.p, ...(e.p || {}) } : undefined, ...over, ...(e.extra || {}) });
@@ -683,12 +683,14 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           {it.p?.lr && <Chips label="Hinge hand (order as)" value={it.p.hand || 'L'} opts={[['L', 'Left'], ['R', 'Right']]} onPick={v => upd(it.id, { p: { ...(it.p || {}), hand: v } })} />}
           <Text label={isCab(it.kind) ? 'Name on the order' : 'Label on the drawing'} value={it.label || ''} placeholder={k.name} onCommit={v => upd(it.id, { label: v })} />
           {isCab(it.kind) && <Text label="Catalog code" value={it.code || ''} placeholder="e.g. B24" onCommit={v => upd(it.id, { code: v.trim() })} />}
-          <div style={{ display: 'grid', gridTemplateColumns: isCab(it.kind) || it.kind === 'window' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isCab(it.kind) || it.kind === 'window' || it.kind === 'kneewall' || it.kind === 'soffit' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '8px' }}>
             <Num label="Width" value={it.w} onCommit={w => upd(it.id, { w: Math.max(1, w), ...(it.wall !== null ? { t: it.t + (Math.max(1, w) - it.w) / 2 } : {}) })} />
             {it.kind !== 'window' && <Num label="Depth" value={it.d} onCommit={dp => upd(it.id, { d: Math.max(1, dp) })} />}
             {isCab(it.kind) && <Num label="Height" value={it.h || 0} onCommit={h => upd(it.id, { h })} />}
             {it.kind === 'window' && <Num label="Height" value={windowOf(d, it).h} onCommit={h => upd(it.id, { h: Math.max(6, h) })} />}
             {it.kind === 'window' && <Num label="Sill" value={windowOf(d, it).sill} onCommit={s => upd(it.id, { sill: s })} />}
+            {it.kind === 'kneewall' && <Num label="Height" value={it.p?.height ?? 36} onCommit={v => upd(it.id, { p: { ...(it.p || {}), height: Math.max(6, v) } })} />}
+            {it.kind === 'soffit' && <Num label="Drop" value={it.p?.drop ?? 12} onCommit={v => upd(it.id, { p: { ...(it.p || {}), drop: Math.max(1, v) } })} />}
           {isCab(it.kind) && <CabPick label="Color for this one" value={it.p?.ccolor || ''} line={d.finish?.line || ''} first={{ id: '', name: 'Same as the room', hex: '#8a8f8c' }} onPick={v => upd(it.id, { p: { ...(it.p || {}), ccolor: v || undefined } })} />}
           </div>
           {hostIt ? (<>
@@ -697,9 +699,9 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             <div style={{ fontSize: '14px', color: 'var(--muted)' }}>{hHoriz ? 'Gap on the left' : 'Gap above'} <b style={{ color: 'var(--cream)' }}>{fmtIn(hEdge)}</b>{' \u00b7 '}{hHoriz ? 'on the right' : 'below'} <b style={{ color: 'var(--cream)' }}>{fmtIn(hOther)}</b>
               <button style={{ ...btn, minHeight: '36px', marginLeft: '8px' }} onClick={() => upd(it.id, { p: { ...(it.p || {}), hs: 0 } })}>Center</button></div>
           </>) : it.wall !== null ? (<>
-            <Num label={horiz ? 'Left edge from the left corner' : 'Top edge from the top corner'} value={rev && wsg ? wsg.L - (it.t + it.w / 2) : it.t - it.w / 2} onCommit={x => upd(it.id, { t: rev && wsg ? wsg.L - x - it.w / 2 : x + it.w / 2 })} />
+            {k.layer === 'inwall' ? (<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}><Num label={horiz ? 'Gap on the left' : 'Gap above'} value={isFinite(gA) ? gA : 0} onCommit={v => { if (isFinite(gA) && wsg) upd(it.id, { t: clampT(it, wsg.L, it.t + (rev ? -1 : 1) * (v - gA)) }); }} /><Num label={horiz ? 'Gap on the right' : 'Gap below'} value={isFinite(gB) ? gB : 0} onCommit={v => { if (isFinite(gB) && wsg) upd(it.id, { t: clampT(it, wsg.L, it.t + (rev ? -1 : 1) * (gB - v)) }); }} /></div>) : (<Num label={horiz ? 'Left edge from the left corner' : 'Top edge from the top corner'} value={rev && wsg ? wsg.L - (it.t + it.w / 2) : it.t - it.w / 2} onCommit={x => upd(it.id, { t: rev && wsg ? wsg.L - x - it.w / 2 : x + it.w / 2 })} />)}
             <div style={{ fontSize: '14px', color: 'var(--muted)' }}>
-              {horiz ? 'Gap on the left' : 'Gap above'} <b style={{ color: 'var(--cream)' }}>{isFinite(gA) ? fmtIn(gA) : '–'}</b> · {horiz ? 'on the right' : 'below'} <b style={{ color: 'var(--cream)' }}>{isFinite(gB) ? fmtIn(gB) : '–'}</b>
+              <span style={k.layer === 'inwall' ? { display: 'none' } : undefined}>{horiz ? 'Gap on the left' : 'Gap above'} <b style={{ color: 'var(--cream)' }}>{isFinite(gA) ? fmtIn(gA) : '–'}</b> · {horiz ? 'on the right' : 'below'} <b style={{ color: 'var(--cream)' }}>{isFinite(gB) ? fmtIn(gB) : '–'}</b></span>
               {isFinite(g.a) && isFinite(g.b) && <button style={{ ...btn, minHeight: '36px', marginLeft: '8px' }} onClick={() => upd(it.id, { t: it.t + (g.b - g.a) / 2 })}>Center</button>}
             </div>
           </>) : (
@@ -850,7 +852,6 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             </>);
             if (it.kind === 'kneewall') return (<>
               <Chips label="Height" value={[36, 42].includes(P.height ?? 36) ? (P.height ?? 36) : 0} opts={[[36, '36"'], [42, '42"'], [0, 'Other']]} onPick={v => v && setP({ height: v })} />
-              <Num label="Height (type it)" value={P.height ?? 36} onCommit={v => setP({ height: Math.max(6, v) })} />
             </>);
             if (it.kind === 'partition') return <div style={{ fontSize: '14px', color: 'var(--muted)' }}>Inside walls always run to the ceiling.</div>;
             if (it.kind === 'toilet') return <Chips label="Bowl" value={P.bowl} opts={[['elong', 'Elongated'], ['round', 'Round']]} onPick={v => setP({ bowl: v })} />;
@@ -858,7 +859,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
               <Chips label="Sinks" value={P.sinks} opts={[[1, 'One'], [2, 'Two']]} onPick={v => setP({ sinks: v })} />
               <Chips label="Sink bowl (3D)" value={P.bowlShape || 'oval'} opts={[['oval', 'Oval'], ['round', 'Round'], ['rect', 'Rectangular']]} onPick={v => setP({ bowlShape: v })} />
             </>);
-            if (it.kind === 'soffit') return <Num label="Drop below ceiling" value={P.drop ?? 12} onCommit={v => setP({ drop: Math.max(1, v) })} />;
+            if (it.kind === 'soffit') return <div style={{ fontSize: '14px', color: 'var(--muted)' }}>How far it drops is the Drop box above.</div>;
             if (it.kind === 'switch') return <Chips label="Gangs" value={P.gang || 1} opts={[[1, '1'], [2, '2'], [3, '3']]} onPick={v => setP({ gang: v })} />;
             return null;
           })()}

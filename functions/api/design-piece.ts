@@ -94,7 +94,7 @@ ${current ? "Current parts of the piece (change these as asked): " + current : "
                   shape: { type: Type.STRING, enum: ["box", "tri", "wedge"] },
                   mat: { type: Type.STRING, enum: ["paint", "tile", "wood", "stone"] },
                   color: { type: Type.STRING },
-                  x: num, y: num, z: num, w: num, d: num, h: num, rot: num,
+                  x: num, y: num, z: num, w: num, d: num, h: num, rot: { type: Type.INTEGER },
                 },
                 required: ["name", "shape", "mat", "x", "y", "z", "w", "d", "h"],
               },

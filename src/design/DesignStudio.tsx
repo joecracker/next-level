@@ -150,14 +150,16 @@ function CustomEditor({ it, upd }: { it: DItem; upd: (id: string, p: Partial<DIt
       {pt && (<>
         <Text label="Part name" value={pt.name} onCommit={t => setPart({ name: t.trim() || 'Part' })} />
         <Chips label="Shape" value={pt.shape} opts={PART_SHAPES} onPick={x => setPart({ shape: x })} />
+        <Chips label="Turn it (around its middle)" value={pt.rot || 0} opts={[[0, 'Straight'], [45, '45\u00b0'], [90, '90\u00b0'], [135, '135\u00b0'], [-45, '-45\u00b0']]} onPick={x => setPart({ rot: x || undefined })} />
+        <Num label="Turn (degrees, clockwise from above)" value={pt.rot || 0} onCommit={x => { let r = ((x % 360) + 360) % 360; if (r > 180) r -= 360; setPart({ rot: r || undefined }); }} />
         <Chips label="Material" value={pt.mat} opts={PART_MATS.map(m => [m[0], m[1]] as [any, string])} onPick={x => setPart({ mat: x, color: partMatColor(x) })} />
         <div><div style={lbl}>Color</div><div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
           {SWATCHES.map(c => <button key={c} aria-label={c} onClick={() => setPart({ color: c })} style={{ width: '40px', height: '40px', borderRadius: '8px', cursor: 'pointer', background: c, border: pt.color === c ? '3px solid var(--ember)' : '1px solid rgba(238,241,238,0.35)' }} />)}
           <input type="color" key={pt.id + pt.color} defaultValue={pt.color} onBlur={e => { if (e.target.value !== pt.color) setPart({ color: e.target.value }); }} style={{ width: '56px', height: '40px' }} />
         </div></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          <Num label="Across (left edge)" value={pt.x} onCommit={x => setPart({ x: Math.max(0, x) })} />
-          <Num label="Back to front (back edge)" value={pt.y} onCommit={x => setPart({ y: Math.max(0, x) })} />
+          <Num label="Across (left edge)" value={pt.x} onCommit={x => setPart({ x: pt.rot ? x : Math.max(0, x) })} />
+          <Num label="Back to front (back edge)" value={pt.y} onCommit={x => setPart({ y: pt.rot ? x : Math.max(0, x) })} />
           <Num label="Off the floor (underside)" value={pt.z} onCommit={x => setPart({ z: Math.max(0, x) })} />
           <Num label="Width" value={pt.w} onCommit={x => setPart({ w: Math.max(0.25, x) })} />
           <Num label="Depth" value={pt.d} onCommit={x => setPart({ d: Math.max(0.25, x) })} />

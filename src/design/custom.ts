@@ -12,6 +12,7 @@ export type PartShape = 'box' | 'tri' | 'wedge';
 export type PartMat = 'paint' | 'tile' | 'wood' | 'stone';
 export interface Part {
   id: string; name: string; shape: PartShape;
+  rot?: number;   // degrees, turns the part clockwise (seen from above) around the middle of its box; 0 or missing = straight
   x: number; y: number; z: number; w: number; d: number; h: number;   // inches; z = underside of the part off the floor
   mat: PartMat; color: string;                                        // color: a hex such as #e6e2d6
 }
@@ -46,10 +47,18 @@ export function starterParts(): Part[] {
   ];
 }
 
+/** A part's footprint in the piece's own inches before scaling, turned by its rotation around the middle of its box. */
+function flatPoly(pt: Part): P2[] {
+  const pts = unitPoly(pt.shape).map(([u, w]) => [pt.x + u * pt.w, pt.y + w * pt.d] as P2);
+  const r = ((pt.rot || 0) * Math.PI) / 180; if (!r) return pts;
+  const cx = pt.x + pt.w / 2, cy = pt.y + pt.d / 2, co = Math.cos(r), si = Math.sin(r);
+  return pts.map(([a, b]) => [cx + (a - cx) * co - (b - cy) * si, cy + (a - cx) * si + (b - cy) * co] as P2);
+}
+
 /** Size of the box that holds every part. */
 export function partsBounds(parts: Part[]): { w: number; d: number; h: number } {
   let w = 0, d = 0, h = 0;
-  for (const p of parts) { w = Math.max(w, p.x + p.w); d = Math.max(d, p.y + p.d); h = Math.max(h, p.z + p.h); }
+  for (const p of parts) { for (const [a, b] of flatPoly(p)) { w = Math.max(w, a); d = Math.max(d, b); } h = Math.max(h, p.z + p.h); }
   return { w: Math.max(w, 1), d: Math.max(d, 1), h: Math.max(h, 1) };
 }
 
@@ -63,7 +72,7 @@ export function customOf(it: DItem): CustomView {
 }
 /** Footprint of one part, in the item's box (inches), after scaling. */
 export function partPoly(pt: Part, v: { sx: number; sy: number }): P2[] {
-  return unitPoly(pt.shape).map(([u, w]) => [(pt.x + u * pt.w) * v.sx, (pt.y + w * pt.d) * v.sy] as P2);
+  return flatPoly(pt).map(([a, b]) => [a * v.sx, b * v.sy] as P2);
 }
 /** Where a part's underside and top are (inches off the floor), after scaling. */
 export const partZ = (pt: Part, v: { sz: number }): [number, number] => [pt.z * v.sz, (pt.z + pt.h) * v.sz];
@@ -104,7 +113,8 @@ export function cleanParts(raw: unknown): Part[] {
     const shape: PartShape = r?.shape === 'tri' || r?.shape === 'wedge' ? r.shape : 'box';
     const mat: PartMat = r?.mat === 'tile' || r?.mat === 'wood' || r?.mat === 'stone' ? r.mat : 'paint';
     const color = /^#[0-9a-f]{6}$/i.test(String(r?.color)) ? String(r.color) : matColor(mat);
-    return { id: uid(), name: String(r?.name || 'Part ' + (i + 1)).slice(0, 40), shape, mat, color, x: n(r?.x, 0, 240, 0), y: n(r?.y, 0, 240, 0), z: n(r?.z, 0, 120, 0), w: n(r?.w, 0.125, 240, 1), d: n(r?.d, 0.125, 240, 1), h: n(r?.h, 0.125, 120, 1) };
+    const rot = n(r?.rot, -360, 360, 0);
+    return { id: uid(), name: String(r?.name || 'Part ' + (i + 1)).slice(0, 40), shape, mat, color, ...(rot ? { rot } : {}), x: n(r?.x, rot ? -240 : 0, 240, 0), y: n(r?.y, rot ? -240 : 0, 240, 0), z: n(r?.z, 0, 120, 0), w: n(r?.w, 0.125, 240, 1), d: n(r?.d, 0.125, 240, 1), h: n(r?.h, 0.125, 120, 1) };
   });
 }
 

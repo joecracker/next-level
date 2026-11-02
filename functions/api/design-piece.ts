@@ -43,8 +43,9 @@ Each part is a straight-sided solid with these fields:
 - w: width of the part across (along x)
 - d: depth of the part (along y)
 - h: height or thickness of the part (up from z)
+- rot: optional. Turns the part clockwise (seen from above) by this many degrees around the MIDDLE of its box, which is the point (x + w/2, y + d/2). Leave it out or use 0 for a straight part. Choose x and y as for the unturned box; for a turned part x and y may be negative.
 
-The piece must be built from parts that actually touch or sit on each other, like real construction. Panels and shelves are 0.75 inch thick; tops are 0.75 to 1.5 inches; a toe-kick recess is usually 3 to 4 inches. Keep it simple: use as few parts as make a sensible piece (usually 4 to 20, never more than 40). Do not model handles, hardware, screws or trim unless asked.
+The piece must be built from parts that actually touch or sit on each other, like real construction. Panels and shelves are 0.75 inch thick; tops are 0.75 to 1.5 inches; a toe-kick recess is usually 3 to 4 inches. Corner pieces: for a piece that fills a 90 degree room corner with an angled face, use shape "tri" for the top, bottom and shelves with x=0, y=0, and w=d=the length of each leg along the walls (the angled face is the long side; face length = leg x 1.414). To stand a divider SQUARE to that angled face at a point P=(px,py) on the face (px + py = leg), run it straight back along the direction (-1,-1) until it reaches a side wall: its length is L = 1.414 x min(px,py); make it a "box" with w = L - 0.5, d = its thickness, rot = 45, whose middle is at (px,py) minus (L/2.828) in both x and y; so x = midx - w/2 and y = midy - d/2. For one divider in the middle of the face: px = py = leg/2. Dividers must reach the shelves and top they sit between, so give them the full inside height. Keep it simple: use as few parts as make a sensible piece (usually 4 to 20, never more than 40). Do not model handles, hardware, screws or trim unless asked.
 If a piece is not square from above, a "tri" or "wedge" part can make the shape; stack parts at different z values for shelves and tops.
 Prefer the colors: white #ffffff, off-white #e8e6df, tile #e6e2d6, gray #9a9a96, navy #1f3a5f, wood #a0764e, dark wood #6b4a32, stone #b7b4ac. Use the colors the person asks for.
 
@@ -92,7 +93,7 @@ ${current ? "Current parts of the piece (change these as asked): " + current : "
                   shape: { type: Type.STRING, enum: ["box", "tri", "wedge"] },
                   mat: { type: Type.STRING, enum: ["paint", "tile", "wood", "stone"] },
                   color: { type: Type.STRING },
-                  x: num, y: num, z: num, w: num, d: num, h: num,
+                  x: num, y: num, z: num, w: num, d: num, h: num, rot: num,
                 },
                 required: ["name", "shape", "mat", "x", "y", "z", "w", "d", "h"],
               },

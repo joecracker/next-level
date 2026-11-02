@@ -130,8 +130,24 @@ function parts(it: DItem, d: Design): Part[] {
     case 'vlight': return [P({ y0: 72, h: 3, color: COL.dark })];
     case 'grab': return [P({ y0: 33, h: 1.5, color: COL.steel })];
     case 'kneewall': return [P({ h: p.height || 36, color: COL.wall })];
-    case 'partition': return [P({ h: ceil, color: COL.wall })];
-    default: return [];
+    case 'partition': { // an inside wall to the ceiling, with the doors and windows that sit on it cut through
+      const ops: Array<{ a: number; b: number; y0: number; y1: number; win?: boolean }> = [];
+      for (const q of d.items) {
+        if ((q.kind !== 'door' && q.kind !== 'window') || q.p?.host !== it.id) continue;
+        const c = Number(q.p?.hs) || 0; const a = Math.max(-w / 2 + 0.25, c - q.w / 2), b = Math.min(w / 2 - 0.25, c + q.w / 2); if (b - a < 4) continue;
+        if (q.kind === 'door') ops.push({ a, b, y0: 0, y1: Math.min(80, ceil - 1) });
+        else { const o = windowOf(d, q); const y0 = Math.max(0.5, o.sill), y1 = Math.min(o.sill + o.h, ceil - 0.5); if (y1 - y0 >= 2) ops.push({ a, b, y0, y1, win: true }); }
+      }
+      if (!ops.length) return [P({ h: ceil, color: COL.wall })];
+      ops.sort((x, y) => x.a - y.a); const out: Part[] = []; let at = -w / 2;
+      const piece = (a: number, b: number, y0: number, h: number) => { if (b - a > 0.05 && h > 0.05) out.push(P({ lx: (a + b) / 2, w: b - a, y0, h, color: COL.wall })); };
+      for (const o of ops) {
+        if (o.a < at) continue;
+        piece(at, o.a, 0, ceil); piece(o.a, o.b, o.y1, ceil - o.y1); if (o.win) { piece(o.a, o.b, 0, o.y0); out.push(P({ lx: (o.a + o.b) / 2, w: o.b - o.a, dd: 0.6, y0: o.y0, h: o.y1 - o.y0, color: COL.glass, opacity: 0.28 })); }
+        at = o.b;
+      }
+      piece(at, w / 2, 0, ceil); return out;
+    }    default: return [];
   }
 }
 

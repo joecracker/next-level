@@ -61,7 +61,7 @@ export function designBody(d: Design, S: number, selId?: string | null, title?: 
     out.push(lowWallsSvg(d));
   }
   const order: string[] = ['inwall', 'floor', 'hung', 'ceiling'];
-  const items = (d.items || []).slice().sort((a, b) => order.indexOf(KINDS[a.kind].layer) - order.indexOf(KINDS[b.kind].layer));
+  const ord = (q: DItem) => (q.p?.host ? 1.5 : order.indexOf(KINDS[q.kind].layer)); const items = (d.items || []).slice().sort((a, b) => ord(a) - ord(b));
   let topsDone = false; const flatCeil = vaultOf(d).shape === 'flat' ? (d.ceiling || 96) : 0; // soffit underside is only worked out for a flat ceiling
   for (const it of items) {
     if (!topsDone && order.indexOf(KINDS[it.kind].layer) >= 2) { out.push(countertopSvg(d, S)); topsDone = true; }

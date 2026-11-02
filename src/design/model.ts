@@ -204,9 +204,22 @@ export function normalize(d: Design): Design {
     const L = seg(d.pts, it.wall).L; const t = clampT(it, L, it.t);
     return t === it.t ? it : { ...it, t };
   });
-  return { ...d, items };
+  return syncHosted({ ...d, items });
 }
-export function orient(pts: Pt[]): Pt[] { // clockwise on screen
+/** Doors and windows that sit on an inside wall (p.host = that wall's id, p.hs = how far from its middle) follow the wall when it moves, turns or is resized. */
+export function syncHosted(d: Design): Design {
+  let changed = false;
+  const items = d.items.map(it => {
+    const hid = it.p?.host; if (!hid) return it;
+    const h = d.items.find(q => q.id === hid && q.kind === 'partition');
+    if (!h) { changed = true; const rest = { ...(it.p || {}) }; delete rest.host; delete rest.hs; return { ...it, p: rest }; }
+    const lim = Math.max(0, (h.w - it.w) / 2); const hs = Math.max(-lim, Math.min(lim, Number(it.p?.hs) || 0));
+    const r = (h.rot || 0) * Math.PI / 180; const x = h.x + Math.cos(r) * hs, y = h.y + Math.sin(r) * hs;
+    if (it.wall === null && Math.abs(it.x - x) < 1e-6 && Math.abs(it.y - y) < 1e-6 && it.rot === (h.rot || 0) && it.d === h.d && (Number(it.p?.hs) || 0) === hs) return it;
+    changed = true; return { ...it, wall: null, x, y, rot: h.rot || 0, d: h.d, p: { ...(it.p || {}), hs } };
+  });
+  return changed ? { ...d, items } : d;
+}export function orient(pts: Pt[]): Pt[] { // clockwise on screen
   let a = 0; pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length]; a += p.x * q.y - q.x * p.y; });
   return a < 0 ? pts.slice().reverse() : pts;
 }

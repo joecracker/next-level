@@ -18,7 +18,7 @@ import { GLASS, WTYPES } from './model';
 import { windowNotes, windowOf } from './windows';
 import {
   CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, polyPatch, polyWorld, toPolyLocal, seg, snapTo, template,
-  type Cat, type DItem, type Design, type Pt,
+  type Cat, type DItem, type Design, type Pt, syncHosted,
 } from './model';
 
 const View3D = lazy(() => import('./View3D')); // the 3D library only loads when 3D is opened
@@ -398,12 +398,13 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
 
   // ----- saving to the job, undo / redo -----
   const persist = (d: Design) => { try { NL?.setDesign(d); } catch { /* ignore */ } };
-  const commit = (next: Design) => {
+  const commit = (next0: Design) => {
+    const next = syncHosted(next0);
     justAdded.current = null;
     const cur = designRef.current; if (cur) { hist.current.push(cur); if (hist.current.length > 80) hist.current.shift(); }
     fut.current = []; designRef.current = next; setDesignState(next); persist(next); bump(x => x + 1);
   };
-  const live = (next: Design) => { designRef.current = next; setDesignState(next); };
+  const live = (next0: Design) => { const next = syncHosted(next0); designRef.current = next; setDesignState(next); };
   const undo = () => { const p = hist.current.pop(); const cur = designRef.current; if (!p || !cur) return; fut.current.push(cur); designRef.current = p; setDesignState(p); persist(p); setSel(null); bump(x => x + 1); };
   const redo = () => { const n = fut.current.pop(); const cur = designRef.current; if (!n || !cur) return; hist.current.push(cur); designRef.current = n; setDesignState(n); persist(n); setSel(null); bump(x => x + 1); };
 
@@ -450,7 +451,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const hitTest = (P: Pt): Sel => {
     const d = designRef.current!; const v = viewRef.current!; const px = 1 / v.s;
     for (let i = 0; i < d.pts.length; i++) if (Math.hypot(P.x - d.pts[i].x, P.y - d.pts[i].y) < 14 * px) return { type: 'corner', i };
-    const items = d.items.slice().sort((a, b) => LAYER_ORDER.indexOf(KINDS[b.kind].layer) - LAYER_ORDER.indexOf(KINDS[a.kind].layer));
+    const lo = (q: DItem) => (q.p?.host ? 2.5 : LAYER_ORDER.indexOf(KINDS[q.kind].layer)); const items = d.items.slice().sort((a, b) => lo(b) - lo(a));
     for (const it of items) if (hitItem(it, d.pts, P.x, P.y, 6 * px)) return { type: 'item', id: it.id };
     let best: { i: number; dist: number } | null = null;
     for (let i = 0; i < d.pts.length; i++) {
@@ -523,9 +524,11 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
     if (g.kind === 'item') {
       const it0 = d0.items.find(q => q.id === g.id)!; const k = KINDS[it0.kind];
       const C = { x: P.x + g.off.x, y: P.y + g.off.y }; const q = nearestWall(d0.pts, C.x, C.y);
+      const hostOf = (it0.kind === 'door' || it0.kind === 'window') ? d0.items.filter(h => h.kind === 'partition').map(h => { const hf = frame(h, d0.pts); const lx = (C.x - hf.cx) * hf.ux + (C.y - hf.cy) * hf.uy, ly = (C.x - hf.cx) * hf.nx + (C.y - hf.cy) * hf.ny; return { h, lx, off: Math.abs(ly) - h.d / 2 }; }).filter(c => Math.abs(c.lx) <= c.h.w / 2 + 6 && c.off < 14 && c.off < q.dist).sort((a, b) => a.off - b.off)[0] : undefined;
       const attach = k.layer === 'inwall' || k.layer === 'hung' || (k.snap && q.dist < it0.d / 2 + 12);
       let patch: Partial<DItem>; let riders = g.riders as Array<{ id: string; off: number }>;
-      if (attach) { const t = snapTo(clampT(it0, q.L, q.t), SNAP); patch = { wall: q.i, t, ...(it0.wall !== q.i ? { rot: 0 } : {}) }; if (it0.wall !== q.i) riders = []; }
+      if (hostOf) { const lim = Math.max(0, (hostOf.h.w - it0.w) / 2); const hs = snapTo(Math.max(-lim, Math.min(lim, hostOf.lx)), SNAP); patch = { wall: null, rot: hostOf.h.rot || 0, d: hostOf.h.d, p: { ...(it0.p || {}), host: hostOf.h.id, hs } }; riders = []; }
+      else if (attach) { const t = snapTo(clampT(it0, q.L, q.t), SNAP); patch = { wall: q.i, t, ...(it0.wall !== q.i ? { rot: 0 } : {}), ...(it0.p?.host ? { d: k.d, p: (() => { const pp = { ...(it0.p || {}) }; delete pp.host; delete pp.hs; return pp; })() } : {}) }; if (it0.wall !== q.i) riders = []; }
       else patch = { wall: null, x: snapTo(C.x, SNAP), y: snapTo(C.y, SNAP), rot: it0.wall !== null ? Math.round(g.rot0) : it0.rot };
       let next = patchItem(d0, it0.id, patch);
       if (riders.length && patch.wall === it0.wall) { const nt = patch.t as number; next = { ...next, items: next.items.map(o => { const r = riders.find(z => z.id === o.id); return r ? { ...o, t: clampT(o, seg(d0.pts, it0.wall!).L, nt + r.off) } : o; }) }; }
@@ -558,8 +561,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const selItem = d && sel?.type === 'item' ? d.items.find(q => q.id === sel.id) || null : null;
   const [, setLibTick] = useState(0); useEffect(() => { if (addOpen) syncPieces().then(() => setLibTick(t => t + 1)); }, [addOpen]);
   const upd = (id: string, p: Partial<DItem>) => d && commit(patchItem(d, id, p));
-  const delItem = (id: string) => { const cur = designRef.current; if (!cur) return; commit({ ...cur, items: cur.items.filter(q => q.id !== id) }); setSel(null); };
-  const dupItem = (it: DItem) => { if (!d) return; const c: DItem = { ...it, id: mkItem(it.kind).id, ...(it.wall !== null ? { t: it.t + it.w } : { x: it.x + 12, y: it.y + 12 }) }; commit(normalize({ ...d, items: [...d.items, c] })); setSel({ type: 'item', id: c.id }); };
+  const delItem = (id: string) => { const cur = designRef.current; if (!cur) return; commit({ ...cur, items: cur.items.filter(q => q.id !== id && q.p?.host !== id) }); setSel(null); };
+  const dupItem = (it: DItem) => { if (!d) return; const c: DItem = { ...it, id: mkItem(it.kind).id, ...(it.p?.host ? { p: { ...(it.p || {}), hs: (Number(it.p.hs) || 0) + it.w } } : it.wall !== null ? { t: it.t + it.w } : { x: it.x + 12, y: it.y + 12 }) }; commit(normalize({ ...d, items: [...d.items, c] })); setSel({ type: 'item', id: c.id }); };
   const addCab = (e: CabEntry) => {
     if (!d) return;
     const kind = kindForEntry(e); const k = KINDS[kind]; const b = designBounds(d);
@@ -581,12 +584,14 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
       commit(patchItem(d, target.id, { p: { ...(target.p || {}), ...(e.p || {}) } })); setSel({ type: 'item', id: target.id }); setAddOpen(false); return;
     }
     const b = designBounds(d); const kind = e.kind; const k = KINDS[kind];
+    if ((kind === 'door' || kind === 'window') && selItem?.kind === 'partition') { const h = selItem; const b0 = mkItem(kind); const nit = mkItem(kind, { w: e.w, d: h.d, wall: null, rot: h.rot || 0, p: { ...(b0.p || {}), ...(e.p || {}), host: h.id, hs: 0 }, ...(e.extra || {}) }); commit(normalize({ ...d, items: [...d.items, nit] })); justAdded.current = nit.id; setSel({ type: 'item', id: nit.id }); setTab('edit'); setAddOpen(false); return; }
     const over: Partial<DItem> = openSpot(d, kind, e.w, e.d, !!e.p?.poly);
     const base0 = mkItem(kind);
     const it = mkItem(kind, { w: e.w, d: e.d, p: base0.p ? { ...base0.p, ...(e.p || {}) } : undefined, ...over, ...(e.extra || {}) });
     commit(normalize({ ...d, items: [...d.items, it] })); justAdded.current = it.id; setSel({ type: 'item', id: it.id }); setTab('edit'); setAddOpen(false);
   };
-  const nudgeBy = (it: DItem, dir: number, axis: 'x' | 'y' | 't') => {
+  const nudgeBy = (it: DItem, dir: number, axis: 'x' | 'y' | 't' | 'hs') => {
+    if (axis === 'hs') { if (it.p?.host) upd(it.id, { p: { ...(it.p || {}), hs: (Number(it.p.hs) || 0) + dir * nudge } }); return; }
     if (!d) return;
     if (it.wall !== null && axis === 't') { const L = seg(d.pts, it.wall).L; const nt = clampT(it, L, it.t + dir * nudge); const dt = nt - it.t;
       const riders = KINDS[it.kind].layer === 'floor' ? d.items.filter(q => q.id !== it.id && q.wall === it.wall && KINDS[q.kind].layer === 'hung' && Math.abs(q.t - it.t) <= it.w / 2 + 0.01) : [];
@@ -665,7 +670,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const editPanel = d && (
     <div style={{ padding: '12px 14px 90px', display: 'flex', flexDirection: 'column', gap: '12px', color: 'var(--cream)' }}>
       {selItem ? (() => {
-        const it = selItem; const k = KINDS[it.kind]; const g = gaps(it, d); const wsg = it.wall !== null && it.wall < d.pts.length ? seg(d.pts, it.wall) : null; const horiz = !wsg || Math.abs(wsg.ux) >= Math.abs(wsg.uy); const rev = !!wsg && (horiz ? wsg.ux < 0 : wsg.uy < 0); const gA = rev ? g.b : g.a, gB = rev ? g.a : g.b; /* what you see on the plan: left/right on top and bottom walls, above/below on side walls */
+        const it = selItem; const k = KINDS[it.kind]; const g = gaps(it, d); const wsg = it.wall !== null && it.wall < d.pts.length ? seg(d.pts, it.wall) : null; const horiz = !wsg || Math.abs(wsg.ux) >= Math.abs(wsg.uy); const rev = !!wsg && (horiz ? wsg.ux < 0 : wsg.uy < 0); const gA = rev ? g.b : g.a, gB = rev ? g.a : g.b; /* what you see on the plan: left/right on top and bottom walls, above/below on side walls */ const hostIt = it.p?.host ? d.items.find(q => q.id === it.p!.host) || null : null; const hr = hostIt ? (hostIt.rot || 0) * Math.PI / 180 : 0; const hHoriz = Math.abs(Math.cos(hr)) >= Math.abs(Math.sin(hr)); const hRev = !!hostIt && (hHoriz ? Math.cos(hr) < 0 : Math.sin(hr) < 0); const hs0 = Number(it.p?.hs) || 0; const hEdge = hostIt ? (hRev ? hostIt.w / 2 - hs0 - it.w / 2 : hostIt.w / 2 + hs0 - it.w / 2) : 0; const hOther = hostIt ? hostIt.w - it.w - hEdge : 0;
         return (<>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Thumb e={{ kind: it.kind, w: it.w, d: it.d, p: it.p, extra: { hinge: it.hinge, swing: it.swing } }} size={48} />
@@ -684,7 +689,12 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             {isCab(it.kind) && <Num label="Height" value={it.h || 0} onCommit={h => upd(it.id, { h })} />}
           {isCab(it.kind) && <CabPick label="Color for this one" value={it.p?.ccolor || ''} line={d.finish?.line || ''} first={{ id: '', name: 'Same as the room', hex: '#8a8f8c' }} onPick={v => upd(it.id, { p: { ...(it.p || {}), ccolor: v || undefined } })} />}
           </div>
-          {it.wall !== null ? (<>
+          {hostIt ? (<>
+            <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>This sits on your inside wall and moves with it. Drag it along the wall, or type a distance.</div>
+            <Num label={hHoriz ? 'Left edge from the left end of the wall' : 'Top edge from the top end of the wall'} value={hEdge} onCommit={x => upd(it.id, { p: { ...(it.p || {}), hs: hRev ? hostIt.w / 2 - it.w / 2 - x : x - hostIt.w / 2 + it.w / 2 } })} />
+            <div style={{ fontSize: '14px', color: 'var(--muted)' }}>{hHoriz ? 'Gap on the left' : 'Gap above'} <b style={{ color: 'var(--cream)' }}>{fmtIn(hEdge)}</b>{' \u00b7 '}{hHoriz ? 'on the right' : 'below'} <b style={{ color: 'var(--cream)' }}>{fmtIn(hOther)}</b>
+              <button style={{ ...btn, minHeight: '36px', marginLeft: '8px' }} onClick={() => upd(it.id, { p: { ...(it.p || {}), hs: 0 } })}>Center</button></div>
+          </>) : it.wall !== null ? (<>
             <Num label={horiz ? 'Left edge from the left corner' : 'Top edge from the top corner'} value={rev && wsg ? wsg.L - (it.t + it.w / 2) : it.t - it.w / 2} onCommit={x => upd(it.id, { t: rev && wsg ? wsg.L - x - it.w / 2 : x + it.w / 2 })} />
             <div style={{ fontSize: '14px', color: 'var(--muted)' }}>
               {horiz ? 'Gap on the left' : 'Gap above'} <b style={{ color: 'var(--cream)' }}>{isFinite(gA) ? fmtIn(gA) : '–'}</b> · {horiz ? 'on the right' : 'below'} <b style={{ color: 'var(--cream)' }}>{isFinite(gB) ? fmtIn(gB) : '–'}</b>
@@ -699,12 +709,12 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           <Sec title="Nudge (small moves, if you ever need them)">
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
               {[[0.0625, '1/16'], [0.25, '1/4'], [1, '1'], [6, '6']].map(([n, t]) => <button key={t as string} style={nudge === n ? btnOn : btn} onClick={() => setNudge(n as number)}>{t}"</button>)}
-              {it.wall !== null ? (<><button style={btn} onClick={() => nudgeBy(it, rev ? 1 : -1, 't')}>{horiz ? '\u25c0' : '\u25b2'}</button><button style={btn} onClick={() => nudgeBy(it, rev ? -1 : 1, 't')}>{horiz ? '\u25b6' : '\u25bc'}</button></>) : (<>
+              {hostIt ? (<><button style={btn} onClick={() => nudgeBy(it, hRev ? 1 : -1, 'hs')}>{hHoriz ? '\u25c0' : '\u25b2'}</button><button style={btn} onClick={() => nudgeBy(it, hRev ? -1 : 1, 'hs')}>{hHoriz ? '\u25b6' : '\u25bc'}</button></>) : it.wall !== null ? (<><button style={btn} onClick={() => nudgeBy(it, rev ? 1 : -1, 't')}>{horiz ? '\u25c0' : '\u25b2'}</button><button style={btn} onClick={() => nudgeBy(it, rev ? -1 : 1, 't')}>{horiz ? '\u25b6' : '\u25bc'}</button></>) : (<>
                 <button style={btn} onClick={() => nudgeBy(it, -1, 'x')}>◀</button><button style={btn} onClick={() => nudgeBy(it, 1, 'x')}>▶</button>
                 <button style={btn} onClick={() => nudgeBy(it, -1, 'y')}>▲</button><button style={btn} onClick={() => nudgeBy(it, 1, 'y')}>▼</button></>)}
             </div>
           </Sec>
-          {it.wall === null && (<div>
+          {it.wall === null && !hostIt && (<div>
             <div style={lbl}>Angle (any direction)</div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
               <button style={btn} onClick={() => upd(it.id, { rot: ((it.rot || 0) - 15 + 360) % 360 })}>−15°</button>

@@ -683,10 +683,12 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           {it.p?.lr && <Chips label="Hinge hand (order as)" value={it.p.hand || 'L'} opts={[['L', 'Left'], ['R', 'Right']]} onPick={v => upd(it.id, { p: { ...(it.p || {}), hand: v } })} />}
           <Text label={isCab(it.kind) ? 'Name on the order' : 'Label on the drawing'} value={it.label || ''} placeholder={k.name} onCommit={v => upd(it.id, { label: v })} />
           {isCab(it.kind) && <Text label="Catalog code" value={it.code || ''} placeholder="e.g. B24" onCommit={v => upd(it.id, { code: v.trim() })} />}
-          <div style={{ display: 'grid', gridTemplateColumns: isCab(it.kind) ? '1fr 1fr 1fr' : '1fr 1fr', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isCab(it.kind) || it.kind === 'window' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '8px' }}>
             <Num label="Width" value={it.w} onCommit={w => upd(it.id, { w: Math.max(1, w), ...(it.wall !== null ? { t: it.t + (Math.max(1, w) - it.w) / 2 } : {}) })} />
-            <Num label="Depth" value={it.d} onCommit={dp => upd(it.id, { d: Math.max(1, dp) })} />
+            {it.kind !== 'window' && <Num label="Depth" value={it.d} onCommit={dp => upd(it.id, { d: Math.max(1, dp) })} />}
             {isCab(it.kind) && <Num label="Height" value={it.h || 0} onCommit={h => upd(it.id, { h })} />}
+            {it.kind === 'window' && <Num label="Height" value={windowOf(d, it).h} onCommit={h => upd(it.id, { h: Math.max(6, h) })} />}
+            {it.kind === 'window' && <Num label="Sill" value={windowOf(d, it).sill} onCommit={s => upd(it.id, { sill: s })} />}
           {isCab(it.kind) && <CabPick label="Color for this one" value={it.p?.ccolor || ''} line={d.finish?.line || ''} first={{ id: '', name: 'Same as the room', hex: '#8a8f8c' }} onPick={v => upd(it.id, { p: { ...(it.p || {}), ccolor: v || undefined } })} />}
           </div>
           {hostIt ? (<>
@@ -744,8 +746,6 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           {it.kind === 'window' && <Sec title="Window" open>
             <Chips label="Kind of window" value={windowOf(d, it).type} opts={WTYPES.map(t => [t.id, t.name.replace(' window', '')] as [string, string])} onPick={v => upd(it.id, { p: { ...(it.p || {}), wtype: v } })} />
             <Chips label="Glass" value={windowOf(d, it).glass} opts={GLASS} onPick={v => upd(it.id, { p: { ...(it.p || {}), glass: v } })} />
-            <Num label="Window height" value={windowOf(d, it).h} onCommit={h => upd(it.id, { h: Math.max(6, h) })} />
-            <Num label="Sill height" value={windowOf(d, it).sill} onCommit={s => upd(it.id, { sill: s })} />
             {windowNotes(d, it).map((t, i) => <div key={i} style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>{t}</div>)}
           </Sec>}
           {(() => {

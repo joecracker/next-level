@@ -357,8 +357,8 @@ export function initNextLevel() {
   }catch(e){ projects = []; }
   projects.forEach(p => {
     p.photos = p.photos || [];
-    // Old drawings from the previous Design side were test work and are dropped.
-    delete (p as any).pages; delete (p as any).canvas; delete (p as any).takeoffAdj; delete (p as any).customItems;
+    // Leftovers from the very first Design side (test work) are dropped. The Design Studio's saved drawings (pages) are kept.
+    delete (p as any).canvas; delete (p as any).takeoffAdj; delete (p as any).customItems; // (never delete p.pages: those are the Design Studio drawings)
   });
 
   // One-time migration: move any legacy inline base64 photos into IndexedDB,

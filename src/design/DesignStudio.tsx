@@ -683,15 +683,14 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
               <Num label="Center down" value={it.y} onCommit={y => upd(it.id, { y })} />
             </div>
           )}
-          <div>
-            <div style={lbl}>Nudge</div>
+          <Sec title="Nudge (small moves, if you ever need them)">
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
               {[[0.0625, '1/16'], [0.25, '1/4'], [1, '1'], [6, '6']].map(([n, t]) => <button key={t as string} style={nudge === n ? btnOn : btn} onClick={() => setNudge(n as number)}>{t}"</button>)}
               {it.wall !== null ? (<><button style={btn} onClick={() => nudgeBy(it, rev ? 1 : -1, 't')}>{horiz ? '\u25c0' : '\u25b2'}</button><button style={btn} onClick={() => nudgeBy(it, rev ? -1 : 1, 't')}>{horiz ? '\u25b6' : '\u25bc'}</button></>) : (<>
                 <button style={btn} onClick={() => nudgeBy(it, -1, 'x')}>◀</button><button style={btn} onClick={() => nudgeBy(it, 1, 'x')}>▶</button>
                 <button style={btn} onClick={() => nudgeBy(it, -1, 'y')}>▲</button><button style={btn} onClick={() => nudgeBy(it, 1, 'y')}>▼</button></>)}
             </div>
-          </div>
+          </Sec>
           {it.wall === null && (<div>
             <div style={lbl}>Angle (any direction)</div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>

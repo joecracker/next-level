@@ -333,9 +333,22 @@ function removeCorner(d: Design, j: number): Design {
   const wh = d.wallH && d.wallH.length === d.pts.length ? d.wallH.slice() : undefined; if (wh) wh.splice(j, 1);
   return normalize({ ...d, pts, items, wallH: wh });
 }
-function setLen(d: Design, i: number, L: number): Design {
+/** A four-cornered room whose corners are all square (within about a degree). */
+function isRect(d: Design): boolean {
+  const n = d.pts.length; if (n !== 4) return false;
+  for (let i = 0; i < 4; i++) { const a = seg(d.pts, i), b = seg(d.pts, (i + 1) % 4); if (Math.abs(a.ux * b.ux + a.uy * b.uy) > 0.02) return false; }
+  return true;
+}
+/** Straighten a four-cornered room: keep the first wall, make the corners square, and use the second wall's length for the sides. */
+function squareUp(d: Design): Design {
+  if (d.pts.length !== 4) return d;
+  const a = seg(d.pts, 0), b = seg(d.pts, 1); const p0 = d.pts[0];
+  const side = (d.pts[3].x - p0.x) * a.nx + (d.pts[3].y - p0.y) * a.ny >= 0 ? 1 : -1;
+  const vx = a.nx * side * b.L, vy = a.ny * side * b.L; const ex = a.ux * a.L, ey = a.uy * a.L;
+  return normalize({ ...d, pts: [{ x: p0.x, y: p0.y }, { x: p0.x + ex, y: p0.y + ey }, { x: p0.x + ex + vx, y: p0.y + ey + vy }, { x: p0.x + vx, y: p0.y + vy }] });
+}function setLen(d: Design, i: number, L: number): Design {
   const s = seg(d.pts, i); const j = (i + 1) % d.pts.length; const pts = clonePts(d.pts);
-  pts[j] = { x: s.ax + s.ux * L, y: s.ay + s.uy * L };
+  if (isRect(d)) { const dl = L - s.L; const k = (j + 1) % d.pts.length; pts[j] = { x: pts[j].x + s.ux * dl, y: pts[j].y + s.uy * dl }; pts[k] = { x: pts[k].x + s.ux * dl, y: pts[k].y + s.uy * dl }; } else pts[j] = { x: s.ax + s.ux * L, y: s.ay + s.uy * L };
   return normalize({ ...d, pts });
 }
 function cornerAngle(d: Design, i: number): number {
@@ -861,6 +874,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           <Chips label="Wall height" value={wallHeights(d)[sel.i]} opts={[[0, 'To the ceiling'], [36, "3'"], [72, "6'"], [84, "7'"], [96, "8'"], [120, "10'"], [144, "12'"]]} onPick={v => commit(setWallHeight(d, sel.i, v))} />
           <Num label="Wall height (type it)" value={wallHeights(d)[sel.i] || d.ceiling || 96} onCommit={v => commit(setWallHeight(d, sel.i, Math.max(6, v)))} />
           <div style={{ fontSize: '14px', color: 'var(--muted)' }}>Drag the wall to push it in or out. Its neighbors stretch with it.</div>
+          {d.pts.length === 4 && !isRect(d) && <button style={btnOn} onClick={() => commit(squareUp(d))}>Square up the room (make every corner 90 degrees)</button>}
           <button style={btn} onClick={() => { commit(splitWall(d, sel.i)); setSel(null); }}>Add a corner in the middle</button>
         </>);
       })() : sel?.type === 'corner' ? (<>
@@ -871,6 +885,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
       </>) : (<>
         <div style={{ fontWeight: 800, fontSize: '18px' }}>{d.mode === 'bath' ? 'Bathroom' : 'Kitchen'}</div>
         <Num label="Ceiling height" value={d.ceiling || 96} onCommit={c => commit({ ...d, ceiling: Math.max(48, c) })} />
+        {d.pts.length === 4 && !isRect(d) && <button style={btnOn} onClick={() => commit(squareUp(d))}>Square up the room (make every corner 90 degrees)</button>}
         <Chips label="Ceiling shape" value={vaultOf(d).shape} opts={[['flat', 'Flat'], ['slope', 'Vaulted, one slope'], ['peak', 'Vaulted peak']]} onPick={v => commit({ ...d, vault: { ...(d.vault || {}), shape: v } })} />
         {vaultOf(d).shape === 'slope' && <Chips label="Ceiling rises toward" value={vaultOf(d).toward} opts={[['top', 'Top wall'], ['right', 'Right wall'], ['bottom', 'Bottom wall'], ['left', 'Left wall']]} onPick={v => commit({ ...d, vault: { ...(d.vault || {}), toward: v } })} />}
         {vaultOf(d).shape === 'peak' && <Chips label="Peak runs" value={vaultOf(d).ridge} opts={[['lr', 'Left to right'], ['ud', 'Up and down']]} onPick={v => commit({ ...d, vault: { ...(d.vault || {}), ridge: v } })} />}

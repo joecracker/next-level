@@ -652,7 +652,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const editPanel = d && (
     <div style={{ padding: '12px 14px 90px', display: 'flex', flexDirection: 'column', gap: '12px', color: 'var(--cream)' }}>
       {selItem ? (() => {
-        const it = selItem; const k = KINDS[it.kind]; const g = gaps(it, d);
+        const it = selItem; const k = KINDS[it.kind]; const g = gaps(it, d); const wsg = it.wall !== null && it.wall < d.pts.length ? seg(d.pts, it.wall) : null; const horiz = !wsg || Math.abs(wsg.ux) >= Math.abs(wsg.uy); const rev = !!wsg && (horiz ? wsg.ux < 0 : wsg.uy < 0); const gA = rev ? g.b : g.a, gB = rev ? g.a : g.b; /* what you see on the plan: left/right on top and bottom walls, above/below on side walls */
         return (<>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Thumb e={{ kind: it.kind, w: it.w, d: it.d, p: it.p, extra: { hinge: it.hinge, swing: it.swing } }} size={48} />
@@ -672,9 +672,9 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           {isCab(it.kind) && <CabPick label="Color for this one" value={it.p?.ccolor || ''} line={d.finish?.line || ''} first={{ id: '', name: 'Same as the room', hex: '#8a8f8c' }} onPick={v => upd(it.id, { p: { ...(it.p || {}), ccolor: v || undefined } })} />}
           </div>
           {it.wall !== null ? (<>
-            <Num label="Left edge from the left corner" value={it.t - it.w / 2} onCommit={x => upd(it.id, { t: x + it.w / 2 })} />
+            <Num label={horiz ? 'Left edge from the left corner' : 'Top edge from the top corner'} value={rev && wsg ? wsg.L - (it.t + it.w / 2) : it.t - it.w / 2} onCommit={x => upd(it.id, { t: rev && wsg ? wsg.L - x - it.w / 2 : x + it.w / 2 })} />
             <div style={{ fontSize: '14px', color: 'var(--muted)' }}>
-              Gap on the left <b style={{ color: 'var(--cream)' }}>{isFinite(g.a) ? fmtIn(g.a) : '–'}</b> · on the right <b style={{ color: 'var(--cream)' }}>{isFinite(g.b) ? fmtIn(g.b) : '–'}</b>
+              {horiz ? 'Gap on the left' : 'Gap above'} <b style={{ color: 'var(--cream)' }}>{isFinite(gA) ? fmtIn(gA) : '–'}</b> · {horiz ? 'on the right' : 'below'} <b style={{ color: 'var(--cream)' }}>{isFinite(gB) ? fmtIn(gB) : '–'}</b>
               {isFinite(g.a) && isFinite(g.b) && <button style={{ ...btn, minHeight: '36px', marginLeft: '8px' }} onClick={() => upd(it.id, { t: it.t + (g.b - g.a) / 2 })}>Center</button>}
             </div>
           </>) : (
@@ -687,7 +687,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             <div style={lbl}>Nudge</div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
               {[[0.0625, '1/16'], [0.25, '1/4'], [1, '1'], [6, '6']].map(([n, t]) => <button key={t as string} style={nudge === n ? btnOn : btn} onClick={() => setNudge(n as number)}>{t}"</button>)}
-              {it.wall !== null ? (<><button style={btn} onClick={() => nudgeBy(it, -1, 't')}>◀</button><button style={btn} onClick={() => nudgeBy(it, 1, 't')}>▶</button></>) : (<>
+              {it.wall !== null ? (<><button style={btn} onClick={() => nudgeBy(it, rev ? 1 : -1, 't')}>{horiz ? '\u25c0' : '\u25b2'}</button><button style={btn} onClick={() => nudgeBy(it, rev ? -1 : 1, 't')}>{horiz ? '\u25b6' : '\u25bc'}</button></>) : (<>
                 <button style={btn} onClick={() => nudgeBy(it, -1, 'x')}>◀</button><button style={btn} onClick={() => nudgeBy(it, 1, 'x')}>▶</button>
                 <button style={btn} onClick={() => nudgeBy(it, -1, 'y')}>▲</button><button style={btn} onClick={() => nudgeBy(it, 1, 'y')}>▼</button></>)}
             </div>

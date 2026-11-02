@@ -18,7 +18,7 @@ import { GLASS, WTYPES } from './model';
 import { windowNotes, windowOf } from './windows';
 import {
   CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, polyPatch, polyWorld, toPolyLocal, seg, snapTo, template,
-  type Cat, type DItem, type Design, type Pt, syncHosted,
+  type Cat, type DItem, type Design, type Pt, syncHosted, freeGaps,
 } from './model';
 
 const View3D = lazy(() => import('./View3D')); // the 3D library only loads when 3D is opened
@@ -670,7 +670,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const editPanel = d && (
     <div style={{ padding: '12px 14px 90px', display: 'flex', flexDirection: 'column', gap: '12px', color: 'var(--cream)' }}>
       {selItem ? (() => {
-        const it = selItem; const k = KINDS[it.kind]; const g = gaps(it, d); const wsg = it.wall !== null && it.wall < d.pts.length ? seg(d.pts, it.wall) : null; const horiz = !wsg || Math.abs(wsg.ux) >= Math.abs(wsg.uy); const rev = !!wsg && (horiz ? wsg.ux < 0 : wsg.uy < 0); const gA = rev ? g.b : g.a, gB = rev ? g.a : g.b; /* what you see on the plan: left/right on top and bottom walls, above/below on side walls */ const hostIt = it.p?.host ? d.items.find(q => q.id === it.p!.host) || null : null; const hr = hostIt ? (hostIt.rot || 0) * Math.PI / 180 : 0; const hHoriz = Math.abs(Math.cos(hr)) >= Math.abs(Math.sin(hr)); const hRev = !!hostIt && (hHoriz ? Math.cos(hr) < 0 : Math.sin(hr) < 0); const hs0 = Number(it.p?.hs) || 0; const hEdge = hostIt ? (hRev ? hostIt.w / 2 - hs0 - it.w / 2 : hostIt.w / 2 + hs0 - it.w / 2) : 0; const hOther = hostIt ? hostIt.w - it.w - hEdge : 0;
+        const it = selItem; const k = KINDS[it.kind]; const g = gaps(it, d); const wsg = it.wall !== null && it.wall < d.pts.length ? seg(d.pts, it.wall) : null; const horiz = !wsg || Math.abs(wsg.ux) >= Math.abs(wsg.uy); const rev = !!wsg && (horiz ? wsg.ux < 0 : wsg.uy < 0); const gA = rev ? g.b : g.a, gB = rev ? g.a : g.b; /* what you see on the plan: left/right on top and bottom walls, above/below on side walls */ const hostIt = it.p?.host ? d.items.find(q => q.id === it.p!.host) || null : null; const hr = hostIt ? (hostIt.rot || 0) * Math.PI / 180 : 0; const hHoriz = Math.abs(Math.cos(hr)) >= Math.abs(Math.sin(hr)); const hRev = !!hostIt && (hHoriz ? Math.cos(hr) < 0 : Math.sin(hr) < 0); const hs0 = Number(it.p?.hs) || 0; const hEdge = hostIt ? (hRev ? hostIt.w / 2 - hs0 - it.w / 2 : hostIt.w / 2 + hs0 - it.w / 2) : 0; const hOther = hostIt ? hostIt.w - it.w - hEdge : 0; const fg = it.wall === null && !hostIt && (it.kind === 'partition' || it.kind === 'kneewall') ? freeGaps(it, d) : null;
         return (<>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Thumb e={{ kind: it.kind, w: it.w, d: it.d, p: it.p, extra: { hinge: it.hinge, swing: it.swing } }} size={48} />
@@ -702,8 +702,15 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             </div>
           </>) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <Num label="Center across" value={it.x} onCommit={x => upd(it.id, { x })} />
-              <Num label="Center down" value={it.y} onCommit={y => upd(it.id, { y })} />
+              {fg ? (<>
+                <Num label="Gap to the left wall" value={isFinite(fg.l) ? fg.l : 0} onCommit={v => { if (isFinite(fg.l)) upd(it.id, { x: it.x + (v - fg.l) }); }} />
+                <Num label="Gap to the right wall" value={isFinite(fg.r) ? fg.r : 0} onCommit={v => { if (isFinite(fg.r)) upd(it.id, { x: it.x + (fg.r - v) }); }} />
+                <Num label="Gap to the top wall" value={isFinite(fg.t) ? fg.t : 0} onCommit={v => { if (isFinite(fg.t)) upd(it.id, { y: it.y + (v - fg.t) }); }} />
+                <Num label="Gap to the bottom wall" value={isFinite(fg.b) ? fg.b : 0} onCommit={v => { if (isFinite(fg.b)) upd(it.id, { y: it.y + (fg.b - v) }); }} />
+              </>) : (<>
+                <Num label="Center across" value={it.x} onCommit={x => upd(it.id, { x })} />
+                <Num label="Center down" value={it.y} onCommit={y => upd(it.id, { y })} />
+              </>)}
             </div>
           )}
           <Sec title="Nudge (small moves, if you ever need them)">

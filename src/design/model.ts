@@ -219,6 +219,13 @@ export function syncHosted(d: Design): Design {
     changed = true; return { ...it, wall: null, x, y, rot: h.rot || 0, d: h.d, p: { ...(it.p || {}), hs } };
   });
   return changed ? { ...d, items } : d;
+}/** For a free-standing item: the clear distance from each of its faces to the room's inside wall in that direction (left, right, up, down on the plan). */
+export function freeGaps(it: DItem, d: Design): { l: number; r: number; t: number; b: number } {
+  const c = corners(it, frame(it, d.pts)); const xs = c.map(q => q[0]), ys = c.map(q => q[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys); const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+  const segs: number[][] = d.pts.map((a, i) => { const b = d.pts[(i + 1) % d.pts.length]; return [a.x, a.y, b.x, b.y]; });
+  const e = 0.05; const g = (v: number) => (isFinite(v) ? Math.max(0, v - e) : NaN);
+  return { l: g(ray(x0 + e, my, -1, 0, segs)), r: g(ray(x1 - e, my, 1, 0, segs)), t: g(ray(mx, y0 + e, 0, -1, segs)), b: g(ray(mx, y1 - e, 0, 1, segs)) };
 }export function orient(pts: Pt[]): Pt[] { // clockwise on screen
   let a = 0; pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length]; a += p.x * q.y - q.x * p.y; });
   return a < 0 ? pts.slice().reverse() : pts;

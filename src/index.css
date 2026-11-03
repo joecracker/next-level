@@ -530,4 +530,6 @@ html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sa
 .qa-btn-rot { bottom: 8px; left: 8px; }
 .qa-btn-del { bottom: 8px; right: 8px; }
 
-
+/* Dropdown lists (selects) follow the dark theme: dark list, light letters, so the choices are readable. */
+select { color-scheme: dark; }
+select option, select optgroup { background-color: #1d2425; color: #eef1ee; }

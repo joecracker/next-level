@@ -996,7 +996,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
         <div style={{ position: 'relative', borderBottom: '1px solid rgba(238,241,238,0.12)' }}>
           <div style={{ display: 'flex', gap: '6px', padding: '6px 10px', overflowX: 'auto' }}>
             {pagesInfo.pages.map(pg => <button key={pg.id} style={{ ...(pg.id === pagesInfo.cur ? btnOn : btn), minHeight: '38px', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => goPage(pg.id)}>{pg.name}{pg.id === pagesInfo.cur ? ' ▾' : ''}</button>)}
-            <button style={{ ...btn, minHeight: '38px', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => { setPageMenu(false); setPageModal({ mode: 'new', name: '' }); }}>+ Page</button>
+            <button style={{ ...btn, minHeight: '38px', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => { setPageMenu(false); setPageModal({ mode: 'new', name: '' }); }}>+ Page</button><button style={{ ...btn, minHeight: '38px', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => { setDelArmed(false); setPageMenu(m => !m); }}>Page options</button>
           </div>
           {pageMenu && (
             <div style={{ position: 'absolute', left: 10, top: '48px', zIndex: 60, background: '#1d2425', border: '1px solid rgba(238,241,238,0.25)', borderRadius: '12px', padding: '6px', minWidth: '210px', display: 'flex', flexDirection: 'column', gap: '4px' }}>

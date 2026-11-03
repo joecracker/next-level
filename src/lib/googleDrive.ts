@@ -44,6 +44,7 @@ function loadToken(): TokenInfo | null {
 
 function storeToken(t: TokenInfo) {
   cachedToken = t;
+  markSignedIn(true);
   try {
     sessionStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(t));
   } catch {
@@ -83,10 +84,28 @@ function loadGisScript(): Promise<void> {
 }
 
 export function isDriveConnected(): boolean {
-  return Boolean(cachedToken);
+  return Boolean(cachedToken) || wasSignedIn();
 }
 
-export async function connectDrive(clientId: string): Promise<void> {
+const SIGNED_IN_KEY = 'gdrive_signed_in_v1';
+// Remembers that this browser has signed in, so an hourly renewal can be quiet (no sign-in screen).
+function wasSignedIn(): boolean {
+  try {
+    return localStorage.getItem(SIGNED_IN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function markSignedIn(on: boolean) {
+  try {
+    if (on) localStorage.setItem(SIGNED_IN_KEY, '1');
+    else localStorage.removeItem(SIGNED_IN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function connectDrive(clientId: string, silent = false): Promise<void> {
   if (!clientId) {
     throw new Error('Google Client ID not configured. See GOOGLE_DRIVE_SETUP.md.');
   }
@@ -110,13 +129,14 @@ export async function connectDrive(clientId: string): Promise<void> {
         reject(new Error(err?.type || 'Google sign-in was cancelled or failed'));
       },
     });
-    tokenClient.requestAccessToken({ prompt: cachedToken ? '' : 'consent' });
+    tokenClient.requestAccessToken({ prompt: silent ? 'none' : (cachedToken || wasSignedIn() ? '' : 'consent') });
   });
 }
 
 export function disconnectDrive() {
   const token = cachedToken?.accessToken;
   clearToken();
+  markSignedIn(false);
   if (token && window.google?.accounts?.oauth2?.revoke) {
     window.google.accounts.oauth2.revoke(token, () => {
       /* noop */
@@ -126,7 +146,17 @@ export function disconnectDrive() {
 
 async function ensureToken(clientId: string): Promise<string> {
   if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.accessToken;
-  await connectDrive(clientId);
+  if (wasSignedIn()) {
+    // Signed in before and the hour has run out: renew quietly, with no sign-in screen.
+    try {
+      await connectDrive(clientId, true);
+    } catch {
+      markSignedIn(false);
+      throw new Error('Google sign-in has run out. Sign in again, then try once more.');
+    }
+  } else {
+    await connectDrive(clientId);
+  }
   if (!cachedToken) throw new Error('Could not get a Google Drive access token');
   return cachedToken.accessToken;
 }

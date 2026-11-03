@@ -104,7 +104,7 @@ function parts(it: DItem, d: Design): Part[] {
     case 'vanity': case 'desk': {
       const h = it.h || k.h || 34.5; const o: Part[] = [P({ h }), top(h)];
       if (it.kind === 'vanity') { // undermount bowls, sized like common ones: oval 19x13.3, round 15, rectangular 19x14
-        const sh = p.bowlShape === 'round' ? 'round' : p.bowlShape === 'rect' ? 'rect' : 'oval'; const n = p.sinks === 2 ? 2 : 1;
+        const sh = p.bowlShape === 'round' ? 'round' : p.bowlShape === 'rect' ? 'rect' : 'oval'; const n = p.sinks === 0 ? 0 : p.sinks === 2 ? 2 : 1;
         const bw = sh === 'round' ? 15 : 19, bd = sh === 'round' ? 15 : sh === 'oval' ? 13.3 : 14;
         for (let i = 0; i < n; i++) o.push(P({ lx: n === 2 ? (i ? 1 : -1) * w / 4 : 0, lz: 0.5, w: Math.min(bw, w / n - 4), dd: bd, y0: h + 1.5, h: 0.15, round: sh !== 'rect', color: '#eef2f3' }));
       }

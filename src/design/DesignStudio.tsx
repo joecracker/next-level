@@ -3,7 +3,7 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as RPE } from 'react';
 import JobPanel from './JobPanel';
 import { runChecks } from './checks';
-import { MAKERS, catalogFor, readyCatalogs, familiesFor, groupsFor, kindForEntry, matches, type CabEntry } from './catalog';
+import { MAKERS, catalogFor, readyCatalogs, familiesFor, groupsFor, kindForEntry, takesSink, matches, type CabEntry } from './catalog';
 import { designBody, designBounds, itemShape, takeoffRows } from './exports';
 import { TOP_KINDS, hasTop, MATS, SPLASHES, counterOf, sinkOf, ovOf, topRun } from './counter';
 import { SIDE_TYPES, sidesOf } from './showerwalls';
@@ -569,7 +569,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
     if (!d) return;
     const kind = kindForEntry(e); const k = KINDS[kind]; const b = designBounds(d);
     const over: Partial<DItem> = openSpot(d, kind, e.w, e.d);
-    const it = mkItem(kind, { w: e.w, d: e.d, ...(e.h ? { h: e.h } : {}), code: e.code, label: `${e.maker}${e.line ? ' ' + e.line : ''} ${e.family}`, p: { maker: e.maker, ...(e.line ? { line: e.line } : {}), family: e.family, ...(e.lr ? { lr: true, hand: 'L' } : {}) }, ...over });
+    const it = mkItem(kind, { w: e.w, d: e.d, ...(e.h ? { h: e.h } : {}), code: e.code, label: `${e.maker}${e.line ? ' ' + e.line : ''} ${e.family}`, p: { maker: e.maker, ...(e.line ? { line: e.line } : {}), family: e.family, ...(e.lr ? { lr: true, hand: 'L' } : {}), ...(kind === 'vanity' && !takesSink(e) ? { sinks: 0 } : {}) }, ...over });
     commit(normalize({ ...d, items: [...d.items, it] })); justAdded.current = it.id; setSel({ type: 'item', id: it.id }); setTab('edit'); setAddOpen(false);
   };
   const addItem = (e: AddEntry) => {
@@ -858,7 +858,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             if (it.kind === 'partition') return <div style={{ fontSize: '14px', color: 'var(--muted)' }}>Inside walls always run to the ceiling.</div>;
             if (it.kind === 'toilet') return <Chips label="Bowl" value={P.bowl} opts={[['elong', 'Elongated'], ['round', 'Round']]} onPick={v => setP({ bowl: v })} />;
             if (it.kind === 'vanity') return (<>
-              <Chips label="Sinks" value={P.sinks} opts={[[1, 'One'], [2, 'Two']]} onPick={v => setP({ sinks: v })} />
+              <Chips label="Sinks" value={P.sinks ?? 1} opts={[[1, 'One'], [2, 'Two'], [0, 'None']]} onPick={v => setP({ sinks: v })} />
               <Chips label="Sink bowl (3D)" value={P.bowlShape || 'oval'} opts={[['oval', 'Oval'], ['round', 'Round'], ['rect', 'Rectangular']]} onPick={v => setP({ bowlShape: v })} />
             </>);
             if (it.kind === 'soffit') return <div style={{ fontSize: '14px', color: 'var(--muted)' }}>How far it drops is the Drop box above.</div>;

@@ -51,6 +51,12 @@ export function kindForEntry(e: CabEntry): string {
   if (e.group === 'Base cabinets' && /sink/.test(f)) return 'sinkbase';
   return 'base';
 }
+/** Does this vanity cabinet take a sink? Drawer bases (two, three, four drawers) have no room for one; bowl and sink bases do. */
+export function takesSink(e: CabEntry): boolean {
+  const f = e.family.toLowerCase();
+  if (/sink|bowl/.test(f)) return true;
+  return !/drawer base|two drawer|three drawer|four drawer/.test(f);
+}
 export function matches(e: CabEntry, q: string): boolean {
   const s = q.toLowerCase(); return e.code.toLowerCase().includes(s) || e.family.toLowerCase().includes(s) || e.group.toLowerCase().includes(s);
 }

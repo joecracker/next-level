@@ -2,7 +2,7 @@
 
 > A field measurement and layout tool built for tracking room dimensions, walls, and job-site scope directly from the field — before it ever needs a formal drawing set.
 
-**[Live demo →](https://nextlevel.crackerbox.app)**
+**[Live demo →](https://nextlevelestimator.crackerbox.app)**
 
 ![App screenshot](./docs-screenshot.png)
 

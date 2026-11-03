@@ -18,7 +18,7 @@ The Drive button needs **one Google OAuth Client ID**. It's a public identifier 
    - Name: "Personal Apps Web Client".
    - **Authorized JavaScript origins** — add one line per place these apps actually run. As of this doc:
      - `http://localhost:5173` (local dev)
-     - `https://nextlevel.crackerbox.app` (Field Layout Tracker — live on Cloudflare Pages)
+     - `https://nextlevelestimator.crackerbox.app` (Field Layout Tracker — live on Cloudflare Workers)
      - Add a line for each of the other 3 apps' *current* live domain — Netlify is no longer in use for any of Tim's apps, so don't reuse the old `.netlify.app` entries. Check each app's actual host before adding it here.
    - Leave "Authorized redirect URIs" blank — this flow doesn't use redirects.
    - Create → copy the **Client ID** (looks like `123456789-abc...apps.googleusercontent.com`).

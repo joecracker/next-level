@@ -68,6 +68,7 @@ export const KINDS: Record<string, Kind> = {
   base:     { name: 'Base cabinet', layer: 'floor', snap: true, w: 24, d: 24, h: 34.5, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
   sinkbase: { name: 'Sink base', layer: 'floor', snap: true, w: 36, d: 24, h: 34.5, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
   drawer:   { name: 'Drawer base', layer: 'floor', snap: true, w: 18, d: 24, h: 34.5, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
+  filler:   { name: 'Filler', layer: 'floor', snap: true, w: 3, d: 24, h: 30, props: { bottom: 4.5 }, cab: true, cat: 'Cabinets', modes: ['kitchen', 'bath'] },
   blank:    { name: 'Blank space (open, with optional top)', layer: 'floor', snap: true, w: 36, d: 24, h: 34.5, cat: 'Cabinets', modes: ['kitchen', 'bath'] },
   pantry:   { name: 'Tall pantry', layer: 'floor', snap: true, w: 24, d: 24, h: 84, cab: true, cat: 'Cabinets', modes: ['kitchen'] },
   fridge:   { name: 'Refrigerator', layer: 'floor', snap: true, w: 36, d: 30, cat: 'Accessories', modes: ['kitchen'] },

@@ -123,6 +123,7 @@ function parts(it: DItem, d: Design): Part[] {
     case 'base': case 'drawer': case 'island': case 'pantry': case 'linen': case 'utility': case 'endpanel':
       return [P({ h: it.h || k.h || 34.5 })];
     case 'upper': return [P({ y0: 54, h: it.h || 30 })];
+    case 'filler': { const bt = p.bottom ?? 4.5; const o: Part[] = [P({ y0: bt, h: it.h || 30 })]; if (bt > 0 && bt < 10) o.push(P({ y0: 0, h: bt, dd: 0.75, lz: dp / 2 - 3.4, color: COL.dark })); return o; } // the toe kick board runs in front of the gap under it
     case 'hood': return [P({ y0: 66, h: 14, color: app })];
     case 'chimney': return [P({ y0: 66, h: 12, color: app }), P({ y0: 78, h: Math.max(4, ceil - 78), w: 12, dd: 10, lz: -dp / 2 + 5, color: app })];
     case 'mirror': return [P({ y0: 42, h: 30, dd: 1.5, lz: -dp / 2 + 0.75, color: '#cfe3ea' })];
@@ -230,7 +231,7 @@ function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
   // countertops
   for (const sl of counterSlabs(d)) {
     const shape = new THREE.Shape(sl.poly.map(p => new THREE.Vector2(p.x, -p.y)));
-    const geo = new THREE.ExtrudeGeometry(shape, { depth: 1.5, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, d.items.find(q => q.id === sl.id)?.h || 34.5, 0);
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 1.5, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, (() => { const q = d.items.find(i => i.id === sl.id); return (q?.p?.bottom || 0) + (q?.h || 34.5); })(), 0);
     add(geo, mat(paintOf(sl.mat, sl.color).fill));
   }
 

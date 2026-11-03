@@ -779,6 +779,23 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
                 {P.tileUp !== false && <Chips label="Tile goes up to" value={P.tileTo || 'ceiling'} opts={[['ceiling', 'The ceiling'], ['soffit', 'The soffit']]} onPick={v => setP({ tileTo: v })} />}
               </>}
             </>);
+            if (it.kind === 'filler') {
+              const bt = P.bottom ?? 4.5; const fits = bt >= 40 ? 'wall' : (it.h || 30) > 60 ? 'tall' : 'base';
+              const matchNeighbor = () => { // copy the height, depth and starting height of the closest cabinet on this wall
+                if (it.wall === null) { say('Place the filler on a wall run first'); return; }
+                const nb = d.items.filter(q => q.id !== it.id && q.wall === it.wall && isCab(q.kind) && q.kind !== 'filler')
+                  .sort((a, b) => (Math.abs(a.t - it.t) - a.w / 2) - (Math.abs(b.t - it.t) - b.w / 2))[0];
+                if (!nb) { say('No cabinet on this wall to match'); return; }
+                const upper = nb.kind === 'upper';
+                upd(it.id, { d: nb.d, h: upper ? (nb.h || KINDS.upper.h || 30) : (nb.h || KINDS[nb.kind].h || 34.5) - 4.5, p: { ...P, bottom: upper ? 54 : 4.5 } });
+              };
+              return (<Sec title="Filler" open>
+                <Chips label="Fits a" value={fits} opts={[['base', 'Base cabinet'], ['wall', 'Wall cabinet'], ['tall', 'Tall cabinet']]} onPick={v => upd(it.id, v === 'wall' ? { h: 30, d: 12, p: { ...P, bottom: 54 } } : v === 'tall' ? { h: 79.5, d: 24, p: { ...P, bottom: 4.5 } } : { h: 30, d: 24, p: { ...P, bottom: 4.5 } })} />
+                <Num label="Starts off the floor" value={bt} onCommit={v => setP({ bottom: Math.max(0, v) })} />
+                <button style={btn} onClick={matchNeighbor}>Match the cabinet beside it</button>
+                <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.5 }}>A base filler is the cabinet's height less the toe kick: a 34 1/2" base cabinet gets a 30" filler that starts 4 1/2" off the floor. Width, depth and height are in the boxes above.</div>
+              </Sec>);
+            }
             if (it.kind === 'custom') return <CustomEditor it={it} upd={upd} />;
             if (it.kind === 'cornerunit') return (<>
               <Num label="Along each wall" value={P.legs || it.w} onCommit={v => { const a = Math.max(12, v); upd(it.id, { w: a, d: a, p: { ...P, legs: a } }); }} />
@@ -1063,6 +1080,8 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <button style={{ ...btn, minHeight: '64px', textAlign: 'left', display: 'flex', gap: '10px', alignItems: 'center', padding: '8px' }} onClick={() => addItem({ key: 'blank', kind: 'blank', name: 'Blank space', w: KINDS.blank.w, d: KINDS.blank.d })}>
               <Thumb e={{ kind: 'blank', w: 36, d: 24 }} /><span>Blank space<div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>an open spot you can size, slide, and put a countertop on</div></span></button>
+            <button style={{ ...btn, minHeight: '64px', textAlign: 'left', display: 'flex', gap: '10px', alignItems: 'center', padding: '8px' }} onClick={() => addItem({ key: 'filler', kind: 'filler', name: 'Filler', w: KINDS.filler.w, d: KINDS.filler.d, extra: { h: 30 } })}>
+              <Thumb e={{ kind: 'filler', w: 6, d: 24 }} /><span>Filler<div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>one filler: set its width, height and how high off the floor it starts</div></span></button>
             <div><div style={lbl}>Maker</div><div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {MAKERS.map(m => <button key={m.id} style={cabMaker === m.id ? btnOn : { ...btn, opacity: m.ready ? 1 : 0.55 }} onClick={() => { setCabMaker(m.id); setCabFam(''); const ln = m.lines ? m.lines.find(l => l.ready)?.id || m.lines[0].id : ''; setCabLine(ln || 'Select'); const g = groupsFor(m.id, ln); if (g.length && !g.includes(cabGroup)) setCabGroup(g[0]); }}>{m.id}</button>)}
               <button style={cabMaker === 'Custom' ? btnOn : btn} onClick={() => setCabMaker('Custom')}>Custom size</button>

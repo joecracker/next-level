@@ -40,7 +40,7 @@ export function itemShape(it: DItem, S: number, sel: boolean, fs: number): strin
     else body = `<rect x="${-hw}" y="${-hd}" width="${it.w}" height="${it.d}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}"${dash}/>`;
     // a cabinet's front (the doors) is the room side: one bold line along that edge, so a turned cabinet shows which way it faces
     if (k.cab && k.layer !== 'ceiling' && it.w > 3) body += `<line x1="${-hw + 1}" y1="${hd - 1.8 / S}" x2="${hw - 1}" y2="${hd - 1.8 / S}" stroke="${INK}" stroke-width="${3.4 / S}" stroke-linecap="round"/>`;
-    const label = isCab(it.kind) && it.code ? it.code : it.label || (k.layer === 'hung' && it.w < 8 ? '' : k.name);
+    const label = it.kind === 'filler' && !it.label ? '' : isCab(it.kind) && it.code ? it.code : it.label || (k.layer === 'hung' && it.w < 8 ? '' : k.name);
     // keep text readable: skip names that cannot fit
     const fits = it.w * S > (label.length * 6.2 + 4) || it.d * S > (label.length * 6.2 + 4);
     if (label && fits) body += it.w * S >= it.d * S ? text(label) : `<g transform="rotate(90)">${text(label)}</g>`;

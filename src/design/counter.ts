@@ -7,7 +7,7 @@ const INK = '#14191A';
 
 export const OVERHANG = 1.5;           // inches past the cabinet fronts
 export const SPLASH_H = 4;             // inches, the standard stone backsplash
-export const TOP_KINDS = new Set(['base', 'sinkbase', 'drawer', 'island', 'dw', 'blank', 'vanity']);
+export const TOP_KINDS = new Set(['base', 'sinkbase', 'drawer', 'island', 'dw', 'blank', 'vanity', 'filler']);
 export const MATS: Array<{ id: string; name: string; fill: string; edge: string }> = [
   { id: 'granite', name: 'Granite', fill: '#b7b4ac', edge: '#6f6c64' },
   { id: 'quartz', name: 'Quartz', fill: '#dcd8cd', edge: '#8a867a' },
@@ -25,6 +25,7 @@ export const paintOf = (mat: string, color: string | undefined) => { const c = c
 export function hasTop(it: DItem): boolean {
   if (!TOP_KINDS.has(it.kind) || KINDS[it.kind]?.layer !== 'floor') return false;
   const v = it.p?.top; if (v !== undefined) return !!v;
+  if (it.kind === 'filler') return (it.p?.bottom || 0) < 6 && (it.p?.bottom || 0) + (it.h || 30) <= 40; // a base filler carries the top; a wall or tall filler does not
   return it.kind !== 'blank';
 }
 

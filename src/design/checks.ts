@@ -88,6 +88,8 @@ export function runChecks(d: Design): Check[] {
   for (let i = 0; i < fl.length; i++) for (let j = i + 1; j < fl.length; j++) {
     const a = fl[i], b = fl[j];
     if (['kneewall', 'partition'].includes(a.kind) || ['kneewall', 'partition'].includes(b.kind)) continue;
+    const zr = (q: DItem): [number, number] => { const bt = q.kind === 'filler' ? (q.p?.bottom || 0) : 0; return [bt, bt + (q.h || KINDS[q.kind].h || 34.5)]; }; // a wall-height filler does not meet the base cabinets under it
+    const za = zr(a), zb = zr(b); if (za[1] <= zb[0] + 0.01 || zb[1] <= za[0] + 0.01) continue;
     if (overlap(corners(a, F(a)), corners(b, F(b)))) add('hit', a, 'fix', `${nm(a)} overlaps ${nm(b).toLowerCase()}`, 'Two things are in the same spot.');
   }
   // room-level

@@ -249,7 +249,7 @@ function Sec({ title, open, children }: { title: string; open?: boolean; childre
   const [o, setO] = useState(() => { try { const v = localStorage.getItem(key); if (v === '1') return true; if (v === '0') return false; } catch { /* use the default */ } return !!open; });
   const flip = () => { const n = !o; setO(n); try { localStorage.setItem(key, n ? '1' : '0'); } catch { /* not saved */ } };
   return (<div style={{ borderTop: '1px solid rgba(238,241,238,0.12)', paddingTop: '8px' }}>
-    <button onClick={flip} style={{ ...btn, width: '100%', textAlign: 'left', minHeight: '40px', background: 'transparent', border: 'none', padding: '0 2px', display: 'flex', justifyContent: 'space-between' }}><span style={{ ...lbl, marginBottom: 0 }}>{title}</span><span>{o ? '▾' : '▸'}</span></button>
+    <button onClick={flip} style={{ ...btn, width: '100%', textAlign: 'left', minHeight: '44px', background: 'rgba(238,241,238,0.08)', border: 'none', borderRadius: '8px', padding: '0 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--cream)', letterSpacing: '0.01em' }}>{title}</span><span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--cream)' }}>{o ? '▾' : '▸'}</span></button>
     {o && <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>{children}</div>}
   </div>);
 }
@@ -693,7 +693,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             {it.kind === 'window' && <Num label="Sill" value={windowOf(d, it).sill} onCommit={s => upd(it.id, { sill: s })} />}
             {it.kind === 'kneewall' && <Num label="Height" value={it.p?.height ?? 36} onCommit={v => upd(it.id, { p: { ...(it.p || {}), height: Math.max(6, v) } })} />}
             {it.kind === 'soffit' && <Num label="Drop" value={it.p?.drop ?? 12} onCommit={v => upd(it.id, { p: { ...(it.p || {}), drop: Math.max(1, v) } })} />}
-          {isCab(it.kind) && <CabPick label="Color for this one" value={it.p?.ccolor || ''} line={d.finish?.line || ''} first={{ id: '', name: 'Same as the room', hex: '#8a8f8c' }} onPick={v => upd(it.id, { p: { ...(it.p || {}), ccolor: v || undefined } })} />}
+          {isCab(it.kind) && <Sec title="Color"><CabPick label="Color for this one" value={it.p?.ccolor || ''} line={d.finish?.line || ''} first={{ id: '', name: 'Same as the room', hex: '#8a8f8c' }} onPick={v => upd(it.id, { p: { ...(it.p || {}), ccolor: v || undefined } })} /></Sec>}
           </div>
           {hostIt ? (<>
             <div style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>This sits on your inside wall and moves with it. Drag it along the wall, or type a distance.</div>
@@ -886,7 +886,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
           {TOP_KINDS.has(it.kind) && KINDS[it.kind].layer === 'floor' && (<Sec title="Countertop" open>
             <Chips label="Countertop on this" value={hasTop(it) ? 'on' : 'off'} opts={[['on', 'On'], ['off', 'Off']]} onPick={v => upd(it.id, { p: { ...(it.p || {}), top: v === 'on' } })} />
             {hasTop(it) && <Chips label="Material for this run" value={it.p?.mat || 'room'} opts={[['room', 'Same as room'], ...MATS.map(m => [m.id, m.name] as [string, string])]} onPick={v => { const ids = new Set(topRun(d!, it.id)); commit({ ...d!, items: d!.items.map(q => ids.has(q.id) ? { ...q, p: { ...(q.p || {}), mat: v === 'room' ? undefined : v } } : q) }); }} />}
-            {hasTop(it) && <Swatches label="Color for this run" value={it.p?.tcolor || ''} opts={[{ id: '', name: 'Same as the room', hex: '#8a8f8c' }, ...TOP_COLORS]} onPick={v => { const ids = new Set(topRun(d!, it.id)); commit({ ...d!, items: d!.items.map(q => ids.has(q.id) ? { ...q, p: { ...(q.p || {}), tcolor: v || undefined } } : q) }); }} />}
+            {hasTop(it) && <Sec title="Color of the top"><Swatches label="Color for this run" value={it.p?.tcolor || ''} opts={[{ id: '', name: 'Same as the room', hex: '#8a8f8c' }, ...TOP_COLORS]} onPick={v => { const ids = new Set(topRun(d!, it.id)); commit({ ...d!, items: d!.items.map(q => ids.has(q.id) ? { ...q, p: { ...(q.p || {}), tcolor: v || undefined } } : q) }); }} /></Sec>}
             {hasTop(it) && (() => { const o = ovOf(it); const free = it.wall === null; const set = (k: string, v: number) => upd(it.id, { p: { ...(it.p || {}), [k]: Math.max(0, v) } });
               return (<>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>

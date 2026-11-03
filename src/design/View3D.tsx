@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { KINDS, T, benchSide, frame, seg, type DItem, type Design, type Pt } from './model';
+import { FRONT_KINDS, FRONT_T, SHAKER_RAIL, frontHeight, frontOpenings } from './fronts';
 import { counterSlabs, hasTop, paintOf } from './counter';
 import { appHex, cabColor, colorPaint, floorHexOf, shade, wallHexOf } from './finishes';
 import { floorOf, vaultOf } from './finish';
@@ -75,7 +76,7 @@ const frameM = (ux: number, uy: number, nx: number, ny: number, cx: number, cy: 
 interface Part { lx: number; lz: number; w: number; dd: number; y0: number; h: number; color: string; opacity?: number; round?: boolean }
 
 /** Clean boxes for an item, in its own frame: x along the wall, z out into the room, centered on the item. */
-function parts(it: DItem, d: Design): Part[] {
+function bodyParts(it: DItem, d: Design): Part[] {
   const k = KINDS[it.kind]; const p = it.p || {}; const w = it.w, dp = it.d; const ceil = d.ceiling || 96;
   const cab = cabColor(d, it); const app = appHex(d); const tcol = colorPaint(it.p?.tcolor || d.counter?.color)?.fill || '#b7b4ac';
   const P = (o: Partial<Part> & { h: number }): Part => ({ lx: 0, lz: 0, w, dd: dp, y0: 0, color: cab, ...o });
@@ -150,6 +151,36 @@ function parts(it: DItem, d: Design): Part[] {
       piece(at, w / 2, 0, ceil); return out;
     }    default: return [];
   }
+}
+
+/** A cabinet's body, then its fronts. */
+function parts(it: DItem, d: Design): Part[] {
+  const body = bodyParts(it, d);
+  if (!FRONT_KINDS.has(it.kind)) return body;
+  return [...body, ...frontParts(it, d)];
+}
+
+function lighten(hex: string, amt: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex); if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return '#' + [16, 8, 0].map(s => Math.round(((n >> s) & 255) * (1 - amt) + 255 * amt).toString(16).padStart(2, '0')).join('');
+}
+
+/** Shaker doors (a frame of rails and stiles around a recessed flat panel) and one-piece drawer fronts, on the room side. */
+function frontParts(it: DItem, d: Design): Part[] {
+  const cab = cabColor(d, it); const panel = lighten(cab, 0.14);
+  const y0 = it.kind === 'upper' ? 54 : 0; const dp = it.d; const z0 = dp / 2 + FRONT_T / 2; // front face sits on the carcass
+  const out: Part[] = [];
+  for (const o of frontOpenings(it.kind, it.w, frontHeight(it))) {
+    const ow = o.x1 - o.x0, oh = o.y1 - o.y0, cx = (o.x0 + o.x1) / 2, base = y0 + o.y0;
+    const bar = (lx: number, w: number, yy: number, h: number): Part => ({ lx, lz: z0, w, dd: FRONT_T, y0: yy, h, color: cab });
+    if (o.kind === 'drawer') { out.push(bar(cx, ow, base, oh)); continue; }
+    const R = SHAKER_RAIL;
+    out.push(bar(cx, ow, base + oh - R, R), bar(cx, ow, base, R), bar(o.x0 + R / 2, R, base + R, oh - 2 * R), bar(o.x1 - R / 2, R, base + R, oh - 2 * R));
+    // the recessed panel: set back behind the frame, its face flush with the carcass front
+    out.push({ lx: cx, lz: dp / 2 + 0.225, w: ow - 2 * R, dd: 0.45, y0: base + R, h: oh - 2 * R, color: panel });
+  }
+  return out;
 }
 
 // ---------- the scene ----------

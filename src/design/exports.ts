@@ -3,6 +3,7 @@
 // the studio, from Capture's Save-to-Drive, or anywhere else with the studio closed.
 import { KINDS, T, corners, fmtIn, frame, isCab, seg, type DItem, type Design } from './model';
 import { fixtureShape } from './shapes';
+import { FRONT_KINDS, frontHeight, frontOpenings } from './fronts';
 import { countertopSvg, counterByMat, fixtureLines } from './counter';
 import { ceilingSvg, finishLines, floorTileSvg, vaultOf } from './finish';
 import { windowSymbol } from './windowsym';
@@ -39,7 +40,8 @@ export function itemShape(it: DItem, S: number, sel: boolean, fs: number): strin
     if (k.layer === 'ceiling' && it.kind !== 'soffit') body = `<ellipse rx="${hw}" ry="${hd}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}"${dash}/>`;
     else body = `<rect x="${-hw}" y="${-hd}" width="${it.w}" height="${it.d}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}"${dash}/>`;
     // a cabinet's front (the doors) is the room side: one bold line along that edge, so a turned cabinet shows which way it faces
-    if (k.cab && k.layer !== 'ceiling' && it.w > 3) body += `<line x1="${-hw + 1}" y1="${hd - 1.8 / S}" x2="${hw - 1}" y2="${hd - 1.8 / S}" stroke="${INK}" stroke-width="${3.4 / S}" stroke-linecap="round"/>`;
+    if (k.cab && k.layer !== 'ceiling' && it.w > 3 && FRONT_KINDS.has(it.kind)) body += frontPlan(it, S, hd);
+    else if (k.cab && k.layer !== 'ceiling' && it.w > 3) body += `<line x1="${-hw + 1}" y1="${hd - 1.8 / S}" x2="${hw - 1}" y2="${hd - 1.8 / S}" stroke="${INK}" stroke-width="${3.4 / S}" stroke-linecap="round"/>`;
     const label = it.kind === 'filler' && !it.label ? '' : isCab(it.kind) && it.code ? it.code : it.label || (k.layer === 'hung' && it.w < 8 ? '' : k.name);
     // keep text readable: skip names that cannot fit
     const fits = it.w * S > (label.length * 6.2 + 4) || it.d * S > (label.length * 6.2 + 4);
@@ -47,6 +49,16 @@ export function itemShape(it: DItem, S: number, sel: boolean, fs: number): strin
     else if (label && k.layer !== 'hung') body += text(label.slice(0, 3));
   }
   return body;
+}
+
+/** Plan of the fronts: one outline per door or drawer front along the room-side edge, so the gaps between them show. */
+function frontPlan(it: DItem, S: number, hd: number): string {
+  const seen = new Set<string>(); let s = '';
+  for (const o of frontOpenings(it.kind, it.w, frontHeight(it))) {
+    const key = o.x0.toFixed(2) + ':' + o.x1.toFixed(2); if (seen.has(key)) continue; seen.add(key);
+    s += `<rect x="${o.x0}" y="${hd - 1.6}" width="${o.x1 - o.x0}" height="1.2" fill="none" stroke="${INK}" stroke-width="${1.2 / S}"/>`;
+  }
+  return s;
 }
 
 /** The inner drawing: floor, walls, wall lengths, items. `S` = pixels per inch (keeps text a steady size). */

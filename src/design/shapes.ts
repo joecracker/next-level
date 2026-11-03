@@ -170,12 +170,8 @@ function toilet(it: DItem, S: number, fs: number, stroke: string, sw: number): s
     ell(w / 2, cy + 1, w * 0.28, ry * 0.7, `fill="none" stroke="${INK}" stroke-width="${0.8 / S}"`) + (w * S > 40 ? txt(round ? 'WC' : 'WC', w / 2, d + fs * 0.9, fs * 0.8, '#555') : '');
 }
 function vanity(it: DItem, S: number, fs: number, stroke: string, sw: number, label: string): string {
-  const w = it.w, d = it.d; const n = it.p?.sinks === 0 ? 0 : it.p?.sinks === 2 ? 2 : 1; const sinks = n === 0 ? [] : n === 2 ? [w / 4, w * 3 / 4] : [w / 2];
+  const w = it.w, d = it.d; // the sink bowls are drawn with the countertop (counter.ts), not with the cabinet
   let o = rect(0, 0, w, d, `fill="#e9d8b8" stroke="${stroke}" stroke-width="${sw}"`);
-  for (const cx of sinks) {
-    o += ell(cx, d * 0.5, Math.min(w / (n * 2) - 1.5, 9), Math.min(d * 0.28, 6), `fill="#fff" stroke="${INK}" stroke-width="${1 / S}"`);
-    o += circ(cx, 3.2, 0.9, `fill="${INK}"`);
-  }
   o += line(1, d - 1.8 / S, w - 1, d - 1.8 / S, `stroke="${INK}" stroke-width="${3.4 / S}" stroke-linecap="round"`); // the doors face the room
   if (label && w * S > label.length * 6.4 + 4) o += txt(label, w / 2, d - fs * 0.9, fs * 0.85);
   return o;

@@ -7,7 +7,7 @@ const INK = '#14191A';
 
 export const OVERHANG = 1.5;           // inches past the cabinet fronts
 export const SPLASH_H = 4;             // inches, the standard stone backsplash
-export const TOP_KINDS = new Set(['base', 'sinkbase', 'drawer', 'island', 'dw', 'blank']);
+export const TOP_KINDS = new Set(['base', 'sinkbase', 'drawer', 'island', 'dw', 'blank', 'vanity']);
 export const MATS: Array<{ id: string; name: string; fill: string; edge: string }> = [
   { id: 'granite', name: 'Granite', fill: '#b7b4ac', edge: '#6f6c64' },
   { id: 'quartz', name: 'Quartz', fill: '#dcd8cd', edge: '#8a867a' },
@@ -110,10 +110,24 @@ export const SINK_NAMES: Record<string, string> = { single: 'Full bowl', '5050':
 /** Undermount sinks are stainless; a farmhouse sink can be stainless or white porcelain. */
 export const sinkMatOf = (it: DItem): string => (sinkOf(it) === 'farm' && it.p?.sinkMat === 'porcelain' ? 'porcelain' : 'steel');
 
+/** Bathroom sink bowls on a vanity's countertop (the sink belongs to the top, not the cabinet). Same sizes as the 3D view. */
+function vanityBowlsSvg(q: DItem, d: Design, S: number): string {
+  const n = q.p?.sinks === 2 ? 2 : 1; const sh = q.p?.bowlShape === 'round' ? 'round' : q.p?.bowlShape === 'rect' ? 'rect' : 'oval';
+  const bw = Math.min(sh === 'round' ? 15 : 19, q.w / n - 4), bd = sh === 'round' ? 15 : sh === 'oval' ? 13.3 : 14; const line = 1.2 / S;
+  const f = frame(q, d.pts); let g = '';
+  for (let i = 0; i < n; i++) {
+    const cx = n === 2 ? (i ? 1 : -1) * q.w / 4 : 0;
+    g += sh === 'rect' ? `<rect x="${cx - bw / 2}" y="${0.5 - bd / 2}" width="${bw}" height="${bd}" rx="2" fill="#f7f7f4" stroke="${INK}" stroke-width="${line}"/>`
+      : `<ellipse cx="${cx}" cy="0.5" rx="${bw / 2}" ry="${bd / 2}" fill="#f7f7f4" stroke="${INK}" stroke-width="${line}"/>`;
+    g += `<circle cx="${cx}" cy="${0.5}" r="1.1" fill="none" stroke="${INK}" stroke-width="${line}"/><circle cx="${cx}" cy="${-q.d / 2 + 2.2}" r="1.1" fill="#fff" stroke="${INK}" stroke-width="${line}"/>`;
+  }
+  return `<g transform="translate(${f.cx} ${f.cy}) rotate(${f.rot})">${g}</g>`;
+}
 /** Sink bowls (and disposal rings) drawn on the tops of sink bases. */
 function sinksSvg(d: Design, S: number): string {
   const o: string[] = []; const line = 1.2 / S;
   for (const q of d.items) {
+    if (q.kind === 'vanity' && hasTop(q) && q.p?.sinks !== 0) { o.push(vanityBowlsSvg(q, d, S)); continue; }
     if (q.kind !== 'sinkbase' || !hasTop(q)) continue; const sk = sinkOf(q); if (sk === 'none') continue;
     const f = frame(q, d.pts); const hw = q.w / 2, hd = q.d / 2; const iw = Math.max(12, q.w - 3);
     const y0 = -hd + 3.5; const bd = sk === 'farm' ? Math.max(12, q.d - 4.5) : Math.min(Math.max(10, q.d - 6), 18);
@@ -186,6 +200,9 @@ export function fixtureLines(d: Design): Array<{ desc: string; qty: number; note
   const sinks: Record<string, number> = {}; let disp = 0;
   for (const q of d.items) if (q.kind === 'sinkbase') { const k = sinkOf(q); if (k !== 'none') { const key = k + '|' + sinkMatOf(q); sinks[key] = (sinks[key] || 0) + 1; } if (q.p?.disposal) disp++; }
   for (const [key, n] of Object.entries(sinks)) { const [k, m] = key.split('|'); out.push({ desc: 'Kitchen sink - ' + (SINK_NAMES[k] || k) + ', ' + (m === 'porcelain' ? 'white porcelain' : k === 'farm' ? 'stainless' : 'stainless undermount'), qty: n, note: '' }); }
+  const vs: Record<string, number> = {};
+  for (const q of d.items) if (q.kind === 'vanity' && hasTop(q) && q.p?.sinks !== 0) { const sh = q.p?.bowlShape === 'round' ? 'round' : q.p?.bowlShape === 'rect' ? 'rectangular' : 'oval'; vs[sh] = (vs[sh] || 0) + (q.p?.sinks === 2 ? 2 : 1); }
+  for (const [sh, n] of Object.entries(vs)) out.push({ desc: 'Bathroom sink - ' + sh + ' undermount', qty: n, note: '' });
   if (disp) out.push({ desc: 'Garbage disposal', qty: disp, note: '' });
   const pf = d.items.filter(q => q.kind === 'potfiller').length; if (pf) out.push({ desc: 'Pot filler', qty: pf, note: '' });
   const ceil = d.ceiling || 96; const soffit = d.items.find(q => q.kind === 'soffit');

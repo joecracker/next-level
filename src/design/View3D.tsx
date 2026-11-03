@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { KINDS, T, benchSide, frame, seg, type DItem, type Design, type Pt } from './model';
-import { counterSlabs, paintOf } from './counter';
+import { counterSlabs, hasTop, paintOf } from './counter';
 import { appHex, cabColor, colorPaint, floorHexOf, shade, wallHexOf } from './finishes';
 import { floorOf, vaultOf } from './finish';
 import { wallHeights } from './walls';
@@ -102,8 +102,8 @@ function parts(it: DItem, d: Design): Part[] {
     case 'range': return [P({ h: 35, color: app }), P({ y0: 35, h: 1, color: COL.dark }), P({ y0: 36, h: 6, dd: 3, lz: -dp / 2 + 1.5, color: app })];
     case 'dw': return [P({ h: 34, color: app })];
     case 'vanity': case 'desk': {
-      const h = it.h || k.h || 34.5; const o: Part[] = [P({ h }), top(h)];
-      if (it.kind === 'vanity') { // undermount bowls, sized like common ones: oval 19x13.3, round 15, rectangular 19x14
+      const h = it.h || k.h || 34.5; const o: Part[] = [P({ h })]; if (it.kind !== 'vanity') o.push(top(h)); // a vanity's top is its countertop (counter.ts)
+      if (it.kind === 'vanity' && hasTop(it)) { // undermount bowls, sized like common ones: oval 19x13.3, round 15, rectangular 19x14
         const sh = p.bowlShape === 'round' ? 'round' : p.bowlShape === 'rect' ? 'rect' : 'oval'; const n = p.sinks === 0 ? 0 : p.sinks === 2 ? 2 : 1;
         const bw = sh === 'round' ? 15 : 19, bd = sh === 'round' ? 15 : sh === 'oval' ? 13.3 : 14;
         for (let i = 0; i < n; i++) o.push(P({ lx: n === 2 ? (i ? 1 : -1) * w / 4 : 0, lz: 0.5, w: Math.min(bw, w / n - 4), dd: bd, y0: h + 1.5, h: 0.15, round: sh !== 'rect', color: '#eef2f3' }));
@@ -230,7 +230,7 @@ function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
   // countertops
   for (const sl of counterSlabs(d)) {
     const shape = new THREE.Shape(sl.poly.map(p => new THREE.Vector2(p.x, -p.y)));
-    const geo = new THREE.ExtrudeGeometry(shape, { depth: 1.5, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, 34.5, 0);
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 1.5, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, d.items.find(q => q.id === sl.id)?.h || 34.5, 0);
     add(geo, mat(paintOf(sl.mat, sl.color).fill));
   }
 

@@ -859,6 +859,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             if (it.kind === 'toilet') return <Chips label="Bowl" value={P.bowl} opts={[['elong', 'Elongated'], ['round', 'Round']]} onPick={v => setP({ bowl: v })} />;
             if (it.kind === 'vanity') return (<Sec title="Sink in the countertop" open>
               <Chips label="Sinks in the top" value={P.sinks ?? 1} opts={[[0, 'None'], [1, 'One'], [2, 'Two']]} onPick={v => setP({ sinks: v })} />
+              {(P.sinks ?? 1) > 0 && !hasTop(it) && <div style={{ fontSize: '13px', color: 'var(--muted)' }}>The sink shows when this cabinet has a countertop on.</div>}
               {(P.sinks ?? 1) > 0 && <Chips label="Sink bowl" value={P.bowlShape || 'oval'} opts={[['oval', 'Oval'], ['round', 'Round'], ['rect', 'Rectangular']]} onPick={v => setP({ bowlShape: v })} />}
             </Sec>);
             if (it.kind === 'soffit') return <div style={{ fontSize: '14px', color: 'var(--muted)' }}>How far it drops is the Drop box above.</div>;

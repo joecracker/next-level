@@ -4,9 +4,21 @@
 //
 // Footprint, in the item's own box (the right-angle corner is at 0,0; the legs run along +x and +y):
 //   (0,0) -> (a,0) -> (a,r) -> (r,a) -> (0,a), where a = length along each wall and r = the side return.
-import { fmtIn, polyArea, type DItem, type Design } from './model';
+import { fmtIn, frame, polyArea, type DItem, type Design, type Pt } from './model';
 import { colorPaint } from './finishes';
 import { counterOf, matOf } from './counter';
+
+/** Is the point inside the corner unit's own triangle? Its drawing starts at the box's top-left corner (see fixtureShape), so the box is shifted to match. */
+export function cornerHit(it: DItem, pts: Pt[], x: number, y: number): boolean {
+  const f = frame(it, pts); const dx = x - f.cx, dy = y - f.cy;
+  const lx = dx * f.ux + dy * f.uy + it.w / 2, ly = dx * f.nx + dy * f.ny + it.d / 2;
+  const poly = cornerPoly(cuOf(it)); let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > ly) !== (yj > ly) && lx < ((xj - xi) * (ly - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
 
 export interface CU { a: number; r: number; h: number; topT: number; shelves: number; lift: number }
 type P2 = [number, number];

@@ -10,14 +10,14 @@ import { SIDE_TYPES, sidesOf } from './showerwalls';
 import { APP_FINISHES, CAB_COLORS, CAB_DEFAULT, FLOOR_COLORS, TOP_COLORS, WALL_COLORS } from './finishes';
 import { TRIM_ITEMS, trimSuggest } from './trim';
 import { LINES, lineGroups } from './linefinishes';
-import { cornerPlace, cuOf, faceLen, rightCorners } from './cornerunit';
+import { cornerHit, cornerPlace, cuOf, faceLen, rightCorners } from './cornerunit';
 import { cleanParts, customOf, deletePiece, driveReady, loadPieces, syncPieces, newPart, partPoly, partsBounds, pieceEntry, savePiece, starterParts, SHAPES as PART_SHAPES, MATS as PART_MATS, matColor as partMatColor, type Part, type PartShape, type Saved as SavedPiece } from './custom';
 import { FLOOR_TILES, floorOf, vaultOf, vaultText } from './finish';
 import { setWallHeight, wallHeights } from './walls';
 import { GLASS, WTYPES } from './model';
 import { windowNotes, windowOf } from './windows';
 import {
-  CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, hitItem, isCab, mkItem, nearestWall, normalize, parseIn, polyPatch, polyWorld, toPolyLocal, seg, snapTo, template,
+  CATS, KINDS, addList, type AddEntry, catLabel, T, clampT, fmtIn, frame, gaps, hasDesign, corners, hitItem, isCab, overlap, mkItem, nearestWall, normalize, parseIn, polyPatch, polyWorld, toPolyLocal, seg, snapTo, template,
   type Cat, type DItem, type Design, type Pt, syncHosted, freeGaps,
 } from './model';
 
@@ -68,7 +68,10 @@ function openSpot(d: Design, kind: string, w: number, dp: number, loose = false)
       const busy = d.items.filter(q => q.wall === i && KINDS[q.kind].layer === layer).map(q => [q.t - q.w / 2, q.t + q.w / 2]);
       const lo = w / 2, hi = L - w / 2; const mid = L / 2;
       const cands: number[] = [mid]; for (let t = lo; t <= hi + 0.01; t += 3) cands.push(t);
-      const free = cands.filter(t => busy.every(([a, b]) => t + w / 2 <= a + 0.01 || t - w / 2 >= b - 0.01));
+      // also keep clear of every free-standing floor item (a corner unit, a vanity), not just wall items
+      const loose = d.items.filter(q => q.wall === null && KINDS[q.kind].layer === layer);
+      const boxAt = (t: number) => { const tmp = { id: '', kind, w, d: dp, wall: i, t, x: 0, y: 0, rot: 0 } as unknown as DItem; return corners(tmp, frame(tmp, d.pts)); };
+      const free = cands.filter(t => busy.every(([a, b]) => t + w / 2 <= a + 0.01 || t - w / 2 >= b - 0.01) && !loose.some(q => overlap(boxAt(t), corners(q, frame(q, d.pts)))));
       if (free.length) { free.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid)); return { wall: i, t: Math.round(Math.max(lo, Math.min(hi, free[0])) * 4) / 4 }; }
     }
     const L0 = seg(d.pts, 0).L; return { wall: 0, t: Math.max(w / 2, Math.min(L0 - w / 2, L0 / 2)) };
@@ -366,6 +369,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const [design, setDesignState] = useState<Design | null>(() => { const d = NL?.getDesign(); return hasDesign(d) ? (d as Design) : null; });
   const designRef = useRef(design); designRef.current = design;
   const [sel, setSel] = useState<Sel>(null);
+  const tapRef = useRef<{ x: number; y: number; t: number; id: string } | null>(null);
   const [show3d, setShow3d] = useState(false);
   const [pEdge, setPEdge] = useState(0); // which side of a drawn shower floor is being set
   const [vtx, setVtx] = useState<number | null>(null); // the selected corner of a drawn shower floor
@@ -454,7 +458,15 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
     const d = designRef.current!; const v = viewRef.current!; const px = 1 / v.s;
     for (let i = 0; i < d.pts.length; i++) if (Math.hypot(P.x - d.pts[i].x, P.y - d.pts[i].y) < 14 * px) return { type: 'corner', i };
     const lo = (q: DItem) => (q.p?.host ? 2.5 : LAYER_ORDER.indexOf(KINDS[q.kind].layer)); const items = d.items.slice().sort((a, b) => lo(b) - lo(a));
-    for (const it of items) if (hitItem(it, d.pts, P.x, P.y, 6 * px)) return { type: 'item', id: it.id };
+    const hits = items.filter(q => q.kind === 'cornerunit' ? cornerHit(q, d.pts, P.x, P.y) : hitItem(q, d.pts, P.x, P.y, 6 * px));
+    if (hits.length) {
+      // a second tap on the same spot moves to the item underneath
+      const prev = tapRef.current; const near = !!prev && Math.hypot(P.x - prev.x, P.y - prev.y) < 14 * px && Date.now() - prev.t < 800;
+      const k = near ? hits.findIndex(q => q.id === prev!.id) : -1;
+      const pick = hits[(k + 1) % hits.length];
+      tapRef.current = { x: P.x, y: P.y, t: Date.now(), id: pick.id };
+      return { type: 'item', id: pick.id };
+    }
     let best: { i: number; dist: number } | null = null;
     for (let i = 0; i < d.pts.length; i++) {
       const s = seg(d.pts, i); const dx = P.x - s.ax, dy = P.y - s.ay;

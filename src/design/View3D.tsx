@@ -154,12 +154,12 @@ function bodyParts(it: DItem, d: Design): Part[] {
 }
 
 /** A cabinet's body, then its fronts. */
-/** Under a base-type cabinet the carcass is cut back at the floor: the toe kick is a recessed dark band, KICK_SET further back than the front. */
+/** Under a base-type cabinet the carcass is cut back at the floor: the toe kick is a recessed band, KICK_SET further back than the front, only a little darker than the cabinet. */
 function kickParts(body: Part[], kick: number): Part[] {
   const out: Part[] = [];
   for (const p of body) {
     if (p.y0 > 0.01 || p.dd <= KICK_SET + 1 || p.h <= 0) { out.push(p); continue; }
-    out.push({ ...p, h: kick, dd: p.dd - KICK_SET, lz: p.lz - KICK_SET / 2, color: '#2e2e2e' });
+    out.push({ ...p, h: kick, dd: p.dd - KICK_SET, lz: p.lz - KICK_SET / 2, color: shade(p.color, 0.88) });
     if (p.h > kick) out.push({ ...p, y0: kick, h: p.h - kick });
   }
   return out;

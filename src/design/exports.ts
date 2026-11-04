@@ -3,7 +3,7 @@
 // the studio, from Capture's Save-to-Drive, or anywhere else with the studio closed.
 import { KINDS, T, corners, fmtIn, frame, isCab, seg, type DItem, type Design } from './model';
 import { fixtureShape } from './shapes';
-import { FRONT_KINDS, frontHeight, frontOpenings } from './fronts';
+import { FRONT_KINDS, KICK_SET, frontHeight, frontOpenings, kickOf } from './fronts';
 import { countertopSvg, counterByMat, fixtureLines } from './counter';
 import { ceilingSvg, finishLines, floorTileSvg, vaultOf } from './finish';
 import { windowSymbol } from './windowsym';
@@ -42,6 +42,8 @@ export function itemShape(it: DItem, S: number, sel: boolean, fs: number): strin
     // a cabinet's front (the doors) is the room side: one bold line along that edge, so a turned cabinet shows which way it faces
     if (k.cab && k.layer !== 'ceiling' && it.w > 3 && FRONT_KINDS.has(it.kind)) body += frontPlan(it, S, hd);
     else if (k.cab && k.layer !== 'ceiling' && it.w > 3) body += `<line x1="${-hw + 1}" y1="${hd - 1.8 / S}" x2="${hw - 1}" y2="${hd - 1.8 / S}" stroke="${INK}" stroke-width="${3.4 / S}" stroke-linecap="round"/>`;
+    // the toe kick line: set back from the front edge, dashed
+    if (kickOf(it) > 0 && it.w > 6) body += `<line x1="${-hw + 1}" y1="${hd - KICK_SET}" x2="${hw - 1}" y2="${hd - KICK_SET}" stroke="${INK}" stroke-width="${0.8 / S}" stroke-dasharray="${4 / S} ${3 / S}"/>`;
     const label = it.kind === 'filler' && !it.label ? '' : isCab(it.kind) && it.code ? it.code : it.label || (k.layer === 'hung' && it.w < 8 ? '' : k.name);
     // keep text readable: skip names that cannot fit
     const fits = it.w * S > (label.length * 6.2 + 4) || it.d * S > (label.length * 6.2 + 4);

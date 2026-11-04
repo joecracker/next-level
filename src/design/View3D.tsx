@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { KINDS, T, benchSide, frame, seg, type DItem, type Design, type Pt } from './model';
-import { FRONT_KINDS, FRONT_T, SHAKER_RAIL, frontHeight, frontOpenings } from './fronts';
+import { FRONT_KINDS, FRONT_T, KICK_SET, SHAKER_RAIL, frontHeight, frontOpenings, kickOf } from './fronts';
 import { counterSlabs, hasTop, paintOf } from './counter';
 import { appHex, cabColor, colorPaint, floorHexOf, shade, wallHexOf } from './finishes';
 import { floorOf, vaultOf } from './finish';
@@ -154,8 +154,20 @@ function bodyParts(it: DItem, d: Design): Part[] {
 }
 
 /** A cabinet's body, then its fronts. */
+/** Under a base-type cabinet the carcass is cut back at the floor: the toe kick is a recessed dark band, KICK_SET further back than the front. */
+function kickParts(body: Part[], kick: number): Part[] {
+  const out: Part[] = [];
+  for (const p of body) {
+    if (p.y0 > 0.01 || p.dd <= KICK_SET + 1 || p.h <= 0) { out.push(p); continue; }
+    out.push({ ...p, h: kick, dd: p.dd - KICK_SET, lz: p.lz - KICK_SET / 2, color: '#2e2e2e' });
+    if (p.h > kick) out.push({ ...p, y0: kick, h: p.h - kick });
+  }
+  return out;
+}
+
 function parts(it: DItem, d: Design): Part[] {
-  const body = bodyParts(it, d);
+  const kick = kickOf(it);
+  const body = kick ? kickParts(bodyParts(it, d), kick) : bodyParts(it, d);
   if (!FRONT_KINDS.has(it.kind)) return body;
   return [...body, ...frontParts(it, d)];
 }
@@ -171,7 +183,7 @@ function frontParts(it: DItem, d: Design): Part[] {
   const cab = cabColor(d, it); const panel = lighten(cab, 0.14);
   const y0 = it.kind === 'upper' ? 54 : 0; const dp = it.d; const z0 = dp / 2 + FRONT_T / 2; // front face sits on the carcass
   const out: Part[] = [];
-  for (const o of frontOpenings(it.kind, it.w, frontHeight(it), it.p?.family)) {
+  for (const o of frontOpenings(it.kind, it.w, frontHeight(it), it.p?.family, kickOf(it))) {
     const ow = o.x1 - o.x0, oh = o.y1 - o.y0, cx = (o.x0 + o.x1) / 2, base = y0 + o.y0;
     const bar = (lx: number, w: number, yy: number, h: number): Part => ({ lx, lz: z0, w, dd: FRONT_T, y0: yy, h, color: cab });
     if (o.kind === 'drawer') { out.push(bar(cx, ow, base, oh)); continue; }

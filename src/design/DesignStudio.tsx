@@ -11,6 +11,7 @@ import { APP_FINISHES, CAB_COLORS, CAB_DEFAULT, FLOOR_COLORS, TOP_COLORS, WALL_C
 import { TRIM_ITEMS, trimSuggest } from './trim';
 import { LINES, lineGroups } from './linefinishes';
 import { cornerHit, cornerPlace, cuOf, faceLen, rightCorners } from './cornerunit';
+import { KICK_KINDS, kickOf } from './fronts';
 import { cleanParts, customOf, deletePiece, driveReady, loadPieces, syncPieces, newPart, partPoly, partsBounds, pieceEntry, savePiece, starterParts, SHAPES as PART_SHAPES, MATS as PART_MATS, matColor as partMatColor, type Part, type PartShape, type Saved as SavedPiece } from './custom';
 import { FLOOR_TILES, floorOf, vaultOf, vaultText } from './finish';
 import { setWallHeight, wallHeights } from './walls';
@@ -739,6 +740,10 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
                 <button style={btn} onClick={() => nudgeBy(it, -1, 'y')}>▲</button><button style={btn} onClick={() => nudgeBy(it, 1, 'y')}>▼</button></>)}
             </div>
           </Sec>
+          {KICK_KINDS.has(it.kind) && (<div>
+            <div style={lbl}>Toe kick</div>
+            <button style={btn} onClick={() => upd(it.id, { p: { ...(it.p || {}), kick: it.p?.kick === false } })}>{kickOf(it) ? 'On: 4 1/2" high, 3" back. Tap to turn off' : 'Off. Tap to turn on'}</button>
+          </div>)}
           {it.wall === null && !hostIt && (<div>
             <div style={lbl}>Angle (any direction)</div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>

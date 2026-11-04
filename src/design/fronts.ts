@@ -3,7 +3,7 @@
 import { KINDS } from './model';
 
 /** Gap between fronts, and the reveal left at each side edge, is half of this (inches). 1/4 in: change here to move every cabinet. */
-export const FRONT_GAP = 0.25;
+export const FRONT_GAP = 0.5;
 /** Thickness of a front (inches). */
 export const FRONT_T = 0.75;
 /** Width of a shaker door's frame (rails and stiles), inches. */

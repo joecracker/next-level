@@ -213,9 +213,38 @@ function tileTexture(tile: string, dir: 'v' | 'h', base: string, lineColor: stri
   tex.repeat.set(1 / cell, 1 / cell); return { tex, cw: cell, ch: cell };
 }
 
+/** A counter surface with a believable grain: speckled granite, fine quartz, wood for butcher block. A seeded random keeps it the same every time. */
+const stoneCache = new Map<string, THREE.MeshStandardMaterial>();
+function stoneMat(id: string, fill: string): THREE.MeshStandardMaterial {
+  const key = id + fill; const hit = stoneCache.get(key); if (hit && mats.includes(hit)) return hit;
+  const N = 512; const SPAN = 36; // the picture covers 36 inches
+  const c = document.createElement('canvas'); c.width = N; c.height = N; const g = c.getContext('2d');
+  let rough = 0.5;
+  const m = new THREE.MeshStandardMaterial({ color: fill, roughness: rough, metalness: 0.04, side: THREE.DoubleSide });
+  if (g) {
+    let s = 1234567; const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, N, N);
+    const dot = (x: number, y: number, r: number, col: string) => { g.fillStyle = col; for (const ox of [-N, 0, N]) for (const oy of [-N, 0, N]) { if (x + ox < -r || x + ox > N + r || y + oy < -r || y + oy > N + r) continue; g.beginPath(); g.arc(x + ox, y + oy, r, 0, 6.2832); g.fill(); } };
+    if (id === 'granite') {
+      rough = 0.32; for (let i = 0; i < 5200; i++) dot(rnd() * N, rnd() * N, 0.6 + rnd() * 1.8, rnd() < 0.55 ? 'rgba(40,36,32,' + (0.10 + rnd() * 0.22) + ')' : 'rgba(255,255,255,' + (0.25 + rnd() * 0.4) + ')');
+    } else if (id === 'quartz') {
+      rough = 0.26; for (let i = 0; i < 2600; i++) dot(rnd() * N, rnd() * N, 0.5 + rnd() * 1.1, rnd() < 0.5 ? 'rgba(90,86,78,' + (0.06 + rnd() * 0.10) + ')' : 'rgba(255,255,255,' + (0.3 + rnd() * 0.4) + ')');
+      g.lineWidth = 1.2; for (let i = 0; i < 5; i++) { g.strokeStyle = 'rgba(110,106,98,' + (0.07 + rnd() * 0.07) + ')'; g.beginPath(); let x = rnd() * N, y = rnd() * N; g.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (rnd() - 0.3) * 90; y += (rnd() - 0.5) * 70; g.lineTo(x, y); } g.stroke(); }
+    } else if (id === 'butcher') {
+      rough = 0.6; for (let i = 0; i < 260; i++) { const y = rnd() * N; g.strokeStyle = 'rgba(' + (rnd() < 0.5 ? '90,56,20' : '255,235,200') + ',' + (0.07 + rnd() * 0.13) + ')'; g.lineWidth = 0.6 + rnd() * 2.2; g.beginPath(); g.moveTo(0, y); g.lineTo(N, y + (rnd() - 0.5) * 8); g.stroke(); }
+      g.strokeStyle = 'rgba(70,44,16,0.28)'; g.lineWidth = 1.5; for (let x = 0; x < N; x += N / 3) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, N); g.stroke(); }
+    } else if (id === 'laminate') {
+      rough = 0.5; for (let i = 0; i < 1400; i++) dot(rnd() * N, rnd() * N, 0.6 + rnd() * 1.2, rnd() < 0.5 ? 'rgba(70,60,40,' + (0.05 + rnd() * 0.08) + ')' : 'rgba(255,255,255,' + (0.12 + rnd() * 0.2) + ')');
+    } else { rough = 0.35; }
+    const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; tex.repeat.set(1 / SPAN, 1 / SPAN);
+    m.map = tex; m.roughness = rough;
+  }
+  mats.push(m); stoneCache.set(key, m); return m;
+}
+
 function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
   const g = new THREE.Group(); const pts = d.pts; const base = d.ceiling || 96;
-  const add = (geo: THREE.BufferGeometry, m: THREE.Material, M?: THREE.Matrix4) => { const mesh = new THREE.Mesh(geo, m); if (M) { mesh.matrixAutoUpdate = false; mesh.matrix.copy(M); } g.add(mesh); return mesh; };
+  const add = (geo: THREE.BufferGeometry, m: THREE.Material, M?: THREE.Matrix4) => { const mesh = new THREE.Mesh(geo, m); if (M) { mesh.matrixAutoUpdate = false; mesh.matrix.copy(M); } if (!m.transparent && !m.userData.noShadow) { mesh.castShadow = true; mesh.receiveShadow = true; } g.add(mesh); return mesh; };
   const boxAt = (M: THREE.Matrix4, p: Part) => {
     const T0 = new THREE.Matrix4().makeTranslation(p.lx, p.y0 + p.h / 2, p.lz);
     if (p.round) { add(new THREE.CylinderGeometry(0.5, 0.5, 1, 28), mat(p.color, p.opacity ?? 1), M.clone().multiply(T0).multiply(new THREE.Matrix4().makeScale(p.w, p.h, p.dd))); return; }
@@ -277,7 +306,7 @@ function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
   for (const sl of counterSlabs(d)) {
     const shape = new THREE.Shape(sl.poly.map(p => new THREE.Vector2(p.x, -p.y)));
     const geo = new THREE.ExtrudeGeometry(shape, { depth: 1.5, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, (() => { const q = d.items.find(i => i.id === sl.id); return (q?.p?.bottom || 0) + (q?.h || 34.5); })(), 0);
-    add(geo, mat(paintOf(sl.mat, sl.color).fill));
+    add(geo, stoneMat(sl.mat, paintOf(sl.mat, sl.color).fill));
   }
 
   // soffits: a flat underside at (ceiling - drop); in a vaulted room it reaches up into the slope
@@ -290,7 +319,7 @@ function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
 
   // ceiling (hidden by default so you can look in from above)
   if (showCeiling && n >= 3) {
-    const v = vaultOf(d); const cm = mat('#fbfaf6'); const b = bounds(pts);
+    const v = vaultOf(d); const cm = mat('#fbfaf6'); cm.userData.noShadow = true; const b = bounds(pts);
     const h = (x: number, z: number) => ceilAt(d, x, z);
     if (v.shape === 'peak') {
       const horiz = v.ridge === 'lr'; const at = horiz ? b.cy : b.cx;
@@ -420,9 +449,9 @@ export default function View3D({ design, onClose }: { design: Design; onClose: (
     const el = host.current; if (!el) return;
     let renderer: THREE.WebGLRenderer;
     try { renderer = new THREE.WebGLRenderer({ antialias: true }); } catch { setErr('This device could not start the 3D view.'); return; }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); el.appendChild(renderer.domElement); renderer.domElement.style.display = 'block';
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; el.appendChild(renderer.domElement); renderer.domElement.style.display = 'block';
     const scene = new THREE.Scene(); scene.background = new THREE.Color('#e6e9e4');
-    scene.add(new THREE.HemisphereLight('#ffffff', '#b8b4a8', 1.7)); const sun = new THREE.DirectionalLight('#ffffff', 1.5); sun.position.set(200, 400, 150); scene.add(sun);
+    scene.add(new THREE.HemisphereLight('#ffffff', '#b8b4a8', 1.35)); const sun = new THREE.DirectionalLight('#ffffff', 1.9); sun.position.set(200, 400, 150); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -450; sc.right = 450; sc.top = 450; sc.bottom = -450; sc.near = 50; sc.far = 1500; sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.5; sun.shadow.radius = 3; scene.add(sun); scene.add(sun.target);
     const camera = new THREE.PerspectiveCamera(50, 1, 2, 6000);
     const controls = new OrbitControls(camera, renderer.domElement); controls.maxPolarAngle = Math.PI * 0.495; controls.minDistance = 12; controls.maxDistance = 2500;
     const render = () => {
@@ -450,7 +479,7 @@ export default function View3D({ design, onClose }: { design: Design; onClose: (
   useEffect(() => { // rebuild the room when the drawing or the ceiling switch changes
     const t = three.current; if (!t) return;
     if (t.room) { t.scene.remove(t.room); t.room.traverse(o => { const m = o as THREE.Mesh; if (m.geometry) m.geometry.dispose(); }); mats.splice(0).forEach(m => { const mm = m as THREE.MeshStandardMaterial; if (mm.map) mm.map.dispose(); m.dispose(); }); }
-    try { t.room = buildRoom(design, ceiling); t.scene.add(t.room); } catch (e) { setErr('Could not build the 3D room: ' + (e instanceof Error ? e.message : String(e))); return; }
+    try { t.room = buildRoom(design, ceiling); t.scene.add(t.room); const sn = t.scene.children.find(o => (o as THREE.DirectionalLight).isDirectionalLight) as THREE.DirectionalLight | undefined; if (sn && design.pts.length) { const cx = design.pts.reduce((a, p) => a + p.x, 0) / design.pts.length, cz = design.pts.reduce((a, p) => a + p.y, 0) / design.pts.length; sn.position.set(cx + 200, 400, cz + 150); sn.target.position.set(cx, 0, cz); sn.target.updateMatrixWorld(); } } catch (e) { setErr('Could not build the 3D room: ' + (e instanceof Error ? e.message : String(e))); return; }
     if (first.current) { first.current = false; look('corner'); } else t.render();
   }, [design, ceiling]); // eslint-disable-line react-hooks/exhaustive-deps
 

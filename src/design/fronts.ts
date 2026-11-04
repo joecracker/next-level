@@ -15,8 +15,12 @@ export const FRONT_KINDS = new Set(['base', 'sinkbase', 'drawer', 'upper', 'pant
 export interface Opening { kind: 'door' | 'drawer'; x0: number; x1: number; y0: number; y1: number }
 
 /** Doors and drawers for a cabinet. Drawer-only cabinets are all drawers; uppers and tall cabinets are all doors. */
-export function frontSpec(kind: string, w: number): { doors: number; drawers: number } {
+export function frontSpec(kind: string, w: number, family?: string): { doors: number; drawers: number } {
   const oneOrTwo = w <= 18 ? 1 : 2;
+  // a catalog drawer base is all drawers: "Two Drawer Base" = 2 drawers, no doors
+  const words: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+  const dm = family ? /\b(one|two|three|four|five)\s+drawer\s+base/i.exec(family) : null;
+  if (dm && (kind === 'base' || kind === 'drawer')) return { doors: 0, drawers: words[dm[1].toLowerCase()] };
   switch (kind) {
     case 'base': return { doors: oneOrTwo, drawers: 1 };
     case 'sinkbase': return { doors: 2, drawers: 1 };
@@ -34,9 +38,9 @@ export function frontHeight(it: { kind: string; h?: number }): number {
 }
 
 /** Each front's place on the cabinet, centred on the item (x from -w/2 to w/2), y from the item's bottom. */
-export function frontOpenings(kind: string, w: number, h: number): Opening[] {
+export function frontOpenings(kind: string, w: number, h: number, family?: string): Opening[] {
   if (w < 6 || h < 6) return [];
-  const { doors, drawers } = frontSpec(kind, w);
+  const { doors, drawers } = frontSpec(kind, w, family);
   const edge = FRONT_GAP / 2;
   const out: Opening[] = [];
   const top = h - edge;

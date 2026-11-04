@@ -171,7 +171,7 @@ function frontParts(it: DItem, d: Design): Part[] {
   const cab = cabColor(d, it); const panel = lighten(cab, 0.14);
   const y0 = it.kind === 'upper' ? 54 : 0; const dp = it.d; const z0 = dp / 2 + FRONT_T / 2; // front face sits on the carcass
   const out: Part[] = [];
-  for (const o of frontOpenings(it.kind, it.w, frontHeight(it))) {
+  for (const o of frontOpenings(it.kind, it.w, frontHeight(it), it.p?.family)) {
     const ow = o.x1 - o.x0, oh = o.y1 - o.y0, cx = (o.x0 + o.x1) / 2, base = y0 + o.y0;
     const bar = (lx: number, w: number, yy: number, h: number): Part => ({ lx, lz: z0, w, dd: FRONT_T, y0: yy, h, color: cab });
     if (o.kind === 'drawer') { out.push(bar(cx, ow, base, oh)); continue; }

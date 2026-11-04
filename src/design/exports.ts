@@ -54,7 +54,7 @@ export function itemShape(it: DItem, S: number, sel: boolean, fs: number): strin
 /** Plan of the fronts: one outline per door or drawer front along the room-side edge, so the gaps between them show. */
 function frontPlan(it: DItem, S: number, hd: number): string {
   const seen = new Set<string>(); let s = '';
-  for (const o of frontOpenings(it.kind, it.w, frontHeight(it))) {
+  for (const o of frontOpenings(it.kind, it.w, frontHeight(it), it.p?.family)) {
     const key = o.x0.toFixed(2) + ':' + o.x1.toFixed(2); if (seen.has(key)) continue; seen.add(key);
     s += `<rect x="${o.x0}" y="${hd - 1.6}" width="${o.x1 - o.x0}" height="1.2" fill="none" stroke="${INK}" stroke-width="${1.2 / S}"/>`;
   }

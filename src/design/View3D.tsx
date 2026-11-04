@@ -169,7 +169,9 @@ function parts(it: DItem, d: Design): Part[] {
   const kick = kickOf(it);
   const body = kick ? kickParts(bodyParts(it, d), kick) : bodyParts(it, d);
   if (!FRONT_KINDS.has(it.kind)) return body;
-  return [...body, ...frontParts(it, d)];
+  // the carcass sits a little darker than the fronts, so the thin gaps between doors and drawers read as lines
+  const cc = cabColor(d, it); const dim = body.map(p => (p.color === cc ? { ...p, color: shade(cc, 0.8) } : p));
+  return [...dim, ...frontParts(it, d)];
 }
 
 function lighten(hex: string, amt: number): string {

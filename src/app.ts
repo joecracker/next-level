@@ -6,6 +6,7 @@ import {
 import { openPhotoBooth } from './lib/photoBooth';
 import { hasDesign } from './design/model';
 import { designPng, takeoffCsv, takeoffCsvAll } from './design/exports';
+import { installerPng } from './design/installer';
 
 declare global {
   interface Window {
@@ -306,6 +307,8 @@ export function initNextLevel() {
       const safe = pg.name.replace(/[\\/:*?"<>|]+/g, '').trim() || 'Page';
       const png = await designPng(pg.design, [p.customer, p.name, pg.name].filter(Boolean).join(' - ')).catch(() => null);
       if (png) out.push({ name: `${safe} - Plan.png`, mime: 'image/png', data: png });
+      const inst = await installerPng(pg.design, [p.customer, p.name, pg.name].filter(Boolean).join(' - ')).catch(() => null);
+      if (inst) out.push({ name: `${safe} - Installer sheet.png`, mime: 'image/png', data: inst });
       const csv = takeoffCsv(pg.design, p);
       if (csv) out.push({ name: `${safe} - Takeoff.csv`, mime: 'text/csv', data: csv });
     }
@@ -585,6 +588,9 @@ export function initNextLevel() {
     deletePage(id: string): void { const p = getProject(); if (!p) return; p.pages = pagesOf(p).filter(x => x.id !== id); if (p.curPage === id) p.curPage = p.pages[0]?.id; save(); },
     async designPicture(): Promise<Blob | null> {
       const p = getProject(); const pg = p && curPageOf(p); return p && pg && hasDesign(pg.design) ? designPng(pg.design, [p.customer, p.name, pg.name].filter(Boolean).join(' - ')) : null;
+    },
+    async designInstaller(): Promise<Blob | null> {
+      const p = getProject(); const pg = p && curPageOf(p); return p && pg && hasDesign(pg.design) ? installerPng(pg.design, [p.customer, p.name, pg.name].filter(Boolean).join(' - ')) : null;
     },
     designTakeoff(all?: boolean): { csv: string; filename: string } | null {
       const p = getProject(); if (!p) return null;

@@ -38,6 +38,7 @@ declare global {
       renamePage: (id: string, name: string) => void;
       deletePage: (id: string) => void;
       designPicture: () => Promise<Blob | null>;
+      designInstaller: () => Promise<Blob | null>;
       designTakeoff: (all?: boolean) => { csv: string; filename: string } | null;
       pickJobFile: () => void;
   buildJobFile: (withPhotos?: boolean) => Promise<File | null>;

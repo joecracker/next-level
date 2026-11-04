@@ -640,6 +640,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
   const base = [slug(jobName || 'Job') || 'Job', slug(curPageName)].filter(Boolean).join('-');
   const savePicture = async () => { setSaveOpen(false); const b = await NL?.designPicture(); if (!b) { say('Draw something first'); return; } await deliver(new File([b], `${base}-Design-Plan.png`, { type: 'image/png' })); };
   const saveTakeoff = async () => { setSaveOpen(false); const t = NL?.designTakeoff(); if (!t) { say('No cabinets in the drawing yet'); return; } await deliver(new File([t.csv], `${base}-Cabinet-Takeoff.csv`, { type: 'text/csv' })); };
+  const saveInstaller = async () => { setSaveOpen(false); const b = await NL?.designInstaller(); if (!b) { say('No cabinets in the drawing yet'); return; } await deliver(new File([b], `${base}-Installer-Sheet.png`, { type: 'image/png' })); };
   const saveTakeoffAll = async () => { setSaveOpen(false); const t = NL?.designTakeoff(true); if (!t) { say('No cabinets in any page yet'); return; } await deliver(new File([t.csv], `${slug(jobName || 'Job') || 'Job'}-All-Pages-Takeoff.csv`, { type: 'text/csv' })); };
   const saveDrive = async () => {
     setSaveOpen(false); const st = NL?.driveState(); if (!st?.configured) { say('Google Drive is not set up in this copy of the app'); return; }
@@ -999,6 +1000,7 @@ export default function DesignStudio({ jobName, onHome, onCapture }: { jobName: 
             {saveOpen && (
               <div style={{ position: 'absolute', right: 0, top: '50px', zIndex: 50, background: '#1d2425', border: '1px solid rgba(238,241,238,0.25)', borderRadius: '12px', padding: '6px', minWidth: '230px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <button style={{ ...btn, textAlign: 'left' }} onClick={savePicture}>Plan picture (PNG)</button>
+                <button style={{ ...btn, textAlign: 'left', opacity: rows.length ? 1 : 0.5 }} onClick={saveInstaller}>Installer sheet (PNG)</button>
                 <button style={{ ...btn, textAlign: 'left', opacity: rows.length ? 1 : 0.5 }} onClick={saveTakeoff}>Cabinet takeoff (CSV)</button>
                 {pagesInfo.pages.length > 1 && <button style={{ ...btn, textAlign: 'left' }} onClick={saveTakeoffAll}>Cabinet takeoff, all pages (CSV)</button>}
                 <button style={{ ...btn, textAlign: 'left' }} onClick={saveDrive}>Save to the job folder in Drive</button>

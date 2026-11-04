@@ -283,6 +283,14 @@ function buildRoom(d: Design, showCeiling: boolean): THREE.Group {
     const wm = mat(wallHexOf(d) || COL.wall); wm.transparent = true; const wmesh = add(new THREE.ExtrudeGeometry(sh, { depth: T, bevelEnabled: false }), wm, M);
     const entry = { m: wm, mesh: wmesh, x: [] as THREE.Mesh[], mx: s.ax + s.ux * s.L / 2 - s.nx * T / 2, mz: s.ay + s.uy * s.L / 2 - s.ny * T / 2, ox: -s.nx, oz: -s.ny };
     walls.push(entry);
+    for (const q of d.items) if (q.kind === 'door' && q.wall === i && q.p?.type !== 'opening') { // the door itself, closed in its opening
+      const a = Math.max(0.5, q.t - q.w / 2), b = Math.min(s.L - 0.5, q.t + q.w / 2); if (b - a <= 4) continue;
+      const dh = Math.min(80, minTop(a, b) - 1); const type = q.p?.type || 'swing'; const cx = (a + b) / 2; const zc = T / 2;
+      const leaf = (x0: number, x1: number) => entry.x.push(add(new THREE.BoxGeometry(x1 - x0, dh - 0.5, 1.75), mat('#efe9dc'), M.clone().multiply(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (dh - 0.5) / 2 + 0.25, zc))));
+      const knob = (x: number) => entry.x.push(add(new THREE.BoxGeometry(2, 2, 3.6), mat('#b9b4a8'), M.clone().multiply(new THREE.Matrix4().makeTranslation(x, 36, zc))));
+      if (type === 'double' || type === 'bifold') { leaf(a, cx - 0.1); leaf(cx + 0.1, b); if (type === 'double') { knob(cx - 3); knob(cx + 3); } }
+      else { leaf(a, b); if (type === 'swing') knob(q.hinge === 'right' ? a + 3 : b - 3); }
+    }
     for (const q of d.items) if (q.kind === 'window' && q.wall === i) { // glass in each window
       const o = windowOf(d, q); const y0 = Math.max(0.5, o.sill), y1 = Math.min(o.sill + o.h, minTop(q.t - q.w / 2, q.t + q.w / 2) - 0.5); if (y1 - y0 < 2) continue;
       const frosted = o.glass === 'obscure' || o.type === 'block';
@@ -451,7 +459,7 @@ export default function View3D({ design, onClose }: { design: Design; onClose: (
     try { renderer = new THREE.WebGLRenderer({ antialias: true }); } catch { setErr('This device could not start the 3D view.'); return; }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; el.appendChild(renderer.domElement); renderer.domElement.style.display = 'block';
     const scene = new THREE.Scene(); scene.background = new THREE.Color('#e6e9e4');
-    scene.add(new THREE.HemisphereLight('#ffffff', '#b8b4a8', 1.35)); const sun = new THREE.DirectionalLight('#ffffff', 1.9); sun.position.set(200, 400, 150); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -450; sc.right = 450; sc.top = 450; sc.bottom = -450; sc.near = 50; sc.far = 1500; sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.5; sun.shadow.radius = 3; scene.add(sun); scene.add(sun.target);
+    scene.add(new THREE.HemisphereLight('#ffffff', '#b8b4a8', 1.6)); const sun = new THREE.DirectionalLight('#ffffff', 1.55); sun.position.set(200, 400, 150); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -450; sc.right = 450; sc.top = 450; sc.bottom = -450; sc.near = 50; sc.far = 1500; sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.5; sun.shadow.radius = 3; scene.add(sun); scene.add(sun.target);
     const camera = new THREE.PerspectiveCamera(50, 1, 2, 6000);
     const controls = new OrbitControls(camera, renderer.domElement); controls.maxPolarAngle = Math.PI * 0.495; controls.minDistance = 12; controls.maxDistance = 2500;
     const render = () => {

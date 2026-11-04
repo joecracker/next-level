@@ -224,7 +224,10 @@ export function syncHosted(d: Design): Design {
 export function freeGaps(it: DItem, d: Design): { l: number; r: number; t: number; b: number } {
   const c = corners(it, frame(it, d.pts)); const xs = c.map(q => q[0]), ys = c.map(q => q[1]);
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys); const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
-  const segs: number[][] = d.pts.map((a, i) => { const b = d.pts[(i + 1) % d.pts.length]; return [a.x, a.y, b.x, b.y]; });
+  const outline: number[][] = d.pts.map((a, i) => { const b = d.pts[(i + 1) % d.pts.length]; return [a.x, a.y, b.x, b.y]; });
+  // inside walls and knee walls stop a gap too: both long faces of each one
+  const inner: number[][] = d.items.filter(h => h.id !== it.id && (h.kind === 'partition' || h.kind === 'kneewall')).flatMap(h => { const c = corners(h, frame(h, d.pts)); return [[c[0][0], c[0][1], c[1][0], c[1][1]], [c[3][0], c[3][1], c[2][0], c[2][1]]]; });
+  const segs: number[][] = [...outline, ...inner];
   const e = 0.05; const g = (v: number) => (isFinite(v) ? Math.max(0, v - e) : NaN);
   return { l: g(ray(x0 + e, my, -1, 0, segs)), r: g(ray(x1 - e, my, 1, 0, segs)), t: g(ray(mx, y0 + e, 0, -1, segs)), b: g(ray(mx, y1 - e, 0, 1, segs)) };
 }export function orient(pts: Pt[]): Pt[] { // clockwise on screen
